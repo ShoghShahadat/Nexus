@@ -1,0 +1,21 @@
+name: nexus
+description: A new standard for Flutter architecture. A highly scalable, clean, and data-oriented framework inspired by ECS and powered by BLoC and GetIt.
+version: 1.0.0-dev.1
+homepage: https://github.com/your_username/nexus # Later, we will create a repository
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  bloc: ^8.1.4 # For state management components
+  get_it: ^7.7.0 # For service location and dependency injection
+  meta: ^1.11.0 # For annotations
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^3.0.0
+
