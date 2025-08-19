@@ -12,8 +12,7 @@ NexusWorld setupWorld() {
   world.addSystem(AnimationSystem());
   world.addSystem(PulsingWarningSystem());
   world.addSystem(MorphingSystem());
-  // InputSystem is no longer needed for this UI.
-  // world.addSystem(InputSystem());
+  // The central InputSystem is no longer needed.
 
   // --- Shared State / Services ---
   final counterCubit = CounterCubit();
@@ -52,7 +51,7 @@ class MyApp extends StatelessWidget {
           title: const Text('Nexus Counter Example',
               style: TextStyle(color: Colors.white)),
         ),
-        // The global GestureDetector is no longer needed.
+        // The root Listener is removed. Input is now handled by individual widgets.
         body: NexusWidget(
           world: world,
           child: renderingSystem.build(context),

@@ -13,12 +13,12 @@ export 'src/core/nexus_world.dart';
 export 'src/core/system.dart';
 
 // --- Events ---
-export 'src/events/shape_events.dart'; // Exporting the new event class
+export 'src/events/shape_events.dart';
 
 // --- Components ---
 export 'src/components/animation_component.dart';
 export 'src/components/bloc_component.dart';
-export 'src/components/clickable_component.dart';
+export 'src/components/clickable_component.dart'; // Re-introduced
 export 'src/components/counter_state_component.dart';
 export 'src/components/lifecycle_component.dart';
 export 'src/components/morphing_component.dart';
@@ -32,7 +32,7 @@ export 'src/components/widget_component.dart';
 export 'src/systems/animation_system.dart';
 export 'src/systems/bloc_system.dart';
 export 'src/systems/flutter_rendering_system.dart';
-export 'src/systems/input_system.dart';
+// InputSystem is removed
 export 'src/systems/lifecycle_system.dart';
 export 'src/systems/morphing_system.dart';
 export 'src/systems/physics_system.dart';

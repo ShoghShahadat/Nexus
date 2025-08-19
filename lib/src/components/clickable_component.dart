@@ -1,11 +1,11 @@
 import 'package:nexus/src/core/component.dart';
 import 'package:nexus/src/core/entity.dart';
 
-/// A component that makes an entity interactive.
+/// A simple data component that holds a callback for tap events.
 ///
-/// It holds a callback function that is executed by the `InputSystem`
-/// when a user tap is detected within the entity's bounds (defined by its
-/// `PositionComponent`).
+/// This component doesn't contain any logic. It's used by the `WidgetComponent`
+/// builder to connect an entity's tap action to a Flutter gesture-handling
+/// widget like [GestureDetector] or [ElevatedButton].
 class ClickableComponent extends Component {
   final void Function(Entity entity) onTap;
 

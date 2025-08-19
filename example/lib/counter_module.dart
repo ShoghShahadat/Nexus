@@ -5,16 +5,14 @@ import 'package:nexus_example/counter_cubit.dart';
 
 /// A self-contained module for the counter feature.
 class CounterModule extends NexusModule {
-  // This module now also provides the system that handles shape selection.
   @override
   List<System> get systems => [_CounterDisplaySystem(), ShapeSelectionSystem()];
 
   void createEntities(NexusWorld world, CounterCubit counterCubit) {
     world.addEntity(_createCounterDisplay(counterCubit));
-    world.addEntity(_createIncrementButton(counterCubit));
-    world.addEntity(_createDecrementButton(counterCubit));
+    world.addEntity(_createIncrementButton(world, counterCubit));
+    world.addEntity(_createDecrementButton(world, counterCubit));
 
-    // Create the 5 shape selection buttons
     final shapeButtons = _createShapeButtons(world);
     for (final button in shapeButtons) {
       world.addEntity(button);
@@ -24,14 +22,13 @@ class CounterModule extends NexusModule {
   Entity _createCounterDisplay(CounterCubit cubit) {
     final entity = Entity();
     final size = const Size(250, 100);
-    final initialPath =
-        _getPolygonPath(size, 4, cornerRadius: 12); // Start as a rounded square
+    final initialPath = _getPolygonPath(size, 4, cornerRadius: 12);
 
     entity.add(PositionComponent(
         x: 80, y: 250, width: size.width, height: size.height));
     entity.add(BlocComponent<CounterCubit, int>(cubit));
     entity.add(CounterStateComponent(cubit.state));
-    entity.add(TagsComponent({'counter_display'})); // Tag for easy lookup
+    entity.add(TagsComponent({'counter_display'}));
     entity.add(
         MorphingComponent(initialPath: initialPath, targetPath: initialPath));
     entity.add(WidgetComponent((context, entity) {
@@ -60,7 +57,6 @@ class CounterModule extends NexusModule {
       const Offset(230, 450),
       const Offset(300, 450),
     ];
-    // Create buttons for Triangle, Square, Pentagon, Hexagon, Circle
     final sides = [3, 4, 5, 6, 30];
 
     for (var i = 0; i < sides.length; i++) {
@@ -73,17 +69,18 @@ class CounterModule extends NexusModule {
           width: buttonSize.width,
           height: buttonSize.height));
       entity.add(ShapePathComponent(shapePath));
+      entity.add(ClickableComponent((e) {
+        final path = e.get<ShapePathComponent>()!.path;
+        world.eventBus.fire(ShapeSelectedEvent(path));
+      }));
       entity.add(WidgetComponent((context, entity) {
+        // THE DEFINITIVE FIX: Use a standard GestureDetector inside the builder.
+        // This is the idiomatic Flutter way and guarantees correct hit detection.
         return GestureDetector(
-          onTap: () {
-            final path = entity.get<ShapePathComponent>()!.path;
-            world.eventBus.fire(ShapeSelectedEvent(path));
-          },
-          // THE DEFINITIVE FIX: Wrap the CustomPaint in a Container with a
-          // transparent color. This gives the GestureDetector a concrete,
-          // hittable child, resolving any ambiguity for the hit-testing engine.
+          onTap: () => entity.get<ClickableComponent>()!.onTap(entity),
           child: Container(
-            color: Colors.transparent,
+            color:
+                Colors.transparent, // Ensures the GestureDetector is hittable
             child: CustomPaint(
               size: buttonSize,
               painter: _ShapeButtonPainter(path: shapePath),
@@ -96,29 +93,31 @@ class CounterModule extends NexusModule {
     return buttons;
   }
 
-  Entity _createIncrementButton(CounterCubit cubit) {
-    // ... (unchanged)
+  Entity _createIncrementButton(NexusWorld world, CounterCubit cubit) {
     final entity = Entity();
     entity.add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
-    entity.add(WidgetComponent(
-      (context, entity) => ElevatedButton(
-        onPressed: cubit.increment,
+    entity.add(ClickableComponent((_) => cubit.increment()));
+    entity.add(WidgetComponent((context, entity) {
+      // DEMONSTRATION OF FLEXIBILITY:
+      // We can use any Flutter widget, including ElevatedButton.
+      return ElevatedButton(
+        onPressed: () => entity.get<ClickableComponent>()!.onTap(entity),
         child: const Icon(Icons.add),
-      ),
-    ));
+      );
+    }));
     return entity;
   }
 
-  Entity _createDecrementButton(CounterCubit cubit) {
-    // ... (unchanged)
+  Entity _createDecrementButton(NexusWorld world, CounterCubit cubit) {
     final entity = Entity();
     entity.add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
-    entity.add(WidgetComponent(
-      (context, entity) => ElevatedButton(
-        onPressed: cubit.decrement,
+    entity.add(ClickableComponent((_) => cubit.decrement()));
+    entity.add(WidgetComponent((context, entity) {
+      return ElevatedButton(
+        onPressed: () => entity.get<ClickableComponent>()!.onTap(entity),
         child: const Icon(Icons.remove),
-      ),
-    ));
+      );
+    }));
     return entity;
   }
 }
@@ -149,19 +148,15 @@ Path _getPolygonPath(Size size, int sides, {double cornerRadius = 0.0}) {
   final angle = (pi * 2) / sides;
 
   if (sides > 20) {
-    // Approximate circle with a many-sided polygon
     return path
       ..addOval(
           Rect.fromCircle(center: Offset(centerX, centerY), radius: radius));
   }
-
   if (sides == 4 && cornerRadius > 0) {
-    // Special case for rounded rectangle
     return path
       ..addRRect(RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.width, size.height),
-        Radius.circular(cornerRadius),
-      ));
+          Rect.fromLTWH(0, 0, size.width, size.height),
+          Radius.circular(cornerRadius)));
   }
 
   final points = <Offset>[];
@@ -170,7 +165,6 @@ Path _getPolygonPath(Size size, int sides, {double cornerRadius = 0.0}) {
     final y = centerY + sin(i * angle - pi / 2) * radius;
     points.add(Offset(x, y));
   }
-
   path.moveTo(points.last.dx, points.last.dy);
   for (final point in points) {
     path.lineTo(point.dx, point.dy);
@@ -193,9 +187,7 @@ class _MorphingPainter extends CustomPainter {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
-
     final bounds = path.getBounds();
-    // Prevent division by zero if path is empty
     if (bounds.width == 0 || bounds.height == 0) return;
 
     final scaleX = size.width / bounds.width;
@@ -210,20 +202,16 @@ class _MorphingPainter extends CustomPainter {
     canvas.drawPath(scaledPath, paint);
 
     final textSpan = TextSpan(
-      text: text,
-      style: const TextStyle(
-          color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-    );
+        text: text,
+        style: const TextStyle(
+            color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold));
     final textPainter = TextPainter(
-      text: textSpan,
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout(minWidth: 0, maxWidth: size.width);
-    final offset = Offset(
-      (size.width - textPainter.width) / 2,
-      (size.height - textPainter.height) / 2,
-    );
+        text: textSpan,
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr)
+      ..layout(minWidth: 0, maxWidth: size.width);
+    final offset = Offset((size.width - textPainter.width) / 2,
+        (size.height - textPainter.height) / 2);
     textPainter.paint(canvas, offset);
   }
 
@@ -240,12 +228,10 @@ class _ShapeButtonPainter extends CustomPainter {
     final paint = Paint()
       ..color = Colors.grey.shade300
       ..style = PaintingStyle.fill;
-
     final strokePaint = Paint()
       ..color = Colors.grey.shade500
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
-
     final bounds = path.getBounds();
     if (bounds.width == 0 || bounds.height == 0) return;
 
