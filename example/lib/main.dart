@@ -7,12 +7,11 @@ NexusWorld setupWorld() {
   final world = NexusWorld();
 
   // 1. Systems
+  // InputSystem is no longer needed for this UI logic.
   final renderingSystem = FlutterRenderingSystem();
-  final inputSystem = InputSystem();
   final counterSystem = _CounterDisplaySystem();
 
   world.addSystem(renderingSystem);
-  world.addSystem(inputSystem);
   world.addSystem(counterSystem);
 
   // 2. Shared State
@@ -23,11 +22,8 @@ NexusWorld setupWorld() {
   counterDisplayEntity
       .add(PositionComponent(x: 80, y: 250, width: 250, height: 100));
   counterDisplayEntity.add(BlocComponent<CounterCubit, int>(counterCubit));
-  // The entity starts with an initial state component.
   counterDisplayEntity.add(CounterStateComponent(counterCubit.state));
   counterDisplayEntity.add(WidgetComponent((context, entity) {
-    // The builder now reads from the simple CounterStateComponent.
-    // This is guaranteed to exist because the system adds it.
     final stateComponent = entity.get<CounterStateComponent>()!;
     final state = stateComponent.value;
 
@@ -50,29 +46,36 @@ NexusWorld setupWorld() {
   }));
   world.addEntity(counterDisplayEntity);
 
-  // Buttons do not need to be reactive, so their widget is static.
+  // --- Button Entities (Refactored) ---
+
+  // For widgets like ElevatedButton, it's more direct and reliable to use
+  // the built-in `onPressed` callback. This avoids gesture conflicts.
+  // Therefore, ClickableComponent and InputSystem are removed from this flow.
+
   final incrementButtonEntity = Entity();
   incrementButtonEntity
       .add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
   incrementButtonEntity.add(WidgetComponent(
-    (context, entity) =>
-        ElevatedButton(onPressed: () {}, child: const Icon(Icons.add)),
+    (context, entity) => ElevatedButton(
+      // Directly call the cubit method from the button's callback.
+      onPressed: counterCubit.increment,
+      child: const Icon(Icons.add),
+    ),
   ));
-  incrementButtonEntity.add(ClickableComponent((entity) {
-    counterCubit.increment();
-  }));
+  // ClickableComponent is no longer needed.
   world.addEntity(incrementButtonEntity);
 
   final decrementButtonEntity = Entity();
   decrementButtonEntity
       .add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
   decrementButtonEntity.add(WidgetComponent(
-    (context, entity) =>
-        ElevatedButton(onPressed: () {}, child: const Icon(Icons.remove)),
+    (context, entity) => ElevatedButton(
+      // Directly call the cubit method from the button's callback.
+      onPressed: counterCubit.decrement,
+      child: const Icon(Icons.remove),
+    ),
   ));
-  decrementButtonEntity.add(ClickableComponent((entity) {
-    counterCubit.decrement();
-  }));
+  // ClickableComponent is no longer needed.
   world.addEntity(decrementButtonEntity);
 
   return world;
@@ -93,8 +96,6 @@ class MyApp extends StatelessWidget {
     final renderingSystem =
         world.systems.firstWhere((s) => s is FlutterRenderingSystem)
             as FlutterRenderingSystem;
-    final inputSystem =
-        world.systems.firstWhere((s) => s is InputSystem) as InputSystem;
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -104,12 +105,10 @@ class MyApp extends StatelessWidget {
           title: const Text('Nexus Counter Example',
               style: TextStyle(color: Colors.white)),
         ),
-        body: GestureDetector(
-          onTapDown: inputSystem.handleTapDown,
-          child: NexusWidget(
-            world: world,
-            child: renderingSystem.build(context),
-          ),
+        // The GestureDetector is no longer needed as the buttons handle their own taps.
+        body: NexusWidget(
+          world: world,
+          child: renderingSystem.build(context),
         ),
       ),
     );
@@ -121,9 +120,6 @@ class MyApp extends StatelessWidget {
 class _CounterDisplaySystem extends BlocSystem<CounterCubit, int> {
   @override
   void onStateChange(Entity entity, int state) {
-    // This `add` call updates the data, and the Entity's `add` method
-    // correctly calls `notifyListeners` internally, triggering the
-    // reactive UI update.
     entity.add(CounterStateComponent(state));
   }
 }
