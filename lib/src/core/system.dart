@@ -1,3 +1,4 @@
+import 'package:get_it/get_it.dart';
 import 'package:nexus/src/core/entity.dart';
 import 'package:nexus/src/core/nexus_world.dart';
 
@@ -8,6 +9,12 @@ import 'package:nexus/src/core/nexus_world.dart';
 abstract class System {
   /// A reference to the world, providing access to all entities.
   late final NexusWorld world;
+
+  /// Provides convenient access to the service locator.
+  ///
+  /// Use this to fetch dependencies like repositories, API clients, etc.
+  /// Example: `services.get<MyApiService>().fetchData();`
+  GetIt get services => world.services;
 
   /// A list of component types that this system is interested in.
   /// The system will only process entities that have all of these components.

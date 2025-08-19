@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/gestures.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/components/clickable_component.dart';

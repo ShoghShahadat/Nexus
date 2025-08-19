@@ -1,12 +1,13 @@
+import 'package:get_it/get_it.dart';
 import 'package:nexus/src/core/entity.dart';
 import 'package:nexus/src/core/system.dart';
 
 /// Manages all the entities and systems in the Nexus world.
 ///
 /// The NexusWorld is the central hub of the architecture. It holds all the
-/// application objects (Entities) and the logic controllers (Systems). It is
-/// responsible for running the main update loop, which drives the entire
-/// application's state and logic forward.
+/// application objects (Entities), the logic controllers (Systems), and a
+/// service locator for dependency injection. It is responsible for running
+/// the main update loop, which drives the application's state forward.
 class NexusWorld {
   /// A map of all entities in the world, indexed by their unique ID.
   final Map<EntityId, Entity> _entities = {};
@@ -14,8 +15,19 @@ class NexusWorld {
   /// A list of all systems that process the entities.
   final List<System> _systems = [];
 
+  /// The service locator instance for dependency injection.
+  /// Systems can access this to get dependencies like repositories or services.
+  final GetIt services;
+
   /// A read-only view of the entities in the world.
   Map<EntityId, Entity> get entities => Map.unmodifiable(_entities);
+
+  /// Creates a new world.
+  ///
+  /// Optionally accepts a [serviceLocator]. If not provided, it will use
+  /// the global `GetIt.instance`.
+  NexusWorld({GetIt? serviceLocator})
+      : services = serviceLocator ?? GetIt.instance;
 
   /// Adds an entity to the world.
   void addEntity(Entity entity) {
