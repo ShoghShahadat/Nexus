@@ -9,9 +9,6 @@ typedef EntityId = int;
 /// It has no data or logic of its own, other than a unique ID.
 /// The combination of components attached to an entity defines what it is
 /// and what it can do.
-///
-/// For example, an entity representing a player might have `PositionComponent`,
-/// `VelocityComponent`, and `PlayerInputComponent`.
 class Entity {
   /// A static counter to ensure each entity has a unique ID.
   static int _nextId = 0;
@@ -48,7 +45,13 @@ class Entity {
     return _components.containsKey(T);
   }
 
+  /// Returns an iterable of all components attached to this entity.
+  /// Useful for systems that need to manually inspect components.
+  Iterable<Component> get allComponents => _components.values;
+
   /// Checks if the entity has all the specified component types.
+  /// Note: This performs an exact type match and may not work as expected
+  /// with generic components like BlocComponent.
   bool hasAll(List<Type> componentTypes) {
     return componentTypes.every((type) => _components.containsKey(type));
   }

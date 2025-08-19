@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart'; // For debugPrint
+import 'package:flutter/foundation.dart';
 import 'package:nexus/src/components/bloc_component.dart';
 import 'package:nexus/src/core/entity.dart';
 import 'package:nexus/src/core/system.dart';
@@ -8,36 +8,34 @@ import 'package:nexus/src/core/system.dart';
 /// A system that listens to state changes from `BlocComponent`s.
 ///
 /// This system is a bridge that allows the reactive BLoC pattern to drive
-/// changes in the data-oriented ECS world. It subscribes to the stream of
-/// states from any entity's `BlocComponent`.
-///
-/// Subclasses should override `onStateChange` to implement logic that
-/// responds to new states.
+/// changes in the data-oriented ECS world.
 abstract class BlocSystem extends System {
   final Map<EntityId, StreamSubscription> _subscriptions = {};
 
   /// Creates a new BlocSystem.
-  /// It automatically targets entities with a `BlocComponent`.
-  BlocSystem() : super([BlocComponent]);
+  BlocSystem()
+      : super([]); // componentTypes is empty as we use custom matching.
 
-  /// This method is called by the `NexusWorld` for each matching entity.
-  /// It sets up a subscription to the BLoC's state stream if one doesn't
-  /// already exist for the entity.
+  /// Overridden to specifically target entities that have a `BlocComponent`.
+  /// This is the key to solving the generic type matching issue.
+  @override
+  bool matches(Entity entity) {
+    return entity.allComponents.any((c) => c is BlocComponent);
+  }
+
+  /// This method is now only called for entities that are guaranteed to have
+  /// a `BlocComponent`, thanks to our custom `matches` logic.
   @override
   void update(Entity entity, double dt) {
     if (_subscriptions.containsKey(entity.id)) return;
+
+    final blocComponent = entity.allComponents
+        .firstWhere((c) => c is BlocComponent) as BlocComponent;
+
     debugPrint(
-        '[BlocSystem] First update for Entity(${entity.id}). Setting up subscription.');
+        '[BlocSystem] Found BlocComponent on Entity(${entity.id}). Setting up subscription.');
 
-    final blocComponent = entity.get<BlocComponent>();
-    if (blocComponent == null) {
-      debugPrint(
-          '[BlocSystem] Entity(${entity.id}) has no BlocComponent. Skipping.');
-      return;
-    }
-
-    // --- LOGGING ---
-    // 1. Immediately process the BLoC's current state.
+    // 1. Immediately process the BLoC's current state to show the initial UI.
     debugPrint(
         '[BlocSystem] Entity(${entity.id}) Processing initial state: ${blocComponent.bloc.state}');
     onStateChange(entity, blocComponent.bloc.state);
@@ -57,21 +55,18 @@ abstract class BlocSystem extends System {
 
   /// The core logic method. This is called whenever a BLoC instance
   /// managed by this system emits a new state.
-  ///
-  /// [entity] is the entity whose `BlocComponent` emitted the state.
-  /// [state] is the new state object.
   void onStateChange(Entity entity, dynamic state);
 
-  /// Cleans up the subscription when a relevant entity is removed.
   @override
   void onEntityRemoved(Entity entity) {
-    debugPrint(
-        '[BlocSystem] Entity(${entity.id}) removed. Cancelling subscription.');
-    _subscriptions.remove(entity.id)?.cancel();
+    if (_subscriptions.containsKey(entity.id)) {
+      debugPrint(
+          '[BlocSystem] Entity(${entity.id}) removed. Cancelling subscription.');
+      _subscriptions.remove(entity.id)?.cancel();
+    }
     super.onEntityRemoved(entity);
   }
 
-  /// Overridden to clean up all subscriptions when the system is removed.
   @override
   void onRemovedFromWorld() {
     debugPrint(

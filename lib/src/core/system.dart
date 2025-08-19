@@ -11,20 +11,22 @@ abstract class System {
   late final NexusWorld world;
 
   /// Provides convenient access to the service locator.
-  ///
-  /// Use this to fetch dependencies like repositories, API clients, etc.
-  /// Example: `services.get<MyApiService>().fetchData();`
   GetIt get services => world.services;
 
-  /// A list of component types that this system is interested in.
-  /// The system will only process entities that have all of these components.
+  /// A list of component types used by the default `matches` implementation.
   final List<Type> componentTypes;
 
-  /// Creates a new system that targets entities with the specified components.
+  /// Creates a new system.
   System(this.componentTypes);
 
-  /// Called once per frame/tick for each entity that matches the
-  /// `componentTypes` filter.
+  /// Checks if an entity is a match for this system.
+  /// The default implementation checks if the entity has all `componentTypes`.
+  /// Systems can override this for more complex logic (e.g., generics).
+  bool matches(Entity entity) {
+    return entity.hasAll(componentTypes);
+  }
+
+  /// Called once per frame/tick for each entity that this system `matches`.
   ///
   /// [entity] is the entity being processed.
   /// [dt] is the delta time, the time elapsed since the last frame in seconds.
@@ -35,9 +37,7 @@ abstract class System {
     this.world = world;
   }
 
-  /// A lifecycle method called when an entity that matches this system's
-  /// component filter is removed from the world.
-  /// Use this to clean up any resources associated with the entity.
+  /// A lifecycle method called when a matching entity is removed from the world.
   void onEntityRemoved(Entity entity) {}
 
   /// A lifecycle method called when the system is removed from the world.
