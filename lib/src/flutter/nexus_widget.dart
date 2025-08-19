@@ -4,17 +4,18 @@ import 'package:nexus/src/core/nexus_world.dart';
 
 /// A Flutter widget that hosts and runs a [NexusWorld].
 ///
-/// This widget separates the high-frequency logic loop (driven by a `Ticker`)
-/// from the UI render loop (driven by a `ChangeNotifier`). This is a highly
-/// performant approach that ensures the UI only rebuilds when necessary.
+/// This widget is now much simpler. It only runs the high-frequency logic
+/// loop via a `Ticker`. The UI rendering is handled reactively by the
+/// `EntityWidgetBuilder`s created by the `FlutterRenderingSystem`, so this
+/// widget no longer needs to listen for changes or call `setState`.
 class NexusWidget extends StatefulWidget {
   final NexusWorld world;
-  final Widget Function(BuildContext context, NexusWorld world) builder;
+  final Widget child;
 
   const NexusWidget({
     super.key,
     required this.world,
-    required this.builder,
+    required this.child,
   });
 
   @override
@@ -31,9 +32,6 @@ class _NexusWidgetState extends State<NexusWidget>
     super.initState();
     // The logic loop ticker. This runs at the screen's refresh rate.
     _ticker = createTicker(_onTick)..start();
-
-    // The render loop listener. This only triggers a rebuild when notified.
-    widget.world.worldNotifier.addListener(_onWorldChanged);
   }
 
   /// The high-frequency callback for the logic loop.
@@ -42,30 +40,22 @@ class _NexusWidgetState extends State<NexusWidget>
     final dt = delta.inMicroseconds / Duration.microsecondsPerSecond;
     _lastElapsed = elapsed;
 
-    // Update the world's logic without rebuilding the widget.
+    // Update the world's logic without rebuilding this widget.
     if (mounted) {
       widget.world.update(dt);
-    }
-  }
-
-  /// The low-frequency callback for the render loop.
-  void _onWorldChanged() {
-    // A visual change has occurred in the world, so we call setState
-    // to trigger a rebuild of the widget tree.
-    if (mounted) {
-      setState(() {});
     }
   }
 
   @override
   void dispose() {
     _ticker.dispose();
-    widget.world.worldNotifier.removeListener(_onWorldChanged);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return widget.builder(context, widget.world);
+    // The child is built only once. All subsequent updates are handled
+    // by the reactive EntityWidgetBuilders within the child tree.
+    return widget.child;
   }
 }

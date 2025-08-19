@@ -1,55 +1,31 @@
 import 'package:flutter/widgets.dart';
-import 'package:nexus/nexus.dart';
 import 'package:nexus/src/components/position_component.dart';
 import 'package:nexus/src/components/widget_component.dart';
 import 'package:nexus/src/core/entity.dart';
 import 'package:nexus/src/core/system.dart';
+import 'package:nexus/src/flutter/entity_widget_builder.dart';
 
-/// A system that renders entities with `WidgetComponent` and `PositionComponent`.
-///
-/// This system provides a `build` method to construct the widget tree.
-/// Crucially, it listens to changes on entities and notifies the `NexusWorld`
-/// when a visual update is required, triggering a UI rebuild.
+/// A system that renders entities using a highly optimized approach.
 class FlutterRenderingSystem extends System {
-  FlutterRenderingSystem() : super([PositionComponent, WidgetComponent]);
-
+  /// Defines that this system is interested in entities that have both
+  /// a `PositionComponent` and a `WidgetComponent`.
   @override
-  void onAddedToWorld(NexusWorld world) {
-    super.onAddedToWorld(world);
-    // When the system is added, we need to listen for component changes.
-    // This is a simplified listener. A more robust implementation might
-    // use a dedicated event bus.
-    for (var entity in world.entities.values) {
-      if (matches(entity)) {
-        _watchEntity(entity);
-      }
-    }
+  bool matches(Entity entity) {
+    return entity.has<PositionComponent>() && entity.has<WidgetComponent>();
   }
 
-  void _watchEntity(Entity entity) {
-    // This is a conceptual representation. In a real-world scenario,
-    // the entity itself might become a notifier, or we'd use an event bus.
-    // For now, we trigger the notification when the component is added/changed.
-    // We achieve this by modifying the entity's `add` method.
-  }
-
-  /// This system's logic is primarily in the `build` method.
+  /// The update loop is not used for rendering logic.
   @override
-  void update(Entity entity, double dt) {
-    // The update loop is not used for rendering logic itself,
-    // but it's where we could detect changes if components were mutable.
-  }
+  void update(Entity entity, double dt) {}
 
   /// Builds the widget representation of the current state of the world.
-  ///
-  /// This method should be called from your `NexusWidget.builder`. It iterates
-  /// through all renderable entities and positions them in a `Stack`.
   Widget build(BuildContext context) {
     final renderableEntities =
-        world.entities.values.where((e) => e.hasAll(componentTypes)).toList();
+        world.entities.values.where((e) => matches(e)).toList();
 
     return Stack(
       children: renderableEntities.map((entity) {
+        // We can safely use `!` because `matches` guarantees they exist.
         final pos = entity.get<PositionComponent>()!;
         final widgetComp = entity.get<WidgetComponent>()!;
 
@@ -58,7 +34,11 @@ class FlutterRenderingSystem extends System {
           top: pos.y,
           width: pos.width,
           height: pos.height,
-          child: widgetComp.widget,
+          child: EntityWidgetBuilder(
+            key: ValueKey(entity.id),
+            entity: entity,
+            builder: widgetComp.builder,
+          ),
         );
       }).toList(),
     );

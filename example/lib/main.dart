@@ -20,20 +20,42 @@ NexusWorld setupWorld() {
 
   // 3. Entities & Components
   final counterDisplayEntity = Entity();
-  // IMPORTANT: We connect the entity's change signal to the world's notifier.
-  counterDisplayEntity.onComponentChanged = world.worldNotifier.notifyListeners;
-
   counterDisplayEntity
       .add(PositionComponent(x: 80, y: 250, width: 250, height: 100));
-  counterDisplayEntity.add(WidgetComponent(const CircularProgressIndicator()));
   counterDisplayEntity.add(BlocComponent(counterCubit));
+  // The WidgetComponent now holds a builder function.
+  counterDisplayEntity.add(WidgetComponent((context, entity) {
+    // This builder will be re-run by EntityWidgetBuilder whenever
+    // the counterDisplayEntity changes.
+    final bloc = entity.get<BlocComponent<CounterCubit, int>>()!.bloc;
+    final state = bloc.state; // We get the latest state directly.
+
+    return Material(
+      key: ValueKey(state),
+      elevation: 4.0,
+      borderRadius: BorderRadius.circular(12),
+      color: state >= 0 ? Colors.deepPurple : Colors.redAccent,
+      child: Center(
+        child: Text(
+          'Count: $state',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }));
   world.addEntity(counterDisplayEntity);
 
+  // Buttons do not need to be reactive, so their widget is static.
   final incrementButtonEntity = Entity();
   incrementButtonEntity
       .add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
   incrementButtonEntity.add(WidgetComponent(
-    ElevatedButton(onPressed: () {}, child: const Icon(Icons.add)),
+    (context, entity) =>
+        ElevatedButton(onPressed: () {}, child: const Icon(Icons.add)),
   ));
   incrementButtonEntity.add(ClickableComponent((entity) {
     counterCubit.increment();
@@ -44,7 +66,8 @@ NexusWorld setupWorld() {
   decrementButtonEntity
       .add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
   decrementButtonEntity.add(WidgetComponent(
-    ElevatedButton(onPressed: () {}, child: const Icon(Icons.remove)),
+    (context, entity) =>
+        ElevatedButton(onPressed: () {}, child: const Icon(Icons.remove)),
   ));
   decrementButtonEntity.add(ClickableComponent((entity) {
     counterCubit.decrement();
@@ -82,11 +105,10 @@ class MyApp extends StatelessWidget {
         ),
         body: GestureDetector(
           onTapDown: inputSystem.handleTapDown,
+          // NexusWidget now just needs the world and the static child.
           child: NexusWidget(
             world: world,
-            builder: (context, world) {
-              return renderingSystem.build(context);
-            },
+            child: renderingSystem.build(context),
           ),
         ),
       ),
@@ -94,33 +116,16 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// A custom system that listens to the CounterCubit's state and updates
-/// the entity's WidgetComponent to display the new count.
+/// A custom system that listens to the CounterCubit's state and triggers
+/// a notification on the entity.
 class _CounterDisplaySystem extends BlocSystem {
   @override
   void onStateChange(Entity entity, dynamic state) {
     if (state is int) {
-      // This `add` call will now trigger the `onComponentChanged` callback
-      // on the entity, which in turn notifies the world, and finally,
-      // the NexusWidget rebuilds the UI.
-      entity.add(WidgetComponent(
-        Material(
-          key: ValueKey(state),
-          elevation: 4.0,
-          borderRadius: BorderRadius.circular(12),
-          color: state >= 0 ? Colors.deepPurple : Colors.redAccent,
-          child: Center(
-            child: Text(
-              'Count: $state',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-      ));
+      // Instead of replacing the component, we now just notify the entity
+      // that its state has changed. The EntityWidgetBuilder will handle
+      // the rebuild by re-running the builder in the WidgetComponent.
+      entity.notifyListeners();
     }
   }
 }

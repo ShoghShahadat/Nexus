@@ -5,7 +5,7 @@ import 'package:nexus/src/core/nexus_world.dart';
 /// The base class for all Systems in the Nexus architecture.
 ///
 /// A System contains all the logic. It operates on a collection of Entities
-/// that have a specific set of Components.
+/// that match its specific component requirements.
 abstract class System {
   /// A reference to the world, providing access to all entities.
   late final NexusWorld world;
@@ -13,18 +13,10 @@ abstract class System {
   /// Provides convenient access to the service locator.
   GetIt get services => world.services;
 
-  /// A list of component types used by the default `matches` implementation.
-  final List<Type> componentTypes;
-
-  /// Creates a new system.
-  System(this.componentTypes);
-
   /// Checks if an entity is a match for this system.
-  /// The default implementation checks if the entity has all `componentTypes`.
-  /// Systems can override this for more complex logic (e.g., generics).
-  bool matches(Entity entity) {
-    return entity.hasAll(componentTypes);
-  }
+  /// Each system must implement this method to define which entities it
+  /// is interested in processing.
+  bool matches(Entity entity);
 
   /// Called once per frame/tick for each entity that this system `matches`.
   ///

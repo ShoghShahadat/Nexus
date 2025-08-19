@@ -1,13 +1,14 @@
 import 'package:flutter/widgets.dart';
-import 'package:nexus/src/core/component.dart';
+import 'package:nexus/nexus.dart';
+import 'package:nexus/src/core/entity.dart';
 
-/// A component that holds a Flutter [Widget].
+/// A component that holds a builder function for creating a Flutter [Widget].
 ///
-/// This is the primary component used by the `FlutterRenderingSystem`
-/// to draw entities on the screen. The entity's appearance is defined
-/// entirely by the widget held in this component.
+/// Instead of holding a static widget, this component holds a function that
+/// can build a widget based on the current state of the entity. This is the
+/// key to making the UI fully reactive and performant.
 class WidgetComponent extends Component {
-  final Widget widget;
+  final Widget Function(BuildContext context, Entity entity) builder;
 
-  WidgetComponent(this.widget);
+  WidgetComponent(this.builder);
 }

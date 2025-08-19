@@ -22,4 +22,5 @@ export 'src/systems/flutter_rendering_system.dart';
 export 'src/systems/input_system.dart';
 
 // --- Flutter Bridge ---
+export 'src/flutter/entity_widget_builder.dart';
 export 'src/flutter/nexus_widget.dart';
