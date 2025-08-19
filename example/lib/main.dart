@@ -7,20 +7,21 @@ NexusWorld setupWorld() {
   final world = NexusWorld();
 
   // 1. Systems
-  // InputSystem is no longer needed for this UI logic.
   final renderingSystem = FlutterRenderingSystem();
   final counterSystem = _CounterDisplaySystem();
+  final animationSystem = AnimationSystem();
 
   world.addSystem(renderingSystem);
   world.addSystem(counterSystem);
+  world.addSystem(animationSystem);
 
   // 2. Shared State
   final counterCubit = CounterCubit();
 
   // 3. Entities & Components
   final counterDisplayEntity = Entity();
-  counterDisplayEntity
-      .add(PositionComponent(x: 80, y: 250, width: 250, height: 100));
+  counterDisplayEntity.add(PositionComponent(
+      x: 80, y: 250, width: 250, height: 100, scale: 0)); // Start with scale 0
   counterDisplayEntity.add(BlocComponent<CounterCubit, int>(counterCubit));
   counterDisplayEntity.add(CounterStateComponent(counterCubit.state));
   counterDisplayEntity.add(WidgetComponent((context, entity) {
@@ -44,25 +45,35 @@ NexusWorld setupWorld() {
       ),
     );
   }));
+
+  // Add an animation to make the counter "pop in" on start
+  counterDisplayEntity.add(AnimationComponent(
+    duration: const Duration(milliseconds: 600),
+    curve: Curves.easeOutBack,
+    onUpdate: (entity, value) {
+      final pos = entity.get<PositionComponent>();
+      if (pos != null) {
+        pos.scale = value;
+        // CORRECT WAY: Re-add the component to the entity.
+        // This triggers the internal, protected `notifyListeners()` call
+        // in a safe and encapsulated manner.
+        entity.add(pos);
+      }
+    },
+  ));
+
   world.addEntity(counterDisplayEntity);
 
-  // --- Button Entities (Refactored) ---
-
-  // For widgets like ElevatedButton, it's more direct and reliable to use
-  // the built-in `onPressed` callback. This avoids gesture conflicts.
-  // Therefore, ClickableComponent and InputSystem are removed from this flow.
-
+  // --- Button Entities ---
   final incrementButtonEntity = Entity();
   incrementButtonEntity
       .add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
   incrementButtonEntity.add(WidgetComponent(
     (context, entity) => ElevatedButton(
-      // Directly call the cubit method from the button's callback.
       onPressed: counterCubit.increment,
       child: const Icon(Icons.add),
     ),
   ));
-  // ClickableComponent is no longer needed.
   world.addEntity(incrementButtonEntity);
 
   final decrementButtonEntity = Entity();
@@ -70,12 +81,10 @@ NexusWorld setupWorld() {
       .add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
   decrementButtonEntity.add(WidgetComponent(
     (context, entity) => ElevatedButton(
-      // Directly call the cubit method from the button's callback.
       onPressed: counterCubit.decrement,
       child: const Icon(Icons.remove),
     ),
   ));
-  // ClickableComponent is no longer needed.
   world.addEntity(decrementButtonEntity);
 
   return world;
@@ -105,7 +114,6 @@ class MyApp extends StatelessWidget {
           title: const Text('Nexus Counter Example',
               style: TextStyle(color: Colors.white)),
         ),
-        // The GestureDetector is no longer needed as the buttons handle their own taps.
         body: NexusWidget(
           world: world,
           child: renderingSystem.build(context),
@@ -115,8 +123,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// The system now has a single, clear responsibility:
-/// Listen to the BLoC and update the data component.
+/// The system that updates the counter's data component.
 class _CounterDisplaySystem extends BlocSystem<CounterCubit, int> {
   @override
   void onStateChange(Entity entity, int state) {

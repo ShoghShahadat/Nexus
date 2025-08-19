@@ -9,11 +9,13 @@ class PositionComponent extends Component {
   double y;
   double width;
   double height;
+  double scale;
 
   PositionComponent({
     this.x = 0.0,
     this.y = 0.0,
     this.width = 0.0,
     this.height = 0.0,
+    this.scale = 1.0,
   });
 }
