@@ -21,18 +21,25 @@ class NexusWorld {
 
   void addEntity(Entity entity) {
     _entities[entity.id] = entity;
+    // Notify systems that a new entity has been added.
+    for (final system in _systems) {
+      if (system.matches(entity)) {
+        system.onEntityAdded(entity);
+      }
+    }
   }
 
   Entity? removeEntity(EntityId id) {
     final entity = _entities.remove(id);
     if (entity != null) {
-      // When removing an entity, also dispose it to release listeners.
-      entity.dispose();
+      // Notify systems before disposing the entity.
       for (final system in _systems) {
         if (system.matches(entity)) {
           system.onEntityRemoved(entity);
         }
       }
+      // When removing an entity, also dispose it to release listeners.
+      entity.dispose();
     }
     return entity;
   }

@@ -29,6 +29,9 @@ abstract class System {
     this.world = world;
   }
 
+  /// A lifecycle method called when a matching entity is added to the world.
+  void onEntityAdded(Entity entity) {}
+
   /// A lifecycle method called when a matching entity is removed from the world.
   void onEntityRemoved(Entity entity) {}
 
