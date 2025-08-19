@@ -10,18 +10,20 @@ NexusWorld setupWorld() {
   final renderingSystem = FlutterRenderingSystem();
   final counterSystem = _CounterDisplaySystem();
   final animationSystem = AnimationSystem();
+  final physicsSystem = PhysicsSystem(); // Add the new system
 
   world.addSystem(renderingSystem);
   world.addSystem(counterSystem);
   world.addSystem(animationSystem);
+  world.addSystem(physicsSystem); // Add the new system
 
   // 2. Shared State
   final counterCubit = CounterCubit();
 
   // 3. Entities & Components
   final counterDisplayEntity = Entity();
-  counterDisplayEntity.add(PositionComponent(
-      x: 80, y: 250, width: 250, height: 100, scale: 0)); // Start with scale 0
+  counterDisplayEntity
+      .add(PositionComponent(x: 80, y: 250, width: 250, height: 100, scale: 0));
   counterDisplayEntity.add(BlocComponent<CounterCubit, int>(counterCubit));
   counterDisplayEntity.add(CounterStateComponent(counterCubit.state));
   counterDisplayEntity.add(WidgetComponent((context, entity) {
@@ -54,11 +56,13 @@ NexusWorld setupWorld() {
       final pos = entity.get<PositionComponent>();
       if (pos != null) {
         pos.scale = value;
-        // CORRECT WAY: Re-add the component to the entity.
-        // This triggers the internal, protected `notifyListeners()` call
-        // in a safe and encapsulated manner.
         entity.add(pos);
       }
+    },
+    // When the animation is complete, give the entity a downward velocity.
+    onComplete: (entity) {
+      entity.add(
+          VelocityComponent(x: 0, y: 50)); // 50 pixels per second downwards
     },
   ));
 

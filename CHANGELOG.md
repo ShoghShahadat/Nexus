@@ -1,3 +1,3 @@
 ## 0.0.1
 
-* TODO: Describe initial release.
+* Changelog1.0.0-dev.2FEAT: Added LifecycleSystem and LifecycleComponent to manage entity initialization and disposal.FEAT: Added AnimationSystem and AnimationComponent for driving component-based animations over time.FEAT: Added PhysicsSystem and VelocityComponent for simple physics-based movement.FIX: Refactored FlutterRenderingSystem to correctly handle reactive UI updates for position, scale, and other transform properties.CHORE: Major improvements to documentation in README.md and pubspec.yaml.1.0.0-dev.1Initial release of the Nexus framework.Core ECS classes: Entity, Component, System, NexusWorld.Flutter rendering bridge: FlutterRenderingSystem, NexusWidget, EntityWidgetBuilder.Initial components: PositionComponent, WidgetComponent, ClickableComponent.BLoC integration: BlocSystem and BlocComponent.
