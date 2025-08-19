@@ -12,63 +12,44 @@ typedef EntityId = int;
 class Entity extends ChangeNotifier {
   static int _nextId = 0;
   final EntityId id;
-  // Using a List is more robust for generic types than a Map with Type keys.
-  final List<Component> _components = [];
+  // Reverting to a Map<Type, Component> is the most performant and
+  // type-safe approach when systems are strongly typed.
+  final Map<Type, Component> _components = {};
 
   Entity() : id = _nextId++;
 
   /// Adds a component to the entity and notifies listeners of the change.
   /// If a component of the same type already exists, it will be replaced.
   void add<T extends Component>(T component) {
-    // Remove any existing component of the same type first.
-    _components.removeWhere((c) => c is T);
-    _components.add(component);
+    _components[T] = component;
     notifyListeners();
   }
 
   /// Removes a component and notifies listeners of the change.
   T? remove<T extends Component>() {
-    T? found;
-    _components.removeWhere((c) {
-      if (c is T) {
-        found = c;
-        return true;
-      }
-      return false;
-    });
-    if (found != null) {
+    final removed = _components.remove(T) as T?;
+    if (removed != null) {
       notifyListeners();
     }
-    return found;
+    return removed;
   }
 
   /// Retrieves a component of a specific type from the entity.
-  /// This method is robust against generic type issues.
+  /// This is now a direct and fast map lookup.
   T? get<T extends Component>() {
-    for (final comp in _components) {
-      if (comp is T) {
-        return comp;
-      }
-    }
-    return null;
+    return _components[T] as T?;
   }
 
   /// Checks if the entity has a component of a specific type.
-  /// This method is robust against generic type issues.
   bool has<T extends Component>() {
-    for (final comp in _components) {
-      if (comp is T) {
-        return true;
-      }
-    }
-    return false;
+    return _components.containsKey(T);
   }
 
   /// An iterable of all components attached to this entity.
-  Iterable<Component> get allComponents => _components;
+  Iterable<Component> get allComponents => _components.values;
 
   @override
   String toString() {
-    return 'Entity($id, components: ${_components.map((c) => c.runtimeType.toString()).toList()})';
+    return 'Entity($id, components: ${_components.keys.map((t) => t.toString()).toList()})';
   }
 }

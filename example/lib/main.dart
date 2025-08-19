@@ -22,13 +22,14 @@ NexusWorld setupWorld() {
   final counterDisplayEntity = Entity();
   counterDisplayEntity
       .add(PositionComponent(x: 80, y: 250, width: 250, height: 100));
-  counterDisplayEntity.add(BlocComponent(counterCubit));
-  // The WidgetComponent now holds a builder function.
+  counterDisplayEntity.add(BlocComponent<CounterCubit, int>(counterCubit));
+  // The entity starts with an initial state component.
+  counterDisplayEntity.add(CounterStateComponent(counterCubit.state));
   counterDisplayEntity.add(WidgetComponent((context, entity) {
-    // This builder will be re-run by EntityWidgetBuilder whenever
-    // the counterDisplayEntity changes.
-    final bloc = entity.get<BlocComponent<CounterCubit, int>>()!.bloc;
-    final state = bloc.state; // We get the latest state directly.
+    // The builder now reads from the simple CounterStateComponent.
+    // This is guaranteed to exist because the system adds it.
+    final stateComponent = entity.get<CounterStateComponent>()!;
+    final state = stateComponent.value;
 
     return Material(
       key: ValueKey(state),
@@ -105,7 +106,6 @@ class MyApp extends StatelessWidget {
         ),
         body: GestureDetector(
           onTapDown: inputSystem.handleTapDown,
-          // NexusWidget now just needs the world and the static child.
           child: NexusWidget(
             world: world,
             child: renderingSystem.build(context),
@@ -116,16 +116,14 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// A custom system that listens to the CounterCubit's state and triggers
-/// a notification on the entity.
-class _CounterDisplaySystem extends BlocSystem {
+/// The system now has a single, clear responsibility:
+/// Listen to the BLoC and update the data component.
+class _CounterDisplaySystem extends BlocSystem<CounterCubit, int> {
   @override
-  void onStateChange(Entity entity, dynamic state) {
-    if (state is int) {
-      // Instead of replacing the component, we now just notify the entity
-      // that its state has changed. The EntityWidgetBuilder will handle
-      // the rebuild by re-running the builder in the WidgetComponent.
-      entity.notifyListeners();
-    }
+  void onStateChange(Entity entity, int state) {
+    // This `add` call updates the data, and the Entity's `add` method
+    // correctly calls `notifyListeners` internally, triggering the
+    // reactive UI update.
+    entity.add(CounterStateComponent(state));
   }
 }

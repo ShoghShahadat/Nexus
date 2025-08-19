@@ -1,26 +1,32 @@
 import 'dart:async';
 
+import 'package:bloc/bloc.dart';
 import 'package:nexus/src/components/bloc_component.dart';
 import 'package:nexus/src/core/entity.dart';
 import 'package:nexus/src/core/system.dart';
 
-/// A system that listens to state changes from `BlocComponent`s.
-abstract class BlocSystem extends System {
+/// A generic system that listens to state changes from a specific
+/// type of `BlocComponent`.
+///
+/// By making the system itself generic, we ensure type safety and eliminate
+/// runtime type errors with generics.
+abstract class BlocSystem<B extends BlocBase<S>, S> extends System {
   final Map<EntityId, StreamSubscription> _subscriptions = {};
 
-  /// Overridden to specifically target entities that have a `BlocComponent`.
+  /// Overridden to specifically target entities that have the exact
+  /// generic `BlocComponent` this system is interested in.
   @override
   bool matches(Entity entity) {
-    return entity.has<BlocComponent>();
+    return entity.has<BlocComponent<B, S>>();
   }
 
   /// This method is now only called for entities that are guaranteed to have
-  /// a `BlocComponent`, thanks to our `matches` logic.
+  /// the correct `BlocComponent`.
   @override
   void update(Entity entity, double dt) {
     if (_subscriptions.containsKey(entity.id)) return;
 
-    final blocComponent = entity.get<BlocComponent>()!;
+    final blocComponent = entity.get<BlocComponent<B, S>>()!;
 
     // 1. Immediately process the BLoC's current state.
     onStateChange(entity, blocComponent.bloc.state);
@@ -33,9 +39,8 @@ abstract class BlocSystem extends System {
     });
   }
 
-  /// The core logic method. This is called whenever a BLoC instance
-  /// managed by this system emits a new state.
-  void onStateChange(Entity entity, dynamic state);
+  /// The core logic method. It receives the correctly typed state.
+  void onStateChange(Entity entity, S state);
 
   @override
   void onEntityRemoved(Entity entity) {
