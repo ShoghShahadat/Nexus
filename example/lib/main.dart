@@ -8,23 +8,21 @@ NexusWorld setupWorld() {
   final world = NexusWorld();
 
   // --- Global Systems ---
-  // These systems are application-wide and not specific to any feature.
   world.addSystem(FlutterRenderingSystem());
   world.addSystem(AnimationSystem());
-  world.addSystem(PhysicsSystem());
-  world.addSystem(LifecycleSystem());
-  world.addSystem(PulsingWarningSystem()); // Add our new custom system
+  world.addSystem(PulsingWarningSystem());
+  world.addSystem(MorphingSystem());
+  // InputSystem is no longer needed for this UI.
+  // world.addSystem(InputSystem());
 
   // --- Shared State / Services ---
   final counterCubit = CounterCubit();
 
   // --- Load Feature Modules ---
-  // The application is now composed by loading isolated modules.
   final counterModule = CounterModule();
   world.loadModule(counterModule);
 
   // --- Create Initial Entities ---
-  // The module itself is responsible for creating its own entities.
   counterModule.createEntities(world, counterCubit);
 
   return world;
@@ -54,6 +52,7 @@ class MyApp extends StatelessWidget {
           title: const Text('Nexus Counter Example',
               style: TextStyle(color: Colors.white)),
         ),
+        // The global GestureDetector is no longer needed.
         body: NexusWidget(
           world: world,
           child: renderingSystem.build(context),

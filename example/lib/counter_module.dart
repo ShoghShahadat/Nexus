@@ -1,62 +1,103 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus_example/counter_cubit.dart';
 
 /// A self-contained module for the counter feature.
-///
-/// This module registers all necessary systems and provides methods to
-/// create the entities required for the counter UI. A large application
-/// would be composed of many such modules.
 class CounterModule extends NexusModule {
+  // This module now also provides the system that handles shape selection.
   @override
-  List<System> get systems => [_CounterDisplaySystem()];
+  List<System> get systems => [_CounterDisplaySystem(), ShapeSelectionSystem()];
 
-  /// Creates all entities related to the counter feature and adds them to the world.
   void createEntities(NexusWorld world, CounterCubit counterCubit) {
     world.addEntity(_createCounterDisplay(counterCubit));
     world.addEntity(_createIncrementButton(counterCubit));
     world.addEntity(_createDecrementButton(counterCubit));
+
+    // Create the 5 shape selection buttons
+    final shapeButtons = _createShapeButtons(world);
+    for (final button in shapeButtons) {
+      world.addEntity(button);
+    }
   }
 
   Entity _createCounterDisplay(CounterCubit cubit) {
     final entity = Entity();
-    entity.add(
-        PositionComponent(x: 80, y: 250, width: 250, height: 100, scale: 0));
+    final size = const Size(250, 100);
+    final initialPath =
+        _getPolygonPath(size, 4, cornerRadius: 12); // Start as a rounded square
+
+    entity.add(PositionComponent(
+        x: 80, y: 250, width: size.width, height: size.height));
     entity.add(BlocComponent<CounterCubit, int>(cubit));
     entity.add(CounterStateComponent(cubit.state));
-    entity.add(TagsComponent({})); // Add an empty set of tags
+    entity.add(TagsComponent({'counter_display'})); // Tag for easy lookup
+    entity.add(
+        MorphingComponent(initialPath: initialPath, targetPath: initialPath));
     entity.add(WidgetComponent((context, entity) {
       final state = entity.get<CounterStateComponent>()!.value;
-      return Material(
-        key: ValueKey(state),
-        elevation: 4.0,
-        borderRadius: BorderRadius.circular(12),
-        color: state >= 0 ? Colors.deepPurple : Colors.redAccent,
-        child: Center(
-          child: Text('Count: $state',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold)),
+      final morph = entity.get<MorphingComponent>()!;
+      final color = state >= 0 ? Colors.deepPurple : Colors.redAccent;
+
+      return CustomPaint(
+        painter: _MorphingPainter(
+          path: morph.currentPath,
+          color: color,
+          text: 'Count: $state',
         ),
       );
     }));
-    entity.add(AnimationComponent(
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeOutBack,
-      onUpdate: (entity, value) {
-        final pos = entity.get<PositionComponent>()!;
-        pos.scale = value;
-        entity.add(pos);
-      },
-      onComplete: (entity) {
-        // We no longer add velocity here to keep the example focused.
-      },
-    ));
     return entity;
   }
 
+  List<Entity> _createShapeButtons(NexusWorld world) {
+    final List<Entity> buttons = [];
+    const buttonSize = Size(60, 60);
+    final positions = [
+      const Offset(20, 450),
+      const Offset(90, 450),
+      const Offset(160, 450),
+      const Offset(230, 450),
+      const Offset(300, 450),
+    ];
+    // Create buttons for Triangle, Square, Pentagon, Hexagon, Circle
+    final sides = [3, 4, 5, 6, 30];
+
+    for (var i = 0; i < sides.length; i++) {
+      final entity = Entity();
+      final shapePath = _getPolygonPath(buttonSize, sides[i]);
+
+      entity.add(PositionComponent(
+          x: positions[i].dx,
+          y: positions[i].dy,
+          width: buttonSize.width,
+          height: buttonSize.height));
+      entity.add(ShapePathComponent(shapePath));
+      entity.add(WidgetComponent((context, entity) {
+        return GestureDetector(
+          onTap: () {
+            final path = entity.get<ShapePathComponent>()!.path;
+            world.eventBus.fire(ShapeSelectedEvent(path));
+          },
+          // THE DEFINITIVE FIX: Wrap the CustomPaint in a Container with a
+          // transparent color. This gives the GestureDetector a concrete,
+          // hittable child, resolving any ambiguity for the hit-testing engine.
+          child: Container(
+            color: Colors.transparent,
+            child: CustomPaint(
+              size: buttonSize,
+              painter: _ShapeButtonPainter(path: shapePath),
+            ),
+          ),
+        );
+      }));
+      buttons.add(entity);
+    }
+    return buttons;
+  }
+
   Entity _createIncrementButton(CounterCubit cubit) {
+    // ... (unchanged)
     final entity = Entity();
     entity.add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
     entity.add(WidgetComponent(
@@ -69,6 +110,7 @@ class CounterModule extends NexusModule {
   }
 
   Entity _createDecrementButton(CounterCubit cubit) {
+    // ... (unchanged)
     final entity = Entity();
     entity.add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
     entity.add(WidgetComponent(
@@ -81,30 +123,144 @@ class CounterModule extends NexusModule {
   }
 }
 
-/// The system that updates the counter's data component.
-/// It now ONLY manages the "warning" tag based on the state.
 class _CounterDisplaySystem extends BlocSystem<CounterCubit, int> {
   @override
   void onStateChange(Entity entity, int state) {
-    // First, update the state component as before.
     entity.add(CounterStateComponent(state));
-
-    // Now, manage the warning tag based purely on the state.
-    // The PulsingWarningSystem will react to the presence of this tag.
-    final tags = entity.get<TagsComponent>();
-    if (tags != null) {
-      final wasWarning = tags.hasTag('warning');
-      final isWarning = state < 0;
-
-      if (isWarning && !wasWarning) {
-        // If the state is negative and it wasn't before, add the tag.
-        tags.add('warning');
-        entity.add(tags);
-      } else if (!isWarning && wasWarning) {
-        // If the state is non-negative and it was a warning before, remove the tag.
-        tags.remove('warning');
-        entity.add(tags);
-      }
+    final tags = entity.get<TagsComponent>()!;
+    final isWarning = state < 0;
+    final wasWarning = tags.hasTag('warning');
+    if (isWarning && !wasWarning) {
+      tags.add('warning');
+      entity.add(tags);
+    } else if (!isWarning && wasWarning) {
+      tags.remove('warning');
+      entity.add(tags);
     }
   }
+}
+
+// --- Helper function to define shapes ---
+Path _getPolygonPath(Size size, int sides, {double cornerRadius = 0.0}) {
+  final path = Path();
+  final radius = min(size.width, size.height) / 2;
+  final centerX = size.width / 2;
+  final centerY = size.height / 2;
+  final angle = (pi * 2) / sides;
+
+  if (sides > 20) {
+    // Approximate circle with a many-sided polygon
+    return path
+      ..addOval(
+          Rect.fromCircle(center: Offset(centerX, centerY), radius: radius));
+  }
+
+  if (sides == 4 && cornerRadius > 0) {
+    // Special case for rounded rectangle
+    return path
+      ..addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, size.height),
+        Radius.circular(cornerRadius),
+      ));
+  }
+
+  final points = <Offset>[];
+  for (int i = 0; i < sides; i++) {
+    final x = centerX + cos(i * angle - pi / 2) * radius;
+    final y = centerY + sin(i * angle - pi / 2) * radius;
+    points.add(Offset(x, y));
+  }
+
+  path.moveTo(points.last.dx, points.last.dy);
+  for (final point in points) {
+    path.lineTo(point.dx, point.dy);
+  }
+  path.close();
+  return path;
+}
+
+// --- Custom Painters ---
+class _MorphingPainter extends CustomPainter {
+  final Path path;
+  final Color color;
+  final String text;
+
+  _MorphingPainter(
+      {required this.path, required this.color, required this.text});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final bounds = path.getBounds();
+    // Prevent division by zero if path is empty
+    if (bounds.width == 0 || bounds.height == 0) return;
+
+    final scaleX = size.width / bounds.width;
+    final scaleY = size.height / bounds.height;
+    final transform = Matrix4.identity()
+      ..translate(size.width / 2, size.height / 2)
+      ..scale(scaleX, scaleY)
+      ..translate(-bounds.center.dx, -bounds.center.dy);
+    final scaledPath = path.transform(transform.storage);
+
+    canvas.drawShadow(scaledPath, Colors.black.withOpacity(0.5), 4.0, true);
+    canvas.drawPath(scaledPath, paint);
+
+    final textSpan = TextSpan(
+      text: text,
+      style: const TextStyle(
+          color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textAlign: TextAlign.center,
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout(minWidth: 0, maxWidth: size.width);
+    final offset = Offset(
+      (size.width - textPainter.width) / 2,
+      (size.height - textPainter.height) / 2,
+    );
+    textPainter.paint(canvas, offset);
+  }
+
+  @override
+  bool shouldRepaint(covariant _MorphingPainter oldDelegate) => true;
+}
+
+class _ShapeButtonPainter extends CustomPainter {
+  final Path path;
+  _ShapeButtonPainter({required this.path});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.grey.shade300
+      ..style = PaintingStyle.fill;
+
+    final strokePaint = Paint()
+      ..color = Colors.grey.shade500
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+
+    final bounds = path.getBounds();
+    if (bounds.width == 0 || bounds.height == 0) return;
+
+    final scale =
+        min(size.width / bounds.width, size.height / bounds.height) * 0.8;
+    final transform = Matrix4.identity()
+      ..translate(size.width / 2, size.height / 2)
+      ..scale(scale, scale)
+      ..translate(-bounds.center.dx, -bounds.center.dy);
+    final scaledPath = path.transform(transform.storage);
+
+    canvas.drawPath(scaledPath, paint);
+    canvas.drawPath(scaledPath, strokePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
