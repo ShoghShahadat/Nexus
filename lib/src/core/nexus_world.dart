@@ -22,6 +22,9 @@ class NexusWorld {
   /// A read-only view of the entities in the world.
   Map<EntityId, Entity> get entities => Map.unmodifiable(_entities);
 
+  /// A read-only view of the systems in the world.
+  List<System> get systems => List.unmodifiable(_systems);
+
   /// Creates a new world.
   ///
   /// Optionally accepts a [serviceLocator]. If not provided, it will use

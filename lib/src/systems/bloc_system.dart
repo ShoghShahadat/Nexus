@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'; // For debugPrint
 import 'package:nexus/src/components/bloc_component.dart';
 import 'package:nexus/src/core/entity.dart';
 import 'package:nexus/src/core/system.dart';
@@ -25,14 +26,31 @@ abstract class BlocSystem extends System {
   @override
   void update(Entity entity, double dt) {
     if (_subscriptions.containsKey(entity.id)) return;
+    debugPrint(
+        '[BlocSystem] First update for Entity(${entity.id}). Setting up subscription.');
 
     final blocComponent = entity.get<BlocComponent>();
-    if (blocComponent == null) return;
+    if (blocComponent == null) {
+      debugPrint(
+          '[BlocSystem] Entity(${entity.id}) has no BlocComponent. Skipping.');
+      return;
+    }
 
+    // --- LOGGING ---
+    // 1. Immediately process the BLoC's current state.
+    debugPrint(
+        '[BlocSystem] Entity(${entity.id}) Processing initial state: ${blocComponent.bloc.state}');
+    onStateChange(entity, blocComponent.bloc.state);
+
+    // 2. Subscribe to all future state changes.
     _subscriptions[entity.id] = blocComponent.bloc.stream.listen((state) {
-      // Ensure the entity still exists before processing the state change.
+      debugPrint(
+          '[BlocSystem] Entity(${entity.id}) received new state from stream: $state');
       if (world.entities.containsKey(entity.id)) {
         onStateChange(entity, state);
+      } else {
+        debugPrint(
+            '[BlocSystem] Entity(${entity.id}) no longer in world. Ignoring state change.');
       }
     });
   }
@@ -47,6 +65,8 @@ abstract class BlocSystem extends System {
   /// Cleans up the subscription when a relevant entity is removed.
   @override
   void onEntityRemoved(Entity entity) {
+    debugPrint(
+        '[BlocSystem] Entity(${entity.id}) removed. Cancelling subscription.');
     _subscriptions.remove(entity.id)?.cancel();
     super.onEntityRemoved(entity);
   }
@@ -54,6 +74,8 @@ abstract class BlocSystem extends System {
   /// Overridden to clean up all subscriptions when the system is removed.
   @override
   void onRemovedFromWorld() {
+    debugPrint(
+        '[BlocSystem] System removed from world. Clearing all subscriptions.');
     for (final subscription in _subscriptions.values) {
       subscription.cancel();
     }
