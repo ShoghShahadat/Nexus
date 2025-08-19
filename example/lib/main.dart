@@ -1,95 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus_example/counter_cubit.dart';
+import 'package:nexus_example/counter_module.dart';
 
 // --- World Setup ---
 NexusWorld setupWorld() {
   final world = NexusWorld();
 
-  // 1. Systems
-  final renderingSystem = FlutterRenderingSystem();
-  final counterSystem = _CounterDisplaySystem();
-  final animationSystem = AnimationSystem();
-  final physicsSystem = PhysicsSystem(); // Add the new system
+  // --- Global Systems ---
+  // These systems are application-wide and not specific to any feature.
+  world.addSystem(FlutterRenderingSystem());
+  world.addSystem(AnimationSystem());
+  world.addSystem(PhysicsSystem());
+  world.addSystem(LifecycleSystem());
+  world.addSystem(PulsingWarningSystem()); // Add our new custom system
 
-  world.addSystem(renderingSystem);
-  world.addSystem(counterSystem);
-  world.addSystem(animationSystem);
-  world.addSystem(physicsSystem); // Add the new system
-
-  // 2. Shared State
+  // --- Shared State / Services ---
   final counterCubit = CounterCubit();
 
-  // 3. Entities & Components
-  final counterDisplayEntity = Entity();
-  counterDisplayEntity
-      .add(PositionComponent(x: 80, y: 250, width: 250, height: 100, scale: 0));
-  counterDisplayEntity.add(BlocComponent<CounterCubit, int>(counterCubit));
-  counterDisplayEntity.add(CounterStateComponent(counterCubit.state));
-  counterDisplayEntity.add(WidgetComponent((context, entity) {
-    final stateComponent = entity.get<CounterStateComponent>()!;
-    final state = stateComponent.value;
+  // --- Load Feature Modules ---
+  // The application is now composed by loading isolated modules.
+  final counterModule = CounterModule();
+  world.loadModule(counterModule);
 
-    return Material(
-      key: ValueKey(state),
-      elevation: 4.0,
-      borderRadius: BorderRadius.circular(12),
-      color: state >= 0 ? Colors.deepPurple : Colors.redAccent,
-      child: Center(
-        child: Text(
-          'Count: $state',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }));
-
-  // Add an animation to make the counter "pop in" on start
-  counterDisplayEntity.add(AnimationComponent(
-    duration: const Duration(milliseconds: 600),
-    curve: Curves.easeOutBack,
-    onUpdate: (entity, value) {
-      final pos = entity.get<PositionComponent>();
-      if (pos != null) {
-        pos.scale = value;
-        entity.add(pos);
-      }
-    },
-    // When the animation is complete, give the entity a downward velocity.
-    onComplete: (entity) {
-      entity.add(
-          VelocityComponent(x: 0, y: 50)); // 50 pixels per second downwards
-    },
-  ));
-
-  world.addEntity(counterDisplayEntity);
-
-  // --- Button Entities ---
-  final incrementButtonEntity = Entity();
-  incrementButtonEntity
-      .add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
-  incrementButtonEntity.add(WidgetComponent(
-    (context, entity) => ElevatedButton(
-      onPressed: counterCubit.increment,
-      child: const Icon(Icons.add),
-    ),
-  ));
-  world.addEntity(incrementButtonEntity);
-
-  final decrementButtonEntity = Entity();
-  decrementButtonEntity
-      .add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
-  decrementButtonEntity.add(WidgetComponent(
-    (context, entity) => ElevatedButton(
-      onPressed: counterCubit.decrement,
-      child: const Icon(Icons.remove),
-    ),
-  ));
-  world.addEntity(decrementButtonEntity);
+  // --- Create Initial Entities ---
+  // The module itself is responsible for creating its own entities.
+  counterModule.createEntities(world, counterCubit);
 
   return world;
 }
@@ -124,13 +60,5 @@ class MyApp extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// The system that updates the counter's data component.
-class _CounterDisplaySystem extends BlocSystem<CounterCubit, int> {
-  @override
-  void onStateChange(Entity entity, int state) {
-    entity.add(CounterStateComponent(state));
   }
 }
