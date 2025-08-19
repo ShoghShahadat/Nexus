@@ -3,12 +3,10 @@ import 'package:nexus/nexus.dart';
 import 'package:nexus_example/counter_cubit.dart';
 
 // --- World Setup ---
-// We've moved the world creation logic into its own function for clarity.
 NexusWorld setupWorld() {
   final world = NexusWorld();
 
   // 1. Systems
-  // Systems are the brains of the application.
   final renderingSystem = FlutterRenderingSystem();
   final inputSystem = InputSystem();
   final counterSystem = _CounterDisplaySystem();
@@ -18,22 +16,19 @@ NexusWorld setupWorld() {
   world.addSystem(counterSystem);
 
   // 2. Shared State
-  // The CounterCubit is shared between multiple entities.
   final counterCubit = CounterCubit();
 
   // 3. Entities & Components
-  // Each entity is a collection of data components.
-
-  // The entity that displays the counter value.
   final counterDisplayEntity = Entity();
+  // IMPORTANT: We connect the entity's change signal to the world's notifier.
+  counterDisplayEntity.onComponentChanged = world.worldNotifier.notifyListeners;
+
   counterDisplayEntity
       .add(PositionComponent(x: 80, y: 250, width: 250, height: 100));
-  counterDisplayEntity.add(
-      WidgetComponent(const CircularProgressIndicator())); // Initial widget
-  counterDisplayEntity.add(BlocComponent(counterCubit)); // Links to the BLoC
+  counterDisplayEntity.add(WidgetComponent(const CircularProgressIndicator()));
+  counterDisplayEntity.add(BlocComponent(counterCubit));
   world.addEntity(counterDisplayEntity);
 
-  // The entity for the "Increment" button.
   final incrementButtonEntity = Entity();
   incrementButtonEntity
       .add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
@@ -41,12 +36,10 @@ NexusWorld setupWorld() {
     ElevatedButton(onPressed: () {}, child: const Icon(Icons.add)),
   ));
   incrementButtonEntity.add(ClickableComponent((entity) {
-    // On tap, we find the cubit and call its method.
     counterCubit.increment();
   }));
   world.addEntity(incrementButtonEntity);
 
-  // The entity for the "Decrement" button.
   final decrementButtonEntity = Entity();
   decrementButtonEntity
       .add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
@@ -54,7 +47,6 @@ NexusWorld setupWorld() {
     ElevatedButton(onPressed: () {}, child: const Icon(Icons.remove)),
   ));
   decrementButtonEntity.add(ClickableComponent((entity) {
-    // It interacts with the *same* cubit instance.
     counterCubit.decrement();
   }));
   world.addEntity(decrementButtonEntity);
@@ -63,8 +55,7 @@ NexusWorld setupWorld() {
 }
 
 void main() {
-  final world = setupWorld();
-  runApp(MyApp(world: world));
+  runApp(MyApp(world: setupWorld()));
 }
 
 /// The root widget of the application.
@@ -109,13 +100,12 @@ class _CounterDisplaySystem extends BlocSystem {
   @override
   void onStateChange(Entity entity, dynamic state) {
     if (state is int) {
-      // --- FIX ---
-      // The widget is simplified to a single Material widget.
-      // Applying color and borderRadius directly to Material avoids layout
-      // conflicts that can occur when nesting it with a decorated Container.
+      // This `add` call will now trigger the `onComponentChanged` callback
+      // on the entity, which in turn notifies the world, and finally,
+      // the NexusWidget rebuilds the UI.
       entity.add(WidgetComponent(
         Material(
-          key: ValueKey(state), // Add a key for better widget reconciliation
+          key: ValueKey(state),
           elevation: 4.0,
           borderRadius: BorderRadius.circular(12),
           color: state >= 0 ? Colors.deepPurple : Colors.redAccent,

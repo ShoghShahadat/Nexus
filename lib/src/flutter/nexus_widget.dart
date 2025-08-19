@@ -4,15 +4,11 @@ import 'package:nexus/src/core/nexus_world.dart';
 
 /// A Flutter widget that hosts and runs a [NexusWorld].
 ///
-/// This widget is the bridge between the Nexus ECS architecture and the Flutter
-/// widget tree. It initializes a `Ticker` to drive the `NexusWorld`'s update
-/// loop, ensuring that all systems are processed on each frame.
+/// This widget separates the high-frequency logic loop (driven by a `Ticker`)
+/// from the UI render loop (driven by a `ChangeNotifier`). This is a highly
+/// performant approach that ensures the UI only rebuilds when necessary.
 class NexusWidget extends StatefulWidget {
-  /// The world instance that this widget will manage.
   final NexusWorld world;
-
-  /// A builder function to create the UI that overlays the Nexus world.
-  /// This UI can react to the state within the world.
   final Widget Function(BuildContext context, NexusWorld world) builder;
 
   const NexusWidget({
@@ -33,27 +29,38 @@ class _NexusWidgetState extends State<NexusWidget>
   @override
   void initState() {
     super.initState();
+    // The logic loop ticker. This runs at the screen's refresh rate.
     _ticker = createTicker(_onTick)..start();
+
+    // The render loop listener. This only triggers a rebuild when notified.
+    widget.world.worldNotifier.addListener(_onWorldChanged);
   }
 
-  /// The callback executed for each animation frame.
+  /// The high-frequency callback for the logic loop.
   void _onTick(Duration elapsed) {
     final delta = elapsed - _lastElapsed;
     final dt = delta.inMicroseconds / Duration.microsecondsPerSecond;
     _lastElapsed = elapsed;
 
-    // Update the world with the calculated delta time.
-    // We also trigger a widget rebuild to ensure the UI reflects the new state.
+    // Update the world's logic without rebuilding the widget.
     if (mounted) {
-      setState(() {
-        widget.world.update(dt);
-      });
+      widget.world.update(dt);
+    }
+  }
+
+  /// The low-frequency callback for the render loop.
+  void _onWorldChanged() {
+    // A visual change has occurred in the world, so we call setState
+    // to trigger a rebuild of the widget tree.
+    if (mounted) {
+      setState(() {});
     }
   }
 
   @override
   void dispose() {
     _ticker.dispose();
+    widget.world.worldNotifier.removeListener(_onWorldChanged);
     super.dispose();
   }
 
