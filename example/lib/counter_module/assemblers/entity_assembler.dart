@@ -25,7 +25,7 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
     entity.add(PositionComponent(x: 80, y: 250, width: 250, height: 100));
     entity.add(BlocComponent<CounterCubit, int>(cubit));
     entity.add(CounterStateComponent(cubit.state));
-    entity.add(TagsComponent({'counter_display'}));
+    entity.add(TagsComponent({BuilderTags.counterDisplay}));
     entity.add(MorphingLogicComponent(initialSides: 4, targetSides: 4));
     return entity;
   }
@@ -48,10 +48,14 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
           x: positions[i][0], y: positions[i][1], width: 60, height: 60));
       entity.add(ShapePathComponent(sides: sides[i]));
       entity.add(ClickableComponent((e) {
-        // Fire the event with the number of sides (int), which is correct now.
         world.eventBus.fire(ShapeSelectedEvent(sides[i]));
       }));
-      entity.add(TagsComponent({'shape_button'}));
+      // Use the generic custom widget tag
+      entity.add(TagsComponent({BuilderTags.customWidget}));
+      // Provide the data blueprint for the widget
+      entity.add(CustomWidgetComponent(
+        widgetType: 'shape_button',
+      ));
       buttons.add(entity);
     }
     return buttons;
@@ -62,7 +66,11 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
     final entity = Entity();
     entity.add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
     entity.add(ClickableComponent((_) => cubit.increment()));
-    entity.add(TagsComponent({'increment_button'}));
+    entity.add(TagsComponent({BuilderTags.customWidget}));
+    entity.add(CustomWidgetComponent(
+      widgetType: 'elevated_button',
+      properties: {'icon': 0xe047}, // Icons.add code point
+    ));
     return entity;
   }
 
@@ -71,7 +79,11 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
     final entity = Entity();
     entity.add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
     entity.add(ClickableComponent((_) => cubit.decrement()));
-    entity.add(TagsComponent({'decrement_button'}));
+    entity.add(TagsComponent({BuilderTags.customWidget}));
+    entity.add(CustomWidgetComponent(
+      widgetType: 'elevated_button',
+      properties: {'icon': 0xe516}, // Icons.remove code point
+    ));
     return entity;
   }
 }

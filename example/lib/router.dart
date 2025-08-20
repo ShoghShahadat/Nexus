@@ -29,7 +29,7 @@ class CounterSceneRoute extends NexusRoute {
           renderingSystemBuilder: (context) {
             return FlutterRenderingSystem(
               builders: {
-                'counter_display': (context, id, controller, manager) {
+                BuilderTags.counterDisplay: (context, id, controller, manager) {
                   final stateComp = controller.get<CounterStateComponent>(id);
                   final morph = controller.get<MorphingLogicComponent>(id);
                   final pos = controller.get<PositionComponent>(id);
@@ -61,42 +61,39 @@ class CounterSceneRoute extends NexusRoute {
                         text: 'Count: $stateValue'),
                   );
                 },
-                'increment_button': (context, id, controller, manager) {
-                  return ElevatedButton(
-                    onPressed: () {
-                      manager.send(EntityTapEvent(id));
-                    },
-                    child: const Icon(Icons.add),
-                  );
-                },
-                'decrement_button': (context, id, controller, manager) {
-                  return ElevatedButton(
-                    onPressed: () {
-                      manager.send(EntityTapEvent(id));
-                    },
-                    child: const Icon(Icons.remove),
-                  );
-                },
-                'shape_button': (context, id, controller, manager) {
-                  final shape = controller.get<ShapePathComponent>(id);
-                  final pos = controller.get<PositionComponent>(id);
-                  if (shape == null || pos == null) {
-                    return const SizedBox.shrink();
+                BuilderTags.customWidget: (context, id, controller, manager) {
+                  final widgetComp = controller.get<CustomWidgetComponent>(id);
+                  if (widgetComp == null) return const SizedBox.shrink();
+
+                  switch (widgetComp.widgetType) {
+                    case 'elevated_button':
+                      final iconCode = widgetComp.properties['icon'] as int?;
+                      return ElevatedButton(
+                        onPressed: () => manager.send(EntityTapEvent(id)),
+                        child: Icon(iconCode != null
+                            ? IconData(iconCode, fontFamily: 'MaterialIcons')
+                            : null),
+                      );
+                    case 'shape_button':
+                      final shape = controller.get<ShapePathComponent>(id);
+                      final pos = controller.get<PositionComponent>(id);
+                      if (shape == null || pos == null)
+                        return const SizedBox.shrink();
+                      final path = getPolygonPath(
+                          Size(pos.width, pos.height), shape.sides);
+                      return GestureDetector(
+                        onTap: () => manager.send(EntityTapEvent(id)),
+                        child: Container(
+                          color: Colors.transparent,
+                          child: CustomPaint(
+                              size: Size(pos.width, pos.height),
+                              painter: ShapeButtonPainter(path: path)),
+                        ),
+                      );
+                    default:
+                      return Text(
+                          'Unknown widget type: ${widgetComp.widgetType}');
                   }
-
-                  final path =
-                      getPolygonPath(Size(pos.width, pos.height), shape.sides);
-
-                  return GestureDetector(
-                    onTap: () {
-                      manager.send(EntityTapEvent(id));
-                    },
-                    child: Container(
-                      color: Colors.transparent,
-                      child:
-                          CustomPaint(painter: ShapeButtonPainter(path: path)),
-                    ),
-                  );
                 },
               },
             );

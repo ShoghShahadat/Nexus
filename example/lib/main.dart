@@ -10,32 +10,20 @@ import 'package:nexus_example/counter_module/utils/shape_utils.dart';
 
 // --- World Provider ---
 // This function will be executed in the background isolate.
-// It sets up the data and logic, but no Flutter widgets.
 NexusWorld provideNexusWorld() {
   final world = NexusWorld();
-
-  // Register CounterCubit as a singleton service
   world.services.registerSingleton(CounterCubit());
-
-  // --- Global Systems ---
   world.addSystem(AnimationSystem());
   world.addSystem(PulsingWarningSystem());
   world.addSystem(MorphingSystem());
   world.addSystem(LifecycleSystem());
   world.addSystem(InputSystem());
-
-  // --- Load Feature Modules ---
-  final counterModule = CounterModule();
-  world.loadModule(counterModule);
-
+  world.loadModule(CounterModule());
   return world;
 }
 
 void main() {
-  // Register all serializable components from the core framework.
-  // This is crucial for communication between isolates.
   registerCoreComponents();
-
   runApp(const MyApp());
 }
 
@@ -45,12 +33,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // --- UI Setup ---
-    // This happens on the main thread.
-    // We define how entities are rendered based on their tags.
     final renderingSystem = FlutterRenderingSystem(
       builders: {
-        'counter_display': (context, id, controller, manager) {
+        BuilderTags.counterDisplay: (context, id, controller, manager) {
           final stateComp = controller.get<CounterStateComponent>(id);
           final morph = controller.get<MorphingLogicComponent>(id);
           final pos = controller.get<PositionComponent>(id);
@@ -70,7 +55,6 @@ class MyApp extends StatelessWidget {
               Size(pos.width, pos.height), morph.targetSides,
               cornerRadius: 12.0);
 
-          // If animation is running, use its progress. Otherwise, it's complete (1.0).
           final progress = anim?.progress ?? 1.0;
 
           return CustomPaint(
@@ -83,46 +67,39 @@ class MyApp extends StatelessWidget {
             ),
           );
         },
-        'increment_button': (context, id, controller, manager) {
-          return ElevatedButton(
-            onPressed: () {
-              // Send a tap event to the logic isolate.
-              manager.send(EntityTapEvent(id));
-            },
-            child: const Icon(Icons.add),
-          );
-        },
-        'decrement_button': (context, id, controller, manager) {
-          return ElevatedButton(
-            onPressed: () {
-              // Send a tap event to the logic isolate.
-              manager.send(EntityTapEvent(id));
-            },
-            child: const Icon(Icons.remove),
-          );
-        },
-        'shape_button': (context, id, controller, manager) {
-          final shape = controller.get<ShapePathComponent>(id);
-          final pos = controller.get<PositionComponent>(id);
+        // The single, smart builder that acts as a widget factory.
+        BuilderTags.customWidget: (context, id, controller, manager) {
+          final widgetComp = controller.get<CustomWidgetComponent>(id);
+          if (widgetComp == null) return const SizedBox.shrink();
 
-          if (shape == null || pos == null) {
-            return const SizedBox.shrink();
+          // Read the blueprint and build the corresponding widget.
+          switch (widgetComp.widgetType) {
+            case 'elevated_button':
+              final iconCode = widgetComp.properties['icon'] as int?;
+              return ElevatedButton(
+                onPressed: () => manager.send(EntityTapEvent(id)),
+                child: Icon(iconCode != null
+                    ? IconData(iconCode, fontFamily: 'MaterialIcons')
+                    : null),
+              );
+            case 'shape_button':
+              final shape = controller.get<ShapePathComponent>(id);
+              final pos = controller.get<PositionComponent>(id);
+              if (shape == null || pos == null) return const SizedBox.shrink();
+              final path =
+                  getPolygonPath(Size(pos.width, pos.height), shape.sides);
+              return GestureDetector(
+                onTap: () => manager.send(EntityTapEvent(id)),
+                child: Container(
+                  color: Colors.transparent,
+                  child: CustomPaint(
+                      size: Size(pos.width, pos.height),
+                      painter: ShapeButtonPainter(path: path)),
+                ),
+              );
+            default:
+              return Text('Unknown widget type: ${widgetComp.widgetType}');
           }
-
-          final path = getPolygonPath(Size(pos.width, pos.height), shape.sides);
-
-          return GestureDetector(
-            onTap: () {
-              // Send a tap event to the logic isolate.
-              manager.send(EntityTapEvent(id));
-            },
-            child: Container(
-              color: Colors.transparent,
-              child: CustomPaint(
-                  size: Size(pos.width, pos.height),
-                  painter: ShapeButtonPainter(path: path)),
-            ),
-          );
         },
       },
     );

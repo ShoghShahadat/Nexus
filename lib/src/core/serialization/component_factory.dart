@@ -4,6 +4,7 @@ import 'package:nexus/src/components/tags_component.dart';
 import 'package:nexus/src/core/serialization/serializable_component.dart';
 import 'package:nexus/src/components/animation_progress_component.dart';
 import 'package:nexus/src/components/counter_state_component.dart';
+import 'package:nexus/src/components/custom_widget_component.dart';
 import 'package:nexus/src/components/morphing_component.dart';
 import 'package:nexus/src/components/shape_path_component.dart';
 
@@ -57,4 +58,6 @@ void registerCoreComponents() {
       (json) => MorphingLogicComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
       'ShapePathComponent', (json) => ShapePathComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'CustomWidgetComponent', (json) => CustomWidgetComponent.fromJson(json));
 }
