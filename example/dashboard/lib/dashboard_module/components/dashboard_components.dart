@@ -1,14 +1,14 @@
 import 'package:nexus/nexus.dart';
 
-// این فایل شامل تمام کامپوننت‌های داده‌ای سفارشی است که برای ماژول داشبورد نیاز داریم.
-// هر کامپوننت، بخشی از داده‌های خالص و سریال‌پذیر را برای یک نوع خاص از Entity تعریف می‌کند.
+// *** FIX: ChildrenComponent has been removed from this file. ***
+// It is now part of the core Nexus library.
 
-/// کامپوننت برای نگهداری داده‌های یک کارت خلاصه در بالای داشبورد.
+/// Component for holding the data of a summary card.
 class SummaryCardComponent extends Component with SerializableComponent {
   final String title;
   final String value;
-  final int iconCodePoint; // کد پوینت آیکون از مجموعه MaterialIcons
-  final int colorValue; // مقدار رنگ به صورت int
+  final int iconCodePoint;
+  final int colorValue;
 
   SummaryCardComponent({
     required this.title,
@@ -38,10 +38,10 @@ class SummaryCardComponent extends Component with SerializableComponent {
   List<Object?> get props => [title, value, iconCodePoint, colorValue];
 }
 
-/// کامپوننت برای نگهداری داده‌های نمودار میله‌ای.
+/// Component for holding the data of the bar chart.
 class ChartDataComponent extends Component with SerializableComponent {
   final String title;
-  final List<double> weeklyData; // لیستی از ۷ مقدار برای روزهای هفته
+  final List<double> weeklyData;
 
   ChartDataComponent({required this.title, required this.weeklyData});
 
@@ -64,11 +64,11 @@ class ChartDataComponent extends Component with SerializableComponent {
   List<Object?> get props => [title, weeklyData];
 }
 
-/// کامپوننت برای نگهداری داده‌های یک آیتم در لیست وظایف.
+/// Component for holding the data of a task list item.
 class TaskItemComponent extends Component with SerializableComponent {
   final String title;
   final String assignedTo;
-  final String priority; // مثلا "High", "Medium", "Low"
+  final String priority;
   final bool isCompleted;
 
   TaskItemComponent({
@@ -99,9 +99,9 @@ class TaskItemComponent extends Component with SerializableComponent {
   List<Object?> get props => [title, assignedTo, priority, isCompleted];
 }
 
-/// یک کامپوننت انیمیشن ساده برای مدیریت حالت‌های ورود (fade-in, slide-in).
+/// A simple animation component for entry states (fade-in, slide-in).
 class EntryAnimationComponent extends Component with SerializableComponent {
-  final double delay; // تاخیر قبل از شروع انیمیشن به ثانیه
+  final double delay;
 
   EntryAnimationComponent({required this.delay});
 

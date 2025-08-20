@@ -1,20 +1,21 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/core/render_packet.dart';
 
-/// A function signature for building a widget based on an entity's ID and
-/// the current rendering controller.
-typedef TaggedWidgetBuilder = Widget Function(BuildContext context, EntityId id,
-    FlutterRenderingSystem controller, NexusIsolateManager manager);
+// *** FIX: Removed all dependencies on the example project. ***
 
-/// A UI-side controller that extends ChangeNotifier. It receives RenderPackets
-/// from the background isolate, caches the component data, and notifies its
-/// listeners to rebuild the UI.
+/// A function signature for building a widget based on an entity's ID and data.
+typedef EntityWidgetBuilderFunc = Widget Function(
+    BuildContext context,
+    EntityId id,
+    FlutterRenderingSystem controller,
+    NexusIsolateManager manager);
+
+/// A UI-side controller that recursively builds a Flutter widget tree from a
+/// hierarchical entity structure.
 class FlutterRenderingSystem extends ChangeNotifier {
   final Map<EntityId, Map<Type, Component>> _componentCache = {};
-  final Map<String, TaggedWidgetBuilder> builders;
+  final Map<String, EntityWidgetBuilderFunc> builders;
   NexusIsolateManager? _isolateManager;
 
   FlutterRenderingSystem({required this.builders});
@@ -25,27 +26,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
 
   T? get<T extends Component>(EntityId id) {
     return _componentCache[id]?[T] as T?;
-  }
-
-  List<EntityId> getAllIdsWithTag(String tag) {
-    final List<EntityId> ids = [];
-    for (final entry in _componentCache.entries) {
-      final tagsComp = entry.value[TagsComponent] as TagsComponent?;
-      if (tagsComp != null && tagsComp.hasTag(tag)) {
-        ids.add(entry.key);
-      }
-    }
-    return ids;
-  }
-
-  void addUiEntity(EntityId id, Set<String> tags) {
-    if (!_componentCache.containsKey(id)) {
-      _componentCache[id] = {};
-    }
-    _componentCache[id]![PositionComponent] =
-        PositionComponent(x: 0, y: 0, width: 0, height: 0);
-    _componentCache[id]![TagsComponent] = TagsComponent(tags);
-    notifyListeners();
   }
 
   void updateFromPackets(List<RenderPacket> packets) {
@@ -79,51 +59,71 @@ class FlutterRenderingSystem extends ChangeNotifier {
     }
   }
 
-  @override
+  // *** FIX: Removed @override annotation as this method does not override anything. ***
   Widget build(BuildContext context) {
-    if (_isolateManager == null) {
-      return const Center(
-          child: Text("Nexus Isolate Manager not initialized."));
-    }
-    if (_componentCache.isEmpty) {
+    if (_isolateManager == null || _componentCache.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final List<Widget> children = [];
-    for (final entityId in _componentCache.keys) {
-      final pos = get<PositionComponent>(entityId);
-      final tags = get<TagsComponent>(entityId);
-      if (pos == null || tags == null) continue;
-
-      TaggedWidgetBuilder? builder;
-      for (final tag in tags.tags) {
-        if (builders.containsKey(tag)) {
-          builder = builders[tag];
-          break;
-        }
+    EntityId? rootId;
+    for (final entry in _componentCache.entries) {
+      final tags = entry.value[TagsComponent] as TagsComponent?;
+      if (tags != null && tags.hasTag('root')) {
+        rootId = entry.key;
+        break;
       }
-      if (builder == null) continue;
-
-      children.add(
-        Positioned(
-          key: ValueKey(entityId),
-          left: pos.x,
-          top: pos.y,
-          width: pos.width,
-          height: pos.height,
-          child: Transform.scale(
-            scale: pos.scale,
-            child: builder(context, entityId, this, _isolateManager!),
-          ),
-        ),
-      );
     }
 
-    // *** FIX: Use a SizedBox with a fixed height to define the scrollable area. ***
-    // This allows the parent SingleChildScrollView to work correctly with the Stack.
-    return SizedBox(
-      height: 1200, // A height large enough to contain all elements
-      child: Stack(children: children),
-    );
+    if (rootId == null) {
+      return const Center(
+          child: Text("Error: 'root' entity not found in the world."));
+    }
+
+    return _buildEntityWidget(context, rootId);
+  }
+
+  Widget _buildEntityWidget(BuildContext context, EntityId id) {
+    final customWidgetComp = get<CustomWidgetComponent>(id);
+    if (customWidgetComp == null) {
+      return const SizedBox.shrink();
+    }
+
+    final widgetType = customWidgetComp.widgetType;
+    final childrenComp = get<ChildrenComponent>(id);
+    final children = childrenComp?.children
+            .map((childId) => _buildEntityWidget(context, childId))
+            .toList() ??
+        [];
+
+    switch (widgetType) {
+      case 'column':
+        return Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch, // Stretch to fill width
+          children: children,
+        );
+      case 'wrap':
+        return Padding(
+          padding: const EdgeInsets.all(16.0), // Add padding around the wrap
+          child: Wrap(
+            spacing: 16.0,
+            runSpacing: 16.0,
+            alignment: WrapAlignment.center, // Center the cards
+            children: children,
+          ),
+        );
+      case 'padding':
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: children.isNotEmpty ? children.first : const SizedBox.shrink(),
+        );
+      default:
+        final builder = builders[widgetType];
+        if (builder != null) {
+          return builder(context, id, this, _isolateManager!);
+        }
+    }
+
+    return Text('Unknown widget type: $widgetType');
   }
 }

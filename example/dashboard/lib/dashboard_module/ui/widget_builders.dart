@@ -3,70 +3,82 @@ import 'package:nexus/nexus.dart';
 import 'package:nexus_example/dashboard_module/components/dashboard_components.dart';
 import 'package:nexus_example/dashboard_module/ui/custom_painters.dart';
 
-/// Builds the widget for a summary card entity with an improved design.
+/// This file contains the widget building logic for the dashboard entities.
+/// These builders are now designed to work within a standard Flutter layout (like Column or Wrap).
+
+/// Builds the widget for a summary card entity.
 Widget buildSummaryCard(BuildContext context, EntityId id,
     FlutterRenderingSystem controller, NexusIsolateManager manager) {
   final cardData = controller.get<SummaryCardComponent>(id);
-  if (cardData == null) return const SizedBox.shrink();
+  final widgetData = controller.get<CustomWidgetComponent>(id);
+  if (cardData == null || widgetData == null) return const SizedBox.shrink();
 
-  return Container(
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          Color(cardData.colorValue).withOpacity(0.7),
-          Color(cardData.colorValue)
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.1),
-          blurRadius: 10,
-          offset: const Offset(0, 5),
-        )
-      ],
-    ),
-    child: Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {}, // Placeholder for future interaction
+  // The size is now provided via properties, making the component more reusable.
+  final width = widgetData.properties['width'] as double? ?? 200.0;
+  final height = widgetData.properties['height'] as double? ?? 120.0;
+
+  return SizedBox(
+    width: width,
+    height: height,
+    child: Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(cardData.colorValue).withOpacity(0.7),
+            Color(cardData.colorValue)
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                cardData.value,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 36,
-                  color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          )
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {}, // Placeholder
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  cardData.value,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 36,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    IconData(cardData.iconCodePoint,
-                        fontFamily: 'MaterialIcons'),
-                    color: Colors.white.withOpacity(0.8),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    cardData.title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white.withOpacity(0.9),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      IconData(cardData.iconCodePoint,
+                          fontFamily: 'MaterialIcons'),
+                      color: Colors.white.withOpacity(0.8),
+                      size: 18,
                     ),
-                  ),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 8),
+                    Text(
+                      cardData.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white.withOpacity(0.9),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -78,39 +90,47 @@ Widget buildSummaryCard(BuildContext context, EntityId id,
 Widget buildChart(BuildContext context, EntityId id,
     FlutterRenderingSystem controller, NexusIsolateManager manager) {
   final chartData = controller.get<ChartDataComponent>(id);
-  final pos = controller.get<PositionComponent>(id);
-  if (chartData == null || pos == null) return const SizedBox.shrink();
+  final widgetData = controller.get<CustomWidgetComponent>(id);
+  // Animation is now driven by a separate component, not PositionComponent.
+  final animProgress = controller.get<AnimationProgressComponent>(id);
+  if (chartData == null || widgetData == null) return const SizedBox.shrink();
 
-  return Card(
-    elevation: 4.0,
-    shadowColor: Colors.black.withOpacity(0.1),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    child: Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            chartData.title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: CustomPaint(
-              painter: BarChartPainter(
-                values: chartData.weeklyData,
-                animationProgress: pos.scale,
-              ),
-              child: const SizedBox.expand(),
+  final height = widgetData.properties['height'] as double? ?? 250.0;
+
+  return SizedBox(
+    height: height,
+    child: Card(
+      elevation: 4.0,
+      shadowColor: Colors.black.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              chartData.title,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Expanded(
+              child: CustomPaint(
+                painter: BarChartPainter(
+                  values: chartData.weeklyData,
+                  animationProgress: animProgress?.progress ??
+                      1.0, // Use progress from the component
+                ),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );
 }
 
-/// Builds the widget for a task list item entity with interactivity.
+/// Builds the widget for a task list item entity.
 Widget buildTaskItem(BuildContext context, EntityId id,
     FlutterRenderingSystem controller, NexusIsolateManager manager) {
   final taskData = controller.get<TaskItemComponent>(id);
@@ -124,19 +144,18 @@ Widget buildTaskItem(BuildContext context, EntityId id,
 
   return Card(
     elevation: 2.0,
+    margin: const EdgeInsets.symmetric(vertical: 4.0),
     shadowColor: Colors.black.withOpacity(0.05),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     child: InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () {
-        // *** FIX: Send tap event to the background isolate. ***
         manager.send(EntityTapEvent(id));
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         child: Row(
           children: [
-            // Animated Checkbox
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
@@ -159,7 +178,6 @@ Widget buildTaskItem(BuildContext context, EntityId id,
                   : null,
             ),
             const SizedBox(width: 16),
-            // Task Title and Assignee
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +203,6 @@ Widget buildTaskItem(BuildContext context, EntityId id,
               ),
             ),
             const SizedBox(width: 16),
-            // Priority Tag
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(

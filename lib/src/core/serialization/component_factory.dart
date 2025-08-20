@@ -1,24 +1,11 @@
-import 'package:nexus/src/core/component.dart';
-import 'package:nexus/src/components/position_component.dart';
-import 'package:nexus/src/components/tags_component.dart';
-import 'package:nexus/src/core/serialization/serializable_component.dart';
-import 'package:nexus/src/components/animation_progress_component.dart';
-import 'package:nexus/src/components/attractor_component.dart';
-import 'package:nexus/src/components/counter_state_component.dart';
-import 'package:nexus/src/components/custom_widget_component.dart';
-import 'package:nexus/src/components/morphing_component.dart';
-import 'package:nexus/src/components/particle_component.dart';
-import 'package:nexus/src/components/shape_path_component.dart';
-import 'package:nexus/src/components/spawner_component.dart';
-import 'package:nexus/src/components/velocity_component.dart';
+import 'package:nexus/nexus.dart';
 
-// FIX: Removed dependency on example project. This file is now self-contained.
+// This file is now fully self-contained within the library.
 
 /// A function signature for a factory that creates a [Component] from a JSON map.
 typedef ComponentFactory = Component Function(Map<String, dynamic> json);
 
 /// A registry for mapping component type names to their deserialization factories.
-/// This registry is now populated by the application code, not the library.
 class ComponentFactoryRegistry {
   final Map<String, ComponentFactory> _factories = {};
 
@@ -27,12 +14,10 @@ class ComponentFactoryRegistry {
 
   ComponentFactoryRegistry._internal();
 
-  /// Registers a component factory. This should be called from the application's setup code.
   void register(String typeName, ComponentFactory factory) {
     _factories[typeName] = factory;
   }
 
-  /// Creates a component instance from JSON using a registered factory.
   Component create(String typeName, Map<String, dynamic> json) {
     final factory = _factories[typeName];
     if (factory == null) {
@@ -45,7 +30,6 @@ class ComponentFactoryRegistry {
 }
 
 /// A helper function to register all default serializable components from the core library.
-/// This should be called by the application at startup.
 void registerCoreComponents() {
   ComponentFactoryRegistry.I.register(
       'PositionComponent', (json) => PositionComponent.fromJson(json));
@@ -69,7 +53,7 @@ void registerCoreComponents() {
       'VelocityComponent', (json) => VelocityComponent.fromJson(json));
   ComponentFactoryRegistry.I
       .register('SpawnerComponent', (json) => SpawnerComponent.fromJson(json));
+  // *** FIX: Register ChildrenComponent as part of the core library ***
+  ComponentFactoryRegistry.I.register(
+      'ChildrenComponent', (json) => ChildrenComponent.fromJson(json));
 }
-
-// FIX: Removed the dashboard-specific registration function.
-// This logic now belongs in the example application code.

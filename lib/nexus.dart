@@ -42,6 +42,8 @@ export 'src/components/spawner_component.dart';
 export 'src/components/tags_component.dart';
 export 'src/components/velocity_component.dart';
 export 'src/components/widget_component.dart';
+// *** FIX: Export the new ChildrenComponent from the core library ***
+export 'src/components/children_component.dart';
 
 // --- Systems ---
 export 'src/systems/animation_system.dart';
