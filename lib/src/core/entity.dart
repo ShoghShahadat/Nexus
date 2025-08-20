@@ -14,6 +14,12 @@ class Entity extends ChangeNotifier {
   final EntityId id;
   final Map<Type, Component> _components = {};
 
+  // --- Dirty Checking Mechanism ---
+  /// A set of component types that have been modified in the current frame.
+  final Set<Type> _dirtyComponents = {};
+  Set<Type> get dirtyComponents => Set.unmodifiable(_dirtyComponents);
+  void clearDirty() => _dirtyComponents.clear();
+
   Entity() : id = _nextId++;
 
   /// Adds a component to the entity and notifies listeners.
@@ -29,6 +35,7 @@ class Entity extends ChangeNotifier {
     // If it's the exact same instance, we assume it was mutated internally
     // and a notification is desired.
     if (identical(existingComponent, component)) {
+      _dirtyComponents.add(T); // Mark as dirty
       notifyListeners();
       return;
     }
@@ -40,6 +47,7 @@ class Entity extends ChangeNotifier {
     }
 
     _components[T] = component;
+    _dirtyComponents.add(T); // Mark as dirty
     notifyListeners();
   }
 
@@ -47,15 +55,25 @@ class Entity extends ChangeNotifier {
   T? remove<T extends Component>() {
     final removed = _components.remove(T) as T?;
     if (removed != null) {
+      // Note: Component removal is handled by a special packet,
+      // so we don't need to mark it as dirty here. The entity's
+      // removal itself is the signal.
       notifyListeners();
     }
     return removed;
   }
 
-  /// Retrieves a component of a specific type from the entity.
+  /// Retrieves a component of a specific type from the entity using generics.
   T? get<T extends Component>() {
     return _components[T] as T?;
   }
+
+  // --- NEW: Method to get a component by its Type object ---
+  /// Retrieves a component of a specific type from the entity using a Type object.
+  Component? getByType(Type componentType) {
+    return _components[componentType];
+  }
+  // --- END NEW ---
 
   /// Checks if the entity has a component of a specific type.
   bool has<T extends Component>() {

@@ -1,10 +1,6 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/flutter/nexus_manager.dart';
-
-// *** MODIFIED: This class now implements the common NexusManager interface. ***
-// Its core logic remains the same, designed for mobile/desktop platforms.
 
 /// Manages the background isolate where the NexusWorld runs.
 class NexusIsolateManager implements NexusManager {
@@ -88,8 +84,13 @@ void _isolateEntryPoint(List<dynamic> args) async {
 
     final packets = <RenderPacket>[];
     for (final entity in world.entities.values) {
+      if (entity.dirtyComponents.isEmpty) continue;
+
       final serializableComponents = <String, Map<String, dynamic>>{};
-      for (final component in entity.allComponents) {
+      for (final componentType in entity.dirtyComponents) {
+        // --- FIX: Use the new getByType method ---
+        final component = entity.getByType(componentType);
+        // --- END FIX ---
         if (component is SerializableComponent) {
           serializableComponents[component.runtimeType.toString()] =
               (component as SerializableComponent).toJson();
@@ -116,6 +117,10 @@ void _isolateEntryPoint(List<dynamic> args) async {
     if (message is EntityTapEvent) {
       world.eventBus.fire(message);
     } else if (message is NexusPointerMoveEvent) {
+      world.eventBus.fire(message);
+    } else if (message is UndoEvent) {
+      world.eventBus.fire(message);
+    } else if (message is RedoEvent) {
       world.eventBus.fire(message);
     } else if (message == 'shutdown') {
       timer.cancel();

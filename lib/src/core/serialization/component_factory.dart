@@ -53,7 +53,9 @@ void registerCoreComponents() {
       'VelocityComponent', (json) => VelocityComponent.fromJson(json));
   ComponentFactoryRegistry.I
       .register('SpawnerComponent', (json) => SpawnerComponent.fromJson(json));
-  // *** FIX: Register ChildrenComponent as part of the core library ***
   ComponentFactoryRegistry.I.register(
       'ChildrenComponent', (json) => ChildrenComponent.fromJson(json));
+  // *** NEW: Register HistoryComponent ***
+  ComponentFactoryRegistry.I
+      .register('HistoryComponent', (json) => HistoryComponent.fromJson(json));
 }

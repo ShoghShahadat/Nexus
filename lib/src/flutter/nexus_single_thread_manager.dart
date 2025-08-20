@@ -1,17 +1,11 @@
 import 'dart:async';
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/widgets.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/flutter/nexus_manager.dart';
-
-// *** NEW FILE ***
-// This class provides a web-compatible, single-threaded execution model.
-// It runs the NexusWorld on the main UI thread using a simple timer.
 
 /// Manages the NexusWorld lifecycle on the main UI thread for web compatibility.
 class NexusSingleThreadManager implements NexusManager {
   NexusWorld? _world;
-  Timer? _timer;
+  Ticker? _ticker;
   final _stopwatch = Stopwatch();
 
   final _renderPacketController =
@@ -32,7 +26,7 @@ class NexusSingleThreadManager implements NexusManager {
     _stopwatch.start();
 
     // Use a Ticker for smoother animations, synchronized with Flutter's rendering pipeline.
-    final ticker = Ticker((_) {
+    _ticker = Ticker((_) {
       if (_world == null) return;
 
       final dt =
@@ -43,8 +37,13 @@ class NexusSingleThreadManager implements NexusManager {
 
       final packets = <RenderPacket>[];
       for (final entity in _world!.entities.values) {
+        if (entity.dirtyComponents.isEmpty) continue;
+
         final serializableComponents = <String, Map<String, dynamic>>{};
-        for (final component in entity.allComponents) {
+        for (final componentType in entity.dirtyComponents) {
+          // --- FIX: Use the new getByType method ---
+          final component = entity.getByType(componentType);
+          // --- END FIX ---
           if (component is SerializableComponent) {
             serializableComponents[component.runtimeType.toString()] =
                 (component as SerializableComponent).toJson();
@@ -66,7 +65,7 @@ class NexusSingleThreadManager implements NexusManager {
       }
     });
 
-    ticker.start();
+    _ticker!.start();
   }
 
   @override
@@ -77,8 +76,9 @@ class NexusSingleThreadManager implements NexusManager {
 
   @override
   void dispose() {
-    _timer?.cancel();
-    _timer = null;
+    _ticker?.stop();
+    _ticker?.dispose();
+    _ticker = null;
     _world?.clear();
     _world = null;
     _renderPacketController.close();

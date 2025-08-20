@@ -95,6 +95,12 @@ class NexusWorld {
         }
       }
     }
+
+    // --- NEW: Clear dirty flags after all systems have run ---
+    for (final entity in _entities.values) {
+      entity.clearDirty();
+    }
+    // --- END NEW ---
   }
 
   void clear() {
