@@ -5,8 +5,14 @@ import 'package:collection/collection.dart';
 import 'particle_painter.dart';
 import 'components/explosion_component.dart';
 import 'components/complex_movement_component.dart';
+import 'components/meteor_component.dart';
+import 'components/meteor_target_component.dart';
 import 'systems/explosion_system.dart';
 import 'systems/complex_movement_system.dart';
+import 'systems/meteor_spawner_system.dart';
+import 'systems/meteor_burn_system.dart';
+import 'systems/meteor_targeting_system.dart';
+import 'systems/collision_system.dart';
 
 /// The entry point for the background isolate.
 NexusWorld provideAttractorWorld() {
@@ -15,7 +21,11 @@ NexusWorld provideAttractorWorld() {
   // Add all necessary systems to the world.
   world.addSystem(AnimationSystem());
   world.addSystem(ParticleExplosionSystem());
-  world.addSystem(ComplexMovementSystem()); // Our new movement system
+  world.addSystem(ComplexMovementSystem());
+  world.addSystem(MeteorSpawnerSystem());
+  world.addSystem(MeteorTargetingSystem()); // New system
+  world.addSystem(MeteorBurnSystem());
+  world.addSystem(CollisionSystem()); // New system
   world.addSystem(PointerSystem());
   world.addSystem(ParticleSpawningSystem());
   world.addSystem(ParticleLifecycleSystem());
@@ -54,6 +64,10 @@ void main() {
       (json) => ExplodingParticleComponent.fromJson(json));
   ComponentFactoryRegistry.I.register('ComplexMovementComponent',
       (json) => ComplexMovementComponent.fromJson(json));
+  ComponentFactoryRegistry.I
+      .register('MeteorComponent', (json) => MeteorComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'MeteorTargetComponent', (json) => MeteorTargetComponent.fromJson(json));
 
   runApp(const MyApp());
 }
@@ -68,6 +82,7 @@ class MyApp extends StatelessWidget {
       builders: {
         'particle_canvas': (context, id, controller, manager, child) {
           final particleIds = controller.getAllIdsWithTag('particle');
+          final meteorIds = controller.getAllIdsWithTag('meteor');
           final attractorId =
               controller.getAllIdsWithTag('attractor').firstOrNull;
 
@@ -79,6 +94,7 @@ class MyApp extends StatelessWidget {
             child: CustomPaint(
               painter: ParticlePainter(
                 particleIds: particleIds,
+                meteorIds: meteorIds,
                 attractorId: attractorId,
                 controller: controller,
               ),
