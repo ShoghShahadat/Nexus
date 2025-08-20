@@ -51,9 +51,10 @@ void registerCoreComponents() {
       'AttractorComponent', (json) => AttractorComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
       'VelocityComponent', (json) => VelocityComponent.fromJson(json));
-  ComponentFactoryRegistry.I
-      .register('SpawnerComponent', (json) => SpawnerComponent.fromJson(json));
-  // --- NEW: Register the new SpawnerLinkComponent ---
+  // --- FIX: Register the correct, serializable spawner component ---
+  // --- اصلاح: ثبت کامپوننت اسپاونر صحیح و سریالایزبل ---
+  ComponentFactoryRegistry.I.register('ParticleSpawnerComponent',
+      (json) => ParticleSpawnerComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
       'SpawnerLinkComponent', (json) => SpawnerLinkComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(

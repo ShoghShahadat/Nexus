@@ -4,12 +4,16 @@ import '../components/meteor_component.dart';
 import '../components/meteor_target_component.dart';
 
 /// A system that checks for collisions between homing meteors and their targets.
-class CollisionSystem extends System {
+/// Renamed to avoid conflict with the core CollisionSystem.
+/// سیستمی که برخورد بین شهاب‌سنگ‌های هدایت‌شونده و اهدافشان را بررسی می‌کند.
+/// برای جلوگیری از تداخل با CollisionSystem هسته، تغییر نام داده شد.
+class MeteorCollisionSystem extends System {
   final Random _random = Random();
 
   @override
   bool matches(Entity entity) {
     // This system only cares about meteors that are actively targeting something.
+    // این سیستم فقط به شهاب‌سنگ‌هایی که به طور فعال هدفی را دنبال می‌کنند، اهمیت می‌دهد.
     final target = entity.get<MeteorTargetComponent>();
     return entity.has<MeteorComponent>() &&
         target != null &&
@@ -40,6 +44,7 @@ class CollisionSystem extends System {
   }
 
   /// Creates a spectacular burst of particles at the collision point.
+  /// یک انفجار دیدنی از ذرات در نقطه برخورد ایجاد می‌کند.
   void _createCollisionExplosion(PositionComponent atPosition) {
     for (int i = 0; i < 50; i++) {
       // Create 50 particles for a big explosion

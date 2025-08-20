@@ -13,7 +13,9 @@ import 'systems/complex_movement_system.dart';
 import 'systems/meteor_spawner_system.dart';
 import 'systems/meteor_burn_system.dart';
 import 'systems/meteor_targeting_system.dart';
-import 'systems/collision_system.dart';
+// --- FIX: Import the renamed, example-specific collision system ---
+// --- اصلاح: ایمپورت کردن سیستم برخورد تغییر نام یافته و مخصوص مثال ---
+import 'systems/meteor_collision_system.dart';
 
 final InMemoryStorageAdapter _debugStorage = InMemoryStorageAdapter();
 
@@ -48,7 +50,9 @@ NexusWorld provideAttractorWorld() {
   world.addSystem(MeteorSpawnerSystem());
   world.addSystem(MeteorTargetingSystem());
   world.addSystem(MeteorBurnSystem());
-  world.addSystem(CollisionSystem());
+  // --- FIX: Use the renamed MeteorCollisionSystem ---
+  // --- اصلاح: استفاده از MeteorCollisionSystem تغییر نام یافته ---
+  world.addSystem(MeteorCollisionSystem());
   world.addSystem(PointerSystem());
   world.addSystem(ParticleSpawningSystem());
   world.addSystem(ParticleLifecycleSystem());
@@ -64,7 +68,7 @@ NexusWorld provideAttractorWorld() {
 
   final spawner = Entity();
   spawner.add(SpawnerLinkComponent(targetTag: 'attractor'));
-  spawner.add(SpawnerComponent(spawnRate: 200));
+  spawner.add(ParticleSpawnerComponent(spawnRate: 200));
   world.addEntity(spawner);
 
   final root = Entity();
@@ -105,7 +109,6 @@ class MyApp extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // --- FIX: Removed the GestureDetector as saving is now handled by NexusWidget ---
           return RepaintBoundary(
             child: CustomPaint(
               painter: ParticlePainter(
@@ -126,7 +129,7 @@ class MyApp extends StatelessWidget {
       home: Scaffold(
         backgroundColor: const Color(0xFF1a1a1a),
         appBar: AppBar(
-          title: const Text('Nexus Attractor  Example'),
+          title: const Text('Nexus Attractor Example'),
           backgroundColor: Colors.grey.shade900,
           foregroundColor: Colors.white,
         ),
