@@ -57,6 +57,7 @@ Future<void> isolateInitializer() async {
   final storage = PrefsAdapter();
   await storage.init();
   GetIt.instance.registerSingleton<StorageAdapter>(storage);
+  GetIt.instance.registerSingleton(CounterCubit());
 }
 
 /// This function now only defines the blueprint of the world.
@@ -72,6 +73,8 @@ NexusWorld provideCounterWorld() {
   // --- ENTITY DEFINITIONS ---
 
   final counterDisplay = Entity();
+  // --- FIX: Added CustomWidgetComponent to tell the renderer which builder to use ---
+  counterDisplay.add(CustomWidgetComponent(widgetType: 'counter_display'));
   counterDisplay.add(PersistenceComponent('counter_entity'));
   counterDisplay.add(TagsComponent({'counter_display'}));
   counterDisplay.add(BlackboardComponent({'mood': 'happy'}));
@@ -95,6 +98,8 @@ NexusWorld provideCounterWorld() {
   ));
 
   final incrementButton = Entity();
+  // --- FIX: Added CustomWidgetComponent ---
+  incrementButton.add(CustomWidgetComponent(widgetType: 'increment_button'));
   incrementButton.add(ClickableComponent((entity) {
     world.services.get<CounterCubit>().increment();
     world.eventBus.fire(SaveDataEvent());
@@ -102,28 +107,39 @@ NexusWorld provideCounterWorld() {
   incrementButton.add(TagsComponent({'increment_button'}));
 
   final decrementButton = Entity();
+  // --- FIX: Added CustomWidgetComponent ---
+  decrementButton.add(CustomWidgetComponent(widgetType: 'decrement_button'));
   decrementButton.add(ClickableComponent((entity) {
     world.services.get<CounterCubit>().decrement();
     world.eventBus.fire(SaveDataEvent());
   }));
   decrementButton.add(TagsComponent({'decrement_button'}));
 
-  // --- FIX: Create a root entity to structure the UI ---
-  final rootEntity = Entity();
-  rootEntity.add(TagsComponent({'root'}));
-  rootEntity
-      .add(CustomWidgetComponent(widgetType: 'column')); // Use a Column layout
-  rootEntity.add(ChildrenComponent([
-    counterDisplay.id,
-    incrementButton.id,
+  final buttonRow = Entity();
+  buttonRow.add(CustomWidgetComponent(widgetType: 'row'));
+  buttonRow.add(ChildrenComponent([
     decrementButton.id,
+    incrementButton.id,
   ]));
 
-  // Add all entities to the world
+  final contentColumn = Entity();
+  contentColumn.add(CustomWidgetComponent(widgetType: 'column'));
+  contentColumn.add(ChildrenComponent([
+    counterDisplay.id,
+    buttonRow.id,
+  ]));
+
+  final rootEntity = Entity();
+  rootEntity.add(TagsComponent({'root'}));
+  rootEntity.add(CustomWidgetComponent(widgetType: 'center_layout'));
+  rootEntity.add(ChildrenComponent([contentColumn.id]));
+
   world.addEntity(counterDisplay);
   world.addEntity(incrementButton);
   world.addEntity(decrementButton);
-  world.addEntity(rootEntity); // Add the root entity
+  world.addEntity(buttonRow);
+  world.addEntity(contentColumn);
+  world.addEntity(rootEntity);
 
   return world;
 }
@@ -145,43 +161,45 @@ class MyApp extends StatelessWidget {
 
     final renderingSystem = FlutterRenderingSystem(
       builders: {
+        'center_layout': (context, id, controller, manager, child) {
+          debugPrint('[UI Builder] Building center_layout (Entity ID: $id)');
+          return Center(child: child);
+        },
         'counter_display': (context, id, controller, manager, child) {
           final state = controller.get<CounterStateComponent>(id);
           final blackboard = controller.get<BlackboardComponent>(id);
           final mood = blackboard?.get<String>('mood') ?? 'unknown';
 
+          debugPrint(
+              '[UI Builder] Building counter_display (Entity ID: $id). State value: ${state?.value}');
+
           if (state == null) return const SizedBox.shrink();
 
           return Padding(
             padding: const EdgeInsets.all(32.0),
-            child: Material(
-              color: Colors.transparent,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${state.value}',
-                      style: TextStyle(
-                        fontSize: 80,
-                        fontWeight: FontWeight.bold,
-                        color:
-                            mood == 'angry' ? Colors.redAccent : Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      "Mood: $mood",
-                      style: const TextStyle(
-                          fontSize: 20, fontStyle: FontStyle.italic),
-                    ),
-                  ],
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${state.value}',
+                  style: TextStyle(
+                    fontSize: 80,
+                    fontWeight: FontWeight.bold,
+                    color: mood == 'angry' ? Colors.redAccent : Colors.black,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                Text(
+                  "Mood: $mood",
+                  style: const TextStyle(
+                      fontSize: 20, fontStyle: FontStyle.italic),
+                ),
+              ],
             ),
           );
         },
         'increment_button': (context, id, controller, manager, child) {
+          debugPrint('[UI Builder] Building increment_button (Entity ID: $id)');
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: ElevatedButton(
@@ -191,6 +209,7 @@ class MyApp extends StatelessWidget {
           );
         },
         'decrement_button': (context, id, controller, manager, child) {
+          debugPrint('[UI Builder] Building decrement_button (Entity ID: $id)');
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: ElevatedButton(
@@ -208,23 +227,11 @@ class MyApp extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Nexus Persistence Example'),
         ),
-        body: Center(
-          child: NexusWidget(
-            worldProvider: () {
-              final world = provideCounterWorld();
-              if (!GetIt.instance.isRegistered<CounterCubit>()) {
-                GetIt.instance.registerSingleton(CounterCubit());
-              }
-              final cubit = GetIt.instance.get<CounterCubit>();
-              final counterEntity = world.entities.values
-                  .firstWhere((e) => e.has<PersistenceComponent>());
-              counterEntity.add(BlocComponent<CounterCubit, int>(cubit));
-              return world;
-            },
-            renderingSystem: renderingSystem,
-            isolateInitializer: isolateInitializer,
-            rootIsolateToken: rootIsolateToken,
-          ),
+        body: NexusWidget(
+          worldProvider: provideCounterWorld,
+          renderingSystem: renderingSystem,
+          isolateInitializer: isolateInitializer,
+          rootIsolateToken: rootIsolateToken,
         ),
       ),
     );
@@ -234,11 +241,25 @@ class MyApp extends StatelessWidget {
 /// System that listens to BLoC state changes.
 class CounterSystem extends BlocSystem<CounterCubit, int> {
   @override
-  void onStateChange(Entity entity, int state) {
-    final currentState = entity.get<CounterStateComponent>();
-    if (currentState == null || currentState.value != state) {
-      entity.add(CounterStateComponent(state));
-      world.eventBus.fire(CounterUpdatedEvent(state));
+  void onStateChange(int state) {
+    debugPrint('[CounterSystem] Received new state from Cubit: $state');
+    try {
+      final displayEntity = world.entities.values.firstWhere(
+          (e) => e.get<TagsComponent>()?.hasTag('counter_display') ?? false);
+
+      final currentState = displayEntity.get<CounterStateComponent>();
+      if (currentState == null || currentState.value != state) {
+        debugPrint(
+            '[CounterSystem] Updating Entity ${displayEntity.id} with new CounterStateComponent($state)');
+        displayEntity.add(CounterStateComponent(state));
+        world.eventBus.fire(CounterUpdatedEvent(state));
+      } else {
+        debugPrint(
+            '[CounterSystem] State is the same as current. No update needed.');
+      }
+    } catch (e) {
+      debugPrint(
+          '[CounterSystem] ERROR: Could not find "counter_display" entity to update. This might happen during initial setup and is now safe.');
     }
   }
 }

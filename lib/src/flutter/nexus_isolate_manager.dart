@@ -28,9 +28,16 @@ class NexusIsolateManager implements NexusManager {
 
     _receivePort.listen((message) {
       if (message is SendPort) {
+        debugPrint('[NexusIsolateManager][UI] Received SendPort from Isolate.');
         completer.complete(message);
       } else if (message is List<RenderPacket>) {
+        // --- LOGGING ADDED ---
+        debugPrint(
+            '[NexusIsolateManager][UI] Received ${message.length} render packets from Isolate.');
         _renderPacketController.add(message);
+      } else {
+        debugPrint(
+            '[NexusIsolateManager][UI] Received unknown message: $message');
       }
     });
 
@@ -41,21 +48,28 @@ class NexusIsolateManager implements NexusManager {
       rootIsolateToken,
     ];
 
+    debugPrint('[NexusIsolateManager][UI] Spawning NexusLogicIsolate...');
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
       entryPointArgs,
       debugName: 'NexusLogicIsolate',
     );
     _sendPort = await completer.future;
+    debugPrint(
+        '[NexusIsolateManager][UI] Isolate spawn complete. Manager is ready.');
   }
 
   @override
   void send(dynamic message) {
+    debugPrint(
+        '[NexusIsolateManager][UI] Sending message to Isolate: ${message.runtimeType}');
     _sendPort?.send(message);
   }
 
   @override
   void dispose() {
+    debugPrint(
+        '[NexusIsolateManager][UI] Disposing manager and killing Isolate.');
     _sendPort?.send('shutdown');
     _receivePort.close();
     _renderPacketController.close();
@@ -80,14 +94,20 @@ void _isolateEntryPoint(List<dynamic> args) async {
     }
 
     if (isolateInitializer != null) {
+      debugPrint('[NexusLogicIsolate] Running isolate initializer...');
       await isolateInitializer();
+      debugPrint('[NexusLogicIsolate] Isolate initializer complete.');
     }
 
     registerCoreComponents();
 
+    debugPrint('[NexusLogicIsolate] Creating NexusWorld...');
     final world = worldProvider();
-
+    debugPrint(
+        '[NexusLogicIsolate] NexusWorld created. Initializing systems...');
     await world.init();
+    debugPrint(
+        '[NexusLogicIsolate] Systems initialized. Starting update loop.');
 
     final stopwatch = Stopwatch()..start();
 
@@ -123,6 +143,13 @@ void _isolateEntryPoint(List<dynamic> args) async {
       }
 
       if (packets.isNotEmpty) {
+        // --- LOGGING ADDED ---
+        debugPrint(
+            '[NexusLogicIsolate] Sending ${packets.length} render packets to UI.');
+        for (var packet in packets) {
+          debugPrint(
+              '  - Packet for Entity ID: ${packet.id}, Components: ${packet.components.keys.toList()}');
+        }
         mainSendPort.send(packets);
       }
 
@@ -132,24 +159,24 @@ void _isolateEntryPoint(List<dynamic> args) async {
     });
 
     isolateReceivePort.listen((message) {
-      if (message is SaveDataEvent) {
-        world.eventBus.fire(message);
-      } else if (message is EntityTapEvent) {
-        world.eventBus.fire(message);
-      } else if (message is NexusPointerMoveEvent) {
-        world.eventBus.fire(message);
-      } else if (message is UndoEvent) {
-        world.eventBus.fire(message);
-      } else if (message is RedoEvent) {
+      debugPrint(
+          '[NexusLogicIsolate] Received message from UI: ${message.runtimeType}');
+      if (message is SaveDataEvent ||
+          message is EntityTapEvent ||
+          message is NexusPointerMoveEvent ||
+          message is UndoEvent ||
+          message is RedoEvent) {
         world.eventBus.fire(message);
       } else if (message == 'shutdown') {
+        debugPrint(
+            '[NexusLogicIsolate] Shutdown signal received. Cleaning up.');
         timer.cancel();
         world.clear();
         isolateReceivePort.close();
       }
     });
   } catch (e, stacktrace) {
-    debugPrint('[Isolate] FATAL ERROR during initialization: $e');
+    debugPrint('[NexusLogicIsolate] FATAL ERROR: $e');
     debugPrint(stacktrace.toString());
   }
 }

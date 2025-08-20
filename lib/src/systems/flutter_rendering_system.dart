@@ -88,9 +88,13 @@ class FlutterRenderingSystem extends ChangeNotifier {
 
     EntityId? rootId;
     try {
+      // --- FIX: Replaced unnecessary_cast with a safe type check ---
       rootId = _componentCache.entries.firstWhere((entry) {
-        final tags = entry.value[TagsComponent] as TagsComponent?;
-        return tags?.hasTag('root') ?? false;
+        final component = entry.value[TagsComponent];
+        if (component is TagsComponent) {
+          return component.hasTag('root');
+        }
+        return false;
       }).key;
     } catch (e) {
       return const Center(child: Text("Error: 'root' entity not found."));
@@ -131,9 +135,20 @@ class FlutterRenderingSystem extends ChangeNotifier {
               children: children);
         } else if (customWidgetComp.widgetType == 'column') {
           childrenWidget = Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: children);
-        } else if (children.isNotEmpty) {
+        }
+        // --- NEW: Added a handler for 'row' widget type ---
+        else if (customWidgetComp.widgetType == 'row') {
+          childrenWidget = Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: children);
+        }
+        // --- END NEW ---
+        else if (children.isNotEmpty) {
           childrenWidget = children.first;
         } else {
           childrenWidget = const SizedBox.shrink();
