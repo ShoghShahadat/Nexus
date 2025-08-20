@@ -16,6 +16,10 @@ export 'src/core/logic/logic_function.dart';
 export 'src/core/utils/equatable_mixin.dart';
 export 'src/core/storage/storage_adapter.dart';
 
+// --- Services ---
+export 'src/services/network/http_method.dart';
+export 'src/services/network/i_network_service.dart';
+
 // --- Serialization ---
 export 'src/core/serialization/serializable_component.dart';
 export 'src/core/serialization/component_factory.dart';
@@ -31,6 +35,8 @@ export 'src/events/history_events.dart';
 // --- Components ---
 export 'src/components/animation_component.dart';
 export 'src/components/animation_progress_component.dart';
+export 'src/components/api_request_component.dart';
+export 'src/components/api_status_component.dart';
 export 'src/components/archetype_component.dart';
 export 'src/components/attractor_component.dart';
 export 'src/components/blackboard_component.dart';
@@ -48,14 +54,16 @@ export 'src/components/render_strategy_component.dart';
 export 'src/components/rule_component.dart';
 export 'src/components/shape_path_component.dart';
 export 'src/components/spawner_component.dart';
-export 'src/components/spawner_link_component.dart'; // NEW EXPORT
+export 'src/components/spawner_link_component.dart';
 export 'src/components/tags_component.dart';
+export 'src/components/timer_component.dart';
 export 'src/components/velocity_component.dart';
 export 'src/components/widget_component.dart';
 export 'src/components/history_component.dart';
 
 // --- Systems ---
 export 'src/systems/animation_system.dart';
+export 'src/systems/api_system.dart';
 export 'src/systems/archetype_system.dart';
 export 'src/systems/attraction_system.dart';
 export 'src/systems/bloc_system.dart';
@@ -71,6 +79,7 @@ export 'src/systems/pointer_system.dart';
 export 'src/systems/pulsing_warning_system.dart';
 export 'src/systems/rule_system.dart';
 export 'src/systems/shape_selection_system.dart';
+export 'src/systems/timer_system.dart';
 export 'src/systems/history_system.dart';
 
 // --- Flutter Bridge ---
