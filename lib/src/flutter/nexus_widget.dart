@@ -1,6 +1,7 @@
 import 'dart:ui';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/widgets.dart';
+import 'package:get_it/get_it.dart'; // Import GetIt
 import 'package:nexus/nexus.dart';
 
 /// A Flutter widget that hosts and runs a NexusWorld.
@@ -8,7 +9,6 @@ class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
   final FlutterRenderingSystem renderingSystem;
   final Future<void> Function()? isolateInitializer;
-  // --- NEW: Added RootIsolateToken ---
   final RootIsolateToken? rootIsolateToken;
 
   const NexusWidget({
@@ -24,26 +24,57 @@ class NexusWidget extends StatefulWidget {
 }
 
 class _NexusWidgetState extends State<NexusWidget> {
-  late final NexusManager _manager;
+  late NexusManager _manager;
 
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      _manager = NexusSingleThreadManager();
-    } else {
+    _initializeManager();
+  }
+
+  @override
+  void didUpdateWidget(NexusWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (kDebugMode) {
+      _resetManager();
+    }
+  }
+
+  void _initializeManager() {
+    if (!kIsWeb && !kDebugMode) {
+      print("--- Nexus running in RELEASE mode (Multi-Threaded Isolate) ---");
       _manager = NexusIsolateManager();
+    } else {
+      if (kDebugMode) {
+        print(
+            "--- Nexus running in DEBUG mode (Single-Threaded for Hot Reload) ---");
+      }
+      _manager = NexusSingleThreadManager();
     }
 
     widget.renderingSystem.setManager(_manager);
+    _spawnWorld();
+  }
 
+  void _spawnWorld() {
     _manager.spawn(
       widget.worldProvider,
       isolateInitializer: widget.isolateInitializer,
-      rootIsolateToken: widget.rootIsolateToken, // Pass the token
+      rootIsolateToken: widget.rootIsolateToken,
     );
     _manager.renderPacketStream
         .listen(widget.renderingSystem.updateFromPackets);
+  }
+
+  void _resetManager() {
+    print("--- Hot Reload Detected: Resetting Nexus World ---");
+    _manager.dispose();
+
+    // --- FINAL FIX: Reset the service locator before re-initializing ---
+    // This clears all registered singletons, preventing the "already registered" error.
+    GetIt.I.reset(dispose: false);
+
+    _initializeManager();
   }
 
   @override
