@@ -34,17 +34,17 @@ NexusWorld provideCosmicWorld() {
   // سیستم اشاره‌گر برای تعامل با UI (مثل حرکت جاذب با لمس)
   world.addSystem(PointerSystem());
 
-  // همچنین یک Entity برای نگهداری تگ 'particle_field' برای ParticlePainter
+  // یک Entity برای نگهداری تگ 'particle_field' برای ParticlePainter
   // در ایزوله UI نیاز داریم. این Entity صرفاً برای این است که ParticlePainter
   // بتواند به IDهای ذرات دسترسی داشته باشد، نه اینکه خودش رندر شود.
-  // این تگ برای `getAllIdsWithTag` در FlutterRenderingSystem استفاده می شود.
+  // تگ 'particle_field' در FlutterRenderingSystem برای ساخت CustomPaint استفاده می‌شود.
   final particleFieldEntity = Entity();
+  // این PositionComponent صرفاً برای این است که builder در FlutterRenderingSystem
+  // بتواند آن را موقعیت‌دهی کند، حتی اگر CustomPaint کل صفحه را پوشش دهد.
+  // ابعاد بزرگتر برای اطمینان از اینکه CustomPaint فضای کافی برای رندر دارد.
+  particleFieldEntity
+      .add(PositionComponent(x: 0, y: 0, width: 400, height: 600));
   particleFieldEntity.add(TagsComponent({'particle_field'}));
-  particleFieldEntity.add(PositionComponent(
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0)); // موقعیت صفر، چون فقط یک نگهدارنده است.
   world.addEntity(particleFieldEntity);
 
   return world;
@@ -110,12 +110,6 @@ class MyApp extends StatelessWidget {
         }
       },
     );
-
-    // توجه: ما addUiEntity را برای 'particle_field' یا 'attractor' اینجا
-    // صدا نمی‌زنیم، زیرا این Entityها در provideCosmicWorld ایجاد شده و
-    // از طریق RenderPacketها به FlutterRenderingSystem ارسال می‌شوند.
-    // تنها Entityهایی که فقط در UI وجود دارند (نه در World پس‌زمینه)
-    // باید با addUiEntity اضافه شوند.
 
     return MaterialApp(
       debugShowCheckedModeBanner: false, // پنهان کردن بنر debug

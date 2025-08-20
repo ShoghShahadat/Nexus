@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/events/pointer_events.dart'; // وارد کردن NexusPointerMoveEvent
 
 /// A Flutter widget that hosts and runs a NexusWorld in a background isolate.
 ///
@@ -43,11 +44,23 @@ class _NexusWidgetState extends State<NexusWidget> {
   Widget build(BuildContext context) {
     // AnimatedBuilder listens to the rendering system (which is a ChangeNotifier)
     // and rebuilds its child whenever the system calls notifyListeners().
-    return AnimatedBuilder(
-      animation: widget.renderingSystem,
-      builder: (context, child) {
-        return widget.renderingSystem.build(context);
+    return Listener(
+      // افزودن Listener برای دریافت رویدادهای اشاره‌گر
+      onPointerMove: (event) {
+        // ایجاد صریح شیء NexusPointerMoveEvent و سپس ارسال آن.
+        // این کار به کامپایلر کمک می‌کند تا یک شیء واحد را تشخیص دهد
+        // و از خطای "Too many positional arguments" جلوگیری کند.
+        final NexusPointerMoveEvent pointerEvent = NexusPointerMoveEvent(
+            event.localPosition.dx,
+            event.localPosition.dy); // نام کلاس تغییر یافت
+        _isolateManager.send(pointerEvent);
       },
+      child: AnimatedBuilder(
+        animation: widget.renderingSystem,
+        builder: (context, child) {
+          return widget.renderingSystem.build(context);
+        },
+      ),
     );
   }
 }
