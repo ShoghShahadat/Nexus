@@ -30,23 +30,35 @@ class CounterSceneRoute extends NexusRoute {
             return FlutterRenderingSystem(
               builders: {
                 'counter_display': (context, id, controller, manager) {
-                  final stateValue =
-                      controller.get<CounterStateComponent>(id)?.value ?? 0;
-                  final morphLogic = controller.get<MorphingLogicComponent>(id);
+                  final stateComp = controller.get<CounterStateComponent>(id);
+                  final morph = controller.get<MorphingLogicComponent>(id);
                   final pos = controller.get<PositionComponent>(id);
-                  if (morphLogic == null || pos == null) {
+                  final anim = controller.get<AnimationProgressComponent>(id);
+
+                  if (stateComp == null || morph == null || pos == null) {
                     return const SizedBox.shrink();
                   }
 
-                  final path = getPolygonPath(
-                      Size(pos.width, pos.height), morphLogic.targetSides,
-                      cornerRadius: 12);
+                  final stateValue = stateComp.value;
                   final color =
                       stateValue >= 0 ? Colors.deepPurple : Colors.redAccent;
 
+                  final startPath = getPolygonPath(
+                      Size(pos.width, pos.height), morph.initialSides,
+                      cornerRadius: 12.0);
+                  final endPath = getPolygonPath(
+                      Size(pos.width, pos.height), morph.targetSides,
+                      cornerRadius: 12.0);
+
+                  final progress = anim?.progress ?? 1.0;
+
                   return CustomPaint(
                     painter: MorphingPainter(
-                        path: path, color: color, text: 'Count: $stateValue'),
+                        startPath: startPath,
+                        endPath: endPath,
+                        progress: progress,
+                        color: color,
+                        text: 'Count: $stateValue'),
                   );
                 },
                 'increment_button': (context, id, controller, manager) {
@@ -100,7 +112,7 @@ class CounterSceneRoute extends NexusRoute {
     world.addSystem(MorphingSystem());
     world.addSystem(LifecycleSystem());
     world.addSystem(ShapeSelectionSystem());
-    world.addSystem(InputSystem()); // Add the input system here as well
+    world.addSystem(InputSystem());
     world.loadModule(CounterModule());
     return world;
   }

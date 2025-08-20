@@ -26,6 +26,7 @@ export 'src/events/input_events.dart';
 
 // --- Components ---
 export 'src/components/animation_component.dart';
+export 'src/components/animation_progress_component.dart';
 export 'src/components/bloc_component.dart';
 export 'src/components/clickable_component.dart';
 export 'src/components/counter_state_component.dart';

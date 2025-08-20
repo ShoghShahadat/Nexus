@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
 
 /// Renders the morphing shape and text for the counter display.
+/// It now supports cross-fading between two paths for a smooth transition.
 class MorphingPainter extends CustomPainter {
-  final Path path;
+  final Path startPath;
+  final Path endPath;
+  final double progress;
   final Color color;
   final String text;
 
-  MorphingPainter(
-      {required this.path, required this.color, required this.text});
+  MorphingPainter({
+    required this.startPath,
+    required this.endPath,
+    required this.progress,
+    required this.color,
+    required this.text,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final bounds = path.getBounds();
+    // --- Path Scaling ---
+    final bounds = endPath.getBounds();
     if (bounds.width == 0 || bounds.height == 0) return;
 
     final scaleX = size.width / bounds.width;
@@ -23,12 +29,26 @@ class MorphingPainter extends CustomPainter {
       ..translate(size.width / 2, size.height / 2)
       ..scale(scaleX, scaleY)
       ..translate(-bounds.center.dx, -bounds.center.dy);
-    final scaledPath = path.transform(transform.storage);
 
-    canvas.drawShadow(
-        scaledPath, Colors.black.withAlpha((255 * 0.5).round()), 4.0, true);
-    canvas.drawPath(scaledPath, paint);
+    final scaledStartPath = startPath.transform(transform.storage);
+    final scaledEndPath = endPath.transform(transform.storage);
 
+    // --- Cross-Fade Painting ---
+    // Draw the starting path, fading it out as progress increases.
+    final startPaint = Paint()
+      ..color = color.withOpacity(1.0 - progress)
+      ..style = PaintingStyle.fill;
+    canvas.drawShadow(scaledStartPath, Colors.black.withAlpha(100), 4.0, true);
+    canvas.drawPath(scaledStartPath, startPaint);
+
+    // Draw the ending path, fading it in as progress increases.
+    final endPaint = Paint()
+      ..color = color.withOpacity(progress)
+      ..style = PaintingStyle.fill;
+    canvas.drawShadow(scaledEndPath, Colors.black.withAlpha(100), 4.0, true);
+    canvas.drawPath(scaledEndPath, endPaint);
+
+    // --- Text Painting ---
     final textSpan = TextSpan(
         text: text,
         style: const TextStyle(

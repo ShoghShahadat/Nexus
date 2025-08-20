@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus_example/counter_cubit.dart';
@@ -20,7 +22,7 @@ NexusWorld provideNexusWorld() {
   world.addSystem(PulsingWarningSystem());
   world.addSystem(MorphingSystem());
   world.addSystem(LifecycleSystem());
-  world.addSystem(InputSystem()); // Add the new InputSystem
+  world.addSystem(InputSystem());
 
   // --- Load Feature Modules ---
   final counterModule = CounterModule();
@@ -30,21 +32,12 @@ NexusWorld provideNexusWorld() {
 }
 
 void main() {
-  // Register all serializable components for the ComponentFactory.
+  // Register all serializable components from the core framework.
   // This is crucial for communication between isolates.
   registerCoreComponents();
-  ComponentFactoryRegistry.I.register('MorphingLogicComponent',
-      (json) => MorphingLogicComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register(
-      'ShapePathComponent', (json) => ShapePathComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register(
-      'CounterStateComponent', (json) => CounterStateComponent.fromJson(json));
 
   runApp(const MyApp());
 }
-
-// The local definition of CounterStateComponent has been removed.
-// The app will now use the serializable version from the core library.
 
 /// The root widget of the application.
 class MyApp extends StatelessWidget {
@@ -61,6 +54,7 @@ class MyApp extends StatelessWidget {
           final stateComp = controller.get<CounterStateComponent>(id);
           final morph = controller.get<MorphingLogicComponent>(id);
           final pos = controller.get<PositionComponent>(id);
+          final anim = controller.get<AnimationProgressComponent>(id);
 
           if (stateComp == null || morph == null || pos == null) {
             return const SizedBox.shrink();
@@ -68,13 +62,25 @@ class MyApp extends StatelessWidget {
 
           final state = stateComp.value;
           final color = state >= 0 ? Colors.deepPurple : Colors.redAccent;
-          final path = getPolygonPath(
+
+          final startPath = getPolygonPath(
+              Size(pos.width, pos.height), morph.initialSides,
+              cornerRadius: 12.0);
+          final endPath = getPolygonPath(
               Size(pos.width, pos.height), morph.targetSides,
               cornerRadius: 12.0);
 
+          // If animation is running, use its progress. Otherwise, it's complete (1.0).
+          final progress = anim?.progress ?? 1.0;
+
           return CustomPaint(
             painter: MorphingPainter(
-                path: path, color: color, text: 'Count: $state'),
+              startPath: startPath,
+              endPath: endPath,
+              progress: progress,
+              color: color,
+              text: 'Count: $state',
+            ),
           );
         },
         'increment_button': (context, id, controller, manager) {

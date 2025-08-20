@@ -2,6 +2,10 @@ import 'package:nexus/src/core/component.dart';
 import 'package:nexus/src/components/position_component.dart';
 import 'package:nexus/src/components/tags_component.dart';
 import 'package:nexus/src/core/serialization/serializable_component.dart';
+import 'package:nexus/src/components/animation_progress_component.dart';
+import 'package:nexus/src/components/counter_state_component.dart';
+import 'package:nexus/src/components/morphing_component.dart';
+import 'package:nexus/src/components/shape_path_component.dart';
 
 /// A function signature for a factory that creates a [Component] from a JSON map.
 typedef ComponentFactory = Component Function(Map<String, dynamic> json);
@@ -45,5 +49,12 @@ void registerCoreComponents() {
       'PositionComponent', (json) => PositionComponent.fromJson(json));
   ComponentFactoryRegistry.I
       .register('TagsComponent', (json) => TagsComponent.fromJson(json));
-  // Register other serializable components here...
+  ComponentFactoryRegistry.I.register('AnimationProgressComponent',
+      (json) => AnimationProgressComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'CounterStateComponent', (json) => CounterStateComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register('MorphingLogicComponent',
+      (json) => MorphingLogicComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'ShapePathComponent', (json) => ShapePathComponent.fromJson(json));
 }
