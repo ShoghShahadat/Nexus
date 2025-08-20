@@ -7,6 +7,7 @@ import 'package:nexus_example/counter_module/counter_module.dart';
 import 'package:nexus_example/counter_module/ui/button_painters.dart';
 import 'package:nexus_example/counter_module/ui/morphing_painter.dart';
 import 'package:nexus_example/counter_module/utils/shape_utils.dart';
+import 'package:nexus_example/counter_module/utils/shape_utils.dart';
 
 /// Defines the routes for the application using go_router.
 final router = GoRouter(

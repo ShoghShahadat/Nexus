@@ -155,7 +155,7 @@ packages:
   nexus:
     dependency: "direct main"
     description:
-      path: ".."
+      path: "../.."
       relative: true
     source: path
     version: "1.2.0-dev.1"
