@@ -13,16 +13,12 @@ NexusWorld provideDashboardWorld() {
   world.addSystem(InputSystem());
   world.addSystem(TaskExpansionSystem());
   world.addSystem(RealtimeDataSystem());
-
-  // --- NEW: Add a system that animates the root container's border ---
   world.addSystem(RootBorderAnimationSystem());
-  // --- END NEW ---
 
   world.loadModule(DashboardModule());
   return world;
 }
 
-// --- NEW: A system to animate the border color of the root entity ---
 class RootBorderAnimationSystem extends System {
   @override
   bool matches(Entity entity) {
@@ -31,16 +27,12 @@ class RootBorderAnimationSystem extends System {
 
   @override
   void update(Entity entity, double dt) {
-    // This is a simple animation, we'll just add an AnimationComponent
-    // if it doesn't already exist.
     if (!entity.has<AnimationComponent>()) {
       entity.add(AnimationComponent(
         duration: const Duration(seconds: 2),
         curve: Curves.easeInOut,
         repeat: true,
         onUpdate: (e, value) {
-          // We'll store the color value in a custom component.
-          // The value will ping-pong between 0.0 and 1.0.
           final progress = (value < 0.5) ? value * 2 : (1.0 - value) * 2;
           e.add(BorderAnimationProgress(progress));
         },
@@ -49,7 +41,6 @@ class RootBorderAnimationSystem extends System {
   }
 }
 
-// --- NEW: A component to hold the border animation progress ---
 class BorderAnimationProgress extends Component with SerializableComponent {
   final double progress;
   BorderAnimationProgress(this.progress);
@@ -63,9 +54,7 @@ class BorderAnimationProgress extends Component with SerializableComponent {
   @override
   List<Object?> get props => [progress];
 }
-// --- END NEW ---
 
-/// A helper function to register all serializable components.
 void registerDashboardComponents() {
   ComponentFactoryRegistry.I.register(
       'SummaryCardComponent', (json) => SummaryCardComponent.fromJson(json));
@@ -79,21 +68,18 @@ void registerDashboardComponents() {
       (json) => ExpandedStateComponent.fromJson(json));
   ComponentFactoryRegistry.I.register('RealtimeChartComponent',
       (json) => RealtimeChartComponent.fromJson(json));
-  // NEW: Register our new components
   ComponentFactoryRegistry.I.register('RenderStrategyComponent',
       (json) => RenderStrategyComponent.fromJson(json));
   ComponentFactoryRegistry.I.register('BorderAnimationProgress',
       (json) => BorderAnimationProgress.fromJson(json));
 }
 
-/// The main entry point for the Flutter application.
 void main() {
   registerCoreComponents();
   registerDashboardComponents();
   runApp(const MyApp());
 }
 
-/// The root widget of the application.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -105,30 +91,24 @@ class MyApp extends StatelessWidget {
         'chart': buildChart,
         'task_item': buildTaskItem,
         'realtime_chart': buildRealtimeChart,
-        // --- NEW: A custom builder for our root container ---
-        'root_container': (context, id, controller, manager) {
+        // --- MODIFIED: The builder now accepts and uses the 'child' parameter ---
+        'root_container': (context, id, controller, manager, child) {
           final progress =
               controller.get<BorderAnimationProgress>(id)?.progress ?? 0.0;
           final color =
               Color.lerp(Colors.grey.shade300, Colors.deepPurple, progress)!;
 
-          // This is a conceptual example. In the modified rendering system,
-          // the children are built and cached automatically. This builder
-          // is only responsible for the "shell".
           return Container(
             margin: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(8.0),
             decoration: BoxDecoration(
               border: Border.all(color: color, width: 3),
               borderRadius: BorderRadius.circular(16),
             ),
-            // The children will be placed inside this container by the rendering system.
-            // For this example, we assume the builder doesn't need to manage children directly.
-            // A more robust implementation would pass a `child` widget to this builder.
-            child:
-                const SizedBox(), // Placeholder, children are handled by the system
+            // --- FIX: Display the pre-rendered children inside the container ---
+            child: child,
           );
         },
-        // --- END NEW ---
       },
     );
 

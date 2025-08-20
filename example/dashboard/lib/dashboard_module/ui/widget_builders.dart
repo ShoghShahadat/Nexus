@@ -5,11 +5,11 @@ import 'package:nexus/nexus.dart';
 import 'package:nexus_example/dashboard_module/components/dashboard_components.dart';
 import 'package:nexus_example/dashboard_module/ui/custom_painters.dart';
 
-// *** FIX: Changed the manager type in all function signatures to the abstract NexusManager. ***
+// --- FIX: Added the 'child' parameter to all function signatures to match the typedef ---
 
 /// Builds the widget for a summary card entity.
 Widget buildSummaryCard(BuildContext context, EntityId id,
-    FlutterRenderingSystem controller, NexusManager manager) {
+    FlutterRenderingSystem controller, NexusManager manager, Widget child) {
   final cardData = controller.get<SummaryCardComponent>(id);
   final widgetData = controller.get<CustomWidgetComponent>(id);
   final animProgress = controller.get<AnimationProgressComponent>(id);
@@ -96,7 +96,7 @@ Widget buildSummaryCard(BuildContext context, EntityId id,
 
 /// Builds the widget for the bar chart entity.
 Widget buildChart(BuildContext context, EntityId id,
-    FlutterRenderingSystem controller, NexusManager manager) {
+    FlutterRenderingSystem controller, NexusManager manager, Widget child) {
   final chartData = controller.get<ChartDataComponent>(id);
   final widgetData = controller.get<CustomWidgetComponent>(id);
   final animProgress = controller.get<AnimationProgressComponent>(id);
@@ -147,7 +147,7 @@ Widget buildChart(BuildContext context, EntityId id,
 
 /// A builder for the high-frequency, real-time chart.
 Widget buildRealtimeChart(BuildContext context, EntityId id,
-    FlutterRenderingSystem controller, NexusManager manager) {
+    FlutterRenderingSystem controller, NexusManager manager, Widget child) {
   final chartData = controller.get<RealtimeChartComponent>(id);
   final widgetData = controller.get<CustomWidgetComponent>(id);
   final animProgress = controller.get<AnimationProgressComponent>(id);
@@ -224,7 +224,7 @@ Widget buildRealtimeChart(BuildContext context, EntityId id,
 
 /// Builds the widget for a task list item with expansion animation.
 Widget buildTaskItem(BuildContext context, EntityId id,
-    FlutterRenderingSystem controller, NexusManager manager) {
+    FlutterRenderingSystem controller, NexusManager manager, Widget child) {
   final taskData = controller.get<TaskItemComponent>(id);
   final expansionState = controller.get<ExpandedStateComponent>(id);
   final animProgress = controller.get<AnimationProgressComponent>(id);

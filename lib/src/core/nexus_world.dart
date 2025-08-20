@@ -12,7 +12,6 @@ class NexusWorld {
   final GetIt services;
   late final EventBus eventBus;
 
-  // یک Set برای نگهداری ID موجودیت‌هایی که در این فریم حذف شده‌اند.
   final Set<EntityId> _removedEntityIdsThisFrame = {};
 
   Map<EntityId, Entity> get entities => Map.unmodifiable(_entities);
@@ -24,21 +23,17 @@ class NexusWorld {
     services.registerSingleton<EventBus>(this.eventBus);
   }
 
-  /// Loads a module into the world, registering its systems and creating its entities.
   void loadModule(NexusModule module) {
     _modules.add(module);
 
-    // Load systems from all system providers.
     for (final provider in module.systemProviders) {
       for (final system in provider.systems) {
         addSystem(system);
       }
     }
 
-    // Call the module's onLoad lifecycle method.
     module.onLoad(this);
 
-    // Create entities from all entity providers.
     for (final provider in module.entityProviders) {
       provider.createEntities(this);
     }
@@ -56,7 +51,6 @@ class NexusWorld {
   Entity? removeEntity(EntityId id) {
     final entity = _entities.remove(id);
     if (entity != null) {
-      // اضافه کردن ID موجودیت حذف شده به لیست موقت
       _removedEntityIdsThisFrame.add(id);
       for (final system in _systems) {
         if (system.matches(entity)) {
@@ -68,7 +62,6 @@ class NexusWorld {
     return entity;
   }
 
-  /// موجودیت‌های حذف شده در این فریم را برمی‌گرداند و لیست را پاک می‌کند.
   Set<EntityId> getAndClearRemovedEntities() {
     final Set<EntityId> removed = Set.from(_removedEntityIdsThisFrame);
     _removedEntityIdsThisFrame.clear();
@@ -96,11 +89,8 @@ class NexusWorld {
       }
     }
 
-    // --- NEW: Clear dirty flags after all systems have run ---
-    for (final entity in _entities.values) {
-      entity.clearDirty();
-    }
-    // --- END NEW ---
+    // --- FIX: Removed the clearing of dirty flags from here. ---
+    // This will now be handled by the managers after packets are created.
   }
 
   void clear() {
@@ -117,6 +107,6 @@ class NexusWorld {
     _systems.clear();
     _modules.clear();
     eventBus.destroy();
-    _removedEntityIdsThisFrame.clear(); // پاک کردن لیست موجودیت‌های حذف شده
+    _removedEntityIdsThisFrame.clear();
   }
 }

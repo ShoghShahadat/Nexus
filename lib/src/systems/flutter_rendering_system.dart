@@ -1,11 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/render_strategy_component.dart';
 
-/// A function signature for building a widget based on an entity's ID and data.
-typedef EntityWidgetBuilderFunc = Widget Function(BuildContext context,
-    EntityId id, FlutterRenderingSystem controller, NexusManager manager);
+// --- MODIFIED: Added a 'child' parameter for proper widget composition ---
+typedef EntityWidgetBuilderFunc = Widget Function(
+    BuildContext context,
+    EntityId id,
+    FlutterRenderingSystem controller,
+    NexusManager manager,
+    Widget child);
 
 /// A UI-side controller that recursively builds a Flutter widget tree from a
 /// hierarchical entity structure with granular, entity-level state management.
@@ -14,16 +17,9 @@ class FlutterRenderingSystem extends ChangeNotifier {
   final Map<String, EntityWidgetBuilderFunc> builders;
   NexusManager? _manager;
 
-  // --- NEW: Granular State Management ---
-  /// A map of individual notifiers for each entity.
+  // Granular State Management
   final Map<EntityId, ChangeNotifier> _entityNotifiers = {};
-
-  /// A cache for the widget subtree of children, used by the `staticShell` behavior.
-  final Map<EntityId, Widget> _childrenWidgetCache = {};
-
-  /// A cache for the entire widget, used by the `staticScope` behavior.
   final Map<EntityId, Widget> _selfWidgetCache = {};
-  // --- END NEW ---
 
   FlutterRenderingSystem({required this.builders});
 
@@ -35,7 +31,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
     return _componentCache[id]?[T] as T?;
   }
 
-  /// Gets or creates a notifier for a specific entity ID.
   ChangeNotifier _getNotifier(EntityId id) {
     return _entityNotifiers.putIfAbsent(id, () => ChangeNotifier());
   }
@@ -43,20 +38,31 @@ class FlutterRenderingSystem extends ChangeNotifier {
   void updateFromPackets(List<RenderPacket> packets) {
     if (packets.isEmpty) return;
 
+    // --- LOGGING ---
+    debugPrint(
+        '[RenderingSystem] Received ${packets.length} packets. IDs: ${packets.map((p) => p.id).toList()}');
+    // --- END LOGGING ---
+
     final Set<EntityId> updatedEntities = {};
+    bool needsGlobalNotify = false;
 
     for (final packet in packets) {
+      final isNewEntity = !_componentCache.containsKey(packet.id);
       updatedEntities.add(packet.id);
+
       if (packet.isRemoved) {
         _componentCache.remove(packet.id);
         _entityNotifiers.remove(packet.id)?.dispose();
-        _childrenWidgetCache.remove(packet.id);
         _selfWidgetCache.remove(packet.id);
+        needsGlobalNotify = true;
         continue;
       }
-      if (!_componentCache.containsKey(packet.id)) {
+
+      if (isNewEntity) {
         _componentCache[packet.id] = {};
+        needsGlobalNotify = true;
       }
+
       for (final typeName in packet.components.keys) {
         final componentJson = packet.components[typeName]!;
         try {
@@ -64,101 +70,124 @@ class FlutterRenderingSystem extends ChangeNotifier {
               ComponentFactoryRegistry.I.create(typeName, componentJson);
           _componentCache[packet.id]![component.runtimeType] = component;
         } catch (e) {
-          if (kDebugMode) {
-            print(
-                '[RenderingSystem] ERROR deserializing $typeName for ID ${packet.id}: $e');
-          }
+          debugPrint(
+              '[RenderingSystem] ERROR deserializing $typeName for ID ${packet.id}: $e');
         }
       }
     }
 
-    // Notify only the listeners for the updated entities.
     for (final id in updatedEntities) {
-      _getNotifier(id).notifyListeners();
+      _selfWidgetCache.remove(id);
+      // --- LOGGING ---
+      debugPrint(
+          '[RenderingSystem] Notifying granular listener for Entity ID: $id');
+      // --- END LOGGING ---
+      (_getNotifier(id) as ChangeNotifier).notifyListeners();
+    }
+
+    if (needsGlobalNotify) {
+      // --- LOGGING ---
+      debugPrint(
+          '[RenderingSystem] Notifying GLOBAL listener for structural change.');
+      // --- END LOGGING ---
+      notifyListeners();
     }
   }
 
   Widget build(BuildContext context) {
+    // --- LOGGING ---
+    debugPrint('[RenderingSystem] Main build method called.');
+    // --- END LOGGING ---
+
     if (_manager == null || _componentCache.isEmpty) {
+      debugPrint(
+          '[RenderingSystem] Build failed: Manager is null or component cache is empty.');
       return const Center(child: CircularProgressIndicator());
     }
 
-    final rootId = _componentCache.entries.firstWhere((entry) {
-      final tags = entry.value[TagsComponent] as TagsComponent?;
-      return tags?.hasTag('root') ?? false;
-    }, orElse: () => _componentCache.entries.first).key;
+    EntityId? rootId;
+    try {
+      rootId = _componentCache.entries.firstWhere((entry) {
+        final tags = entry.value[TagsComponent] as TagsComponent?;
+        return tags?.hasTag('root') ?? false;
+      }).key;
+      debugPrint('[RenderingSystem] Found root entity with ID: $rootId');
+    } catch (e) {
+      debugPrint(
+          '[RenderingSystem] FATAL: Could not find any entity with "root" tag. Building aborted.');
+      return const Center(child: Text("Error: 'root' entity not found."));
+    }
 
     return _buildEntityWidget(context, rootId);
   }
 
   Widget _buildEntityWidget(BuildContext context, EntityId id) {
-    // Each entity's widget is wrapped in an AnimatedBuilder listening
-    // to its own specific notifier.
     return AnimatedBuilder(
       animation: _getNotifier(id),
-      builder: (context, child) {
+      builder: (context, _) {
+        // --- LOGGING ---
+        final customWidgetComp = get<CustomWidgetComponent>(id);
+        debugPrint(
+            '[RenderingSystem] Rebuilding widget for Entity ID: $id (Type: ${customWidgetComp?.widgetType ?? "N/A"})');
+        // --- END LOGGING ---
+
         final strategy = get<RenderStrategyComponent>(id)?.behavior ??
             RenderBehavior.dynamicView;
 
-        // Handle static scope: if widget is cached, return it immediately.
         if (strategy == RenderBehavior.staticScope &&
             _selfWidgetCache.containsKey(id)) {
+          debugPrint(
+              '[RenderingSystem]   -> Returning STATIC SCOPE cached widget for ID: $id');
           return _selfWidgetCache[id]!;
         }
 
-        final customWidgetComp = get<CustomWidgetComponent>(id);
         if (customWidgetComp == null) {
+          debugPrint(
+              '[RenderingSystem]   -> ABORT: No CustomWidgetComponent found for ID: $id');
           return const SizedBox.shrink();
         }
 
-        final widgetType = customWidgetComp.widgetType;
-        Widget builtChildren;
+        final childrenComp = get<ChildrenComponent>(id);
+        final children = childrenComp?.children
+                .map((childId) => _buildEntityWidget(context, childId))
+                .toList() ??
+            [];
 
-        // Handle shell vs. dynamic children rendering
-        if (strategy == RenderBehavior.staticShell &&
-            _childrenWidgetCache.containsKey(id)) {
-          builtChildren = _childrenWidgetCache[id]!;
-        } else {
-          final childrenComp = get<ChildrenComponent>(id);
-          final children = childrenComp?.children
-                  .map((childId) => _buildEntityWidget(context, childId))
-                  .toList() ??
-              [];
-
-          // This is a simple way to represent the children tree.
-          // In a real app, how you structure this depends on the parent widget.
-          // For this example, we'll assume a Column for multiple children.
-          if (children.length > 1) {
-            builtChildren = Column(
-              mainAxisSize: MainAxisSize.min,
+        final Widget childrenWidget;
+        if (customWidgetComp.widgetType == 'wrap') {
+          childrenWidget = Wrap(
+              spacing: 16.0,
+              runSpacing: 16.0,
+              alignment: WrapAlignment.center,
+              children: children);
+        } else if (customWidgetComp.widgetType == 'column') {
+          childrenWidget = Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: children,
-            );
-          } else if (children.length == 1) {
-            builtChildren = children.first;
-          } else {
-            builtChildren = const SizedBox.shrink();
-          }
-          _childrenWidgetCache[id] = builtChildren;
-        }
-
-        // Build the actual widget using the builder
-        final builder = builders[widgetType];
-        Widget finalWidget;
-        if (builder != null) {
-          finalWidget = builder(context, id, this, _manager!);
+              children: children);
+        } else if (children.isNotEmpty) {
+          childrenWidget = children.first;
         } else {
-          finalWidget = Text('Unknown widget type: $widgetType');
+          childrenWidget = const SizedBox.shrink();
         }
 
-        // This is a conceptual implementation. A real implementation would
-        // need the builder to accept a `child` parameter. For now, we assume
-        // the builder knows how to handle its children via the controller.
-        // For simplicity, we'll just return the parent widget.
-        // A more robust solution uses a builder pattern like:
-        // finalWidget = builder(context, id, this, _manager!, child: builtChildren);
+        final builder = builders[customWidgetComp.widgetType];
+        Widget finalWidget;
+
+        if (builder != null) {
+          debugPrint(
+              '[RenderingSystem]   -> Calling custom builder for type: "${customWidgetComp.widgetType}"');
+          final parentShell =
+              builder(context, id, this, _manager!, childrenWidget);
+          finalWidget = parentShell;
+        } else {
+          debugPrint(
+              '[RenderingSystem]   -> No custom builder found. Returning layout widget directly.');
+          finalWidget = childrenWidget;
+        }
 
         if (strategy == RenderBehavior.staticScope) {
+          debugPrint(
+              '[RenderingSystem]   -> Caching widget for STATIC SCOPE ID: $id');
           _selfWidgetCache[id] = finalWidget;
         }
 

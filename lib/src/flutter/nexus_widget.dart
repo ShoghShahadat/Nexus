@@ -2,9 +2,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:nexus/nexus.dart';
 
-// *** FIX: Removed unnecessary specific imports. ***
-// All required classes are exported from 'package:nexus/nexus.dart'.
-
 /// A Flutter widget that hosts and runs a NexusWorld.
 class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
@@ -34,7 +31,6 @@ class _NexusWidgetState extends State<NexusWidget> {
       _manager = NexusIsolateManager();
     }
 
-    // This call is now type-safe because setManager expects a NexusManager.
     widget.renderingSystem.setManager(_manager);
 
     _manager.spawn(
@@ -59,6 +55,10 @@ class _NexusWidgetState extends State<NexusWidget> {
             event.localPosition.dx, event.localPosition.dy);
         _manager.send(pointerEvent);
       },
+      // --- FIX: The AnimatedBuilder now correctly listens to the main rendering system ---
+      // This ensures that when new entities are added or removed (structural changes),
+      // the entire widget tree is rebuilt to reflect those changes.
+      // Granular updates are handled by AnimatedBuilders inside the rendering system.
       child: AnimatedBuilder(
         animation: widget.renderingSystem,
         builder: (context, child) {

@@ -26,32 +26,40 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
     final realtimeChart = _createRealtimeChart();
     final taskList = _createTaskList();
 
+    // --- MODIFIED: Layout entities now just define the layout type ---
+    // The rendering system will handle creating the appropriate layout widget.
     final summaryGrid = _createLayoutEntity(
-      widgetType: 'wrap',
+      widgetType: 'wrap', // This tells the renderer to use a Wrap widget
       children: summaryCards.map((e) => e.id).toList(),
     );
 
     final taskColumn = _createLayoutEntity(
-      widgetType: 'column',
+      widgetType: 'column', // This tells the renderer to use a Column widget
       children: taskList.map((e) => e.id).toList(),
     );
 
-    // --- MODIFIED: The root entity is now a container with a static shell ---
+    final rootContent = _createLayoutEntity(
+      widgetType: 'column',
+      children: [
+        summaryGrid.id,
+        chart.id,
+        realtimeChart.id,
+        taskColumn.id,
+      ],
+    );
+
+    // The root entity is the animated container. Its child is the main content column.
     final rootEntity = Entity();
     rootEntity.add(CustomWidgetComponent(widgetType: 'root_container'));
     rootEntity.add(TagsComponent({'root'}));
-    rootEntity.add(ChildrenComponent([
-      summaryGrid.id,
-      chart.id,
-      realtimeChart.id,
-      taskColumn.id,
-    ]));
+    rootEntity.add(ChildrenComponent([rootContent.id]));
     // This is the key instruction: only rebuild the shell, not the children.
     rootEntity.add(RenderStrategyComponent(RenderBehavior.staticShell));
     // --- END MODIFICATION ---
 
     return [
       rootEntity,
+      rootContent,
       summaryGrid,
       chart,
       realtimeChart,
