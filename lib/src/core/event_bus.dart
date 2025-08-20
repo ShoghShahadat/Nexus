@@ -21,11 +21,10 @@ class EventBus {
   /// Listens for events of a specific type [T].
   ///
   /// The [onData] callback is called when an event of type [T] is fired.
+  /// Note: Listening for `dynamic` is an advanced use-case, typically for
+  /// dispatcher systems like RuleSystem that need to react to any event.
   StreamSubscription<T> on<T>(void Function(T event) onData) {
-    if (T == dynamic) {
-      throw ArgumentError(
-          'Listening for dynamic events is not supported. Please provide a specific event type.');
-    }
+    // --- FIX: Removed the check that prevented listening to dynamic events ---
     return _streamController.stream
         .where((event) => event is T)
         .cast<T>()

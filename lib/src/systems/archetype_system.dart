@@ -11,6 +11,7 @@ class ArchetypeSystem extends System {
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
     _buildSubscriptionMap();
+    // This requires the EventBus to allow listening to the 'dynamic' type.
     _eventBusSubscription = world.eventBus.on<dynamic>(_handleEvent);
   }
 
@@ -57,28 +58,19 @@ class ArchetypeSystem extends System {
         final conditionResult = conditionalArchetype.condition(entity, event);
 
         if (conditionResult && !isCurrentlyActive) {
-          // Condition met, archetype not active -> Apply it
           archetype.apply(entity);
           archetypeComp.activeArchetypes.add(archetype);
           changed = true;
-          print(
-              "ArchetypeSystem: Applied archetype ${archetype.runtimeType} to Entity ${entity.id}");
         } else if (!conditionResult && isCurrentlyActive) {
-          // Condition not met, archetype is active -> Remove it
           for (final componentType in archetype.componentTypes) {
-            // --- FIX: Use the new removeByType method ---
             entity.removeByType(componentType);
-            // --- END FIX ---
           }
           archetypeComp.activeArchetypes.remove(archetype);
           changed = true;
-          print(
-              "ArchetypeSystem: Removed archetype ${archetype.runtimeType} from Entity ${entity.id}");
         }
       }
 
       if (changed) {
-        // Re-add the component to save the state of activeArchetypes
         entity.add(archetypeComp);
       }
     }
