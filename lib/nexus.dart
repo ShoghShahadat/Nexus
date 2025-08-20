@@ -2,6 +2,7 @@
 library nexus;
 
 // --- Core ---
+export 'src/core/archetype.dart';
 export 'src/core/component.dart';
 export 'src/core/entity.dart';
 export 'src/core/event_bus.dart';
@@ -29,6 +30,7 @@ export 'src/events/history_events.dart';
 // --- Components ---
 export 'src/components/animation_component.dart';
 export 'src/components/animation_progress_component.dart';
+export 'src/components/archetype_component.dart';
 export 'src/components/attractor_component.dart';
 export 'src/components/bloc_component.dart';
 export 'src/components/children_component.dart';
@@ -39,16 +41,18 @@ export 'src/components/lifecycle_component.dart';
 export 'src/components/morphing_component.dart';
 export 'src/components/particle_component.dart';
 export 'src/components/position_component.dart';
+export 'src/components/render_strategy_component.dart'; // NEW
+export 'src/components/rule_component.dart';
 export 'src/components/shape_path_component.dart';
 export 'src/components/spawner_component.dart';
 export 'src/components/tags_component.dart';
 export 'src/components/velocity_component.dart';
 export 'src/components/widget_component.dart';
 export 'src/components/history_component.dart';
-export 'src/components/rule_component.dart'; // NEW
 
 // --- Systems ---
 export 'src/systems/animation_system.dart';
+export 'src/systems/archetype_system.dart';
 export 'src/systems/attraction_system.dart';
 export 'src/systems/bloc_system.dart';
 export 'src/systems/flutter_rendering_system.dart';
@@ -60,9 +64,9 @@ export 'src/systems/particle_spawning_system.dart';
 export 'src/systems/physics_system.dart';
 export 'src/systems/pointer_system.dart';
 export 'src/systems/pulsing_warning_system.dart';
+export 'src/systems/rule_system.dart';
 export 'src/systems/shape_selection_system.dart';
 export 'src/systems/history_system.dart';
-export 'src/systems/rule_system.dart'; // NEW
 
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';

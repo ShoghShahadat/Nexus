@@ -23,7 +23,6 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
   List<Entity> assemble() {
     final summaryCards = _createSummaryCards();
     final chart = _createChart();
-    // *** NEW: Create the real-time chart entity. ***
     final realtimeChart = _createRealtimeChart();
     final taskList = _createTaskList();
 
@@ -37,23 +36,25 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
       children: taskList.map((e) => e.id).toList(),
     );
 
-    final rootEntity = _createLayoutEntity(
-      widgetType: 'column',
-      tag: 'root',
-      children: [
-        summaryGrid.id,
-        chart.id,
-        // *** NEW: Add the real-time chart to the layout. ***
-        realtimeChart.id,
-        taskColumn.id,
-      ],
-    );
+    // --- MODIFIED: The root entity is now a container with a static shell ---
+    final rootEntity = Entity();
+    rootEntity.add(CustomWidgetComponent(widgetType: 'root_container'));
+    rootEntity.add(TagsComponent({'root'}));
+    rootEntity.add(ChildrenComponent([
+      summaryGrid.id,
+      chart.id,
+      realtimeChart.id,
+      taskColumn.id,
+    ]));
+    // This is the key instruction: only rebuild the shell, not the children.
+    rootEntity.add(RenderStrategyComponent(RenderBehavior.staticShell));
+    // --- END MODIFICATION ---
 
     return [
       rootEntity,
       summaryGrid,
       chart,
-      realtimeChart, // Add to the list of entities
+      realtimeChart,
       taskColumn,
       ...summaryCards,
       ...taskList,
@@ -99,14 +100,12 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
     return entity;
   }
 
-  // *** NEW: A method to create the real-time chart entity. ***
   Entity _createRealtimeChart() {
     final entity = Entity();
     entity.add(CustomWidgetComponent(
       widgetType: 'realtime_chart',
       properties: {'height': 150.0},
     ));
-    // Initialize with empty data; the system will populate it immediately.
     entity.add(RealtimeChartComponent([]));
     entity.add(EntryAnimationComponent(delay: 0.6));
     return entity;

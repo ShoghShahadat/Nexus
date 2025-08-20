@@ -55,7 +55,9 @@ void registerCoreComponents() {
       .register('SpawnerComponent', (json) => SpawnerComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
       'ChildrenComponent', (json) => ChildrenComponent.fromJson(json));
-  // *** NEW: Register HistoryComponent ***
   ComponentFactoryRegistry.I
       .register('HistoryComponent', (json) => HistoryComponent.fromJson(json));
+  // *** NEW: Register RenderStrategyComponent ***
+  ComponentFactoryRegistry.I.register('RenderStrategyComponent',
+      (json) => RenderStrategyComponent.fromJson(json));
 }

@@ -23,57 +23,53 @@ class Entity extends ChangeNotifier {
   Entity() : id = _nextId++;
 
   /// Adds a component to the entity and notifies listeners.
-  ///
-  /// This method is optimized to prevent unnecessary notifications.
-  /// - If the exact same component instance is passed, it assumes the component
-  ///   was mutated and always notifies listeners.
-  /// - If a new component instance is passed, it uses value-based equality
-  ///   to check if the data has actually changed before notifying.
   void add<T extends Component>(T component) {
     final existingComponent = _components[T];
 
-    // If it's the exact same instance, we assume it was mutated internally
-    // and a notification is desired.
     if (identical(existingComponent, component)) {
-      _dirtyComponents.add(T); // Mark as dirty
+      _dirtyComponents.add(T);
       notifyListeners();
       return;
     }
 
-    // If it's a new instance, but its value is the same as the existing one,
-    // do nothing to prevent redundant notifications and UI rebuilds.
     if (existingComponent != null && existingComponent == component) {
       return;
     }
 
     _components[T] = component;
-    _dirtyComponents.add(T); // Mark as dirty
+    _dirtyComponents.add(T);
     notifyListeners();
   }
 
-  /// Removes a component and notifies listeners of the change.
+  /// Removes a component of a specific type using generics and notifies listeners.
   T? remove<T extends Component>() {
     final removed = _components.remove(T) as T?;
     if (removed != null) {
-      // Note: Component removal is handled by a special packet,
-      // so we don't need to mark it as dirty here. The entity's
-      // removal itself is the signal.
       notifyListeners();
     }
     return removed;
   }
+
+  // --- NEW: Method to remove a component by its Type object ---
+  /// Removes a component of a specific type using a Type object and notifies listeners.
+  Component? removeByType(Type componentType) {
+    final removed = _components.remove(componentType);
+    if (removed != null) {
+      notifyListeners();
+    }
+    return removed;
+  }
+  // --- END NEW ---
 
   /// Retrieves a component of a specific type from the entity using generics.
   T? get<T extends Component>() {
     return _components[T] as T?;
   }
 
-  // --- NEW: Method to get a component by its Type object ---
   /// Retrieves a component of a specific type from the entity using a Type object.
   Component? getByType(Type componentType) {
     return _components[componentType];
   }
-  // --- END NEW ---
 
   /// Checks if the entity has a component of a specific type.
   bool has<T extends Component>() {
