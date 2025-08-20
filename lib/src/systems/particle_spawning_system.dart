@@ -2,13 +2,13 @@ import 'dart:math';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/components/spawner_component.dart';
 
-/// A system that spawns new particle entities based on a SpawnerComponent.
+/// سیستمی که موجودیت‌های ذره جدید را بر اساس یک SpawnerComponent تولید می‌کند.
 class ParticleSpawningSystem extends System {
   final Random _random = Random();
 
   @override
   bool matches(Entity entity) {
-    // This system only operates on a single entity with a SpawnerComponent.
+    // این سیستم فقط روی یک موجودیت با SpawnerComponent عمل می‌کند.
     return entity.has<SpawnerComponent>();
   }
 
@@ -22,22 +22,23 @@ class ParticleSpawningSystem extends System {
       spawner.timeSinceLastSpawn -= timePerSpawn;
       world.addEntity(_createParticle(entity));
     }
-    entity.add(spawner); // Re-add to save the updated time
+    entity.add(spawner); // دوباره اضافه کردن برای ذخیره زمان به‌روزرسانی شده
   }
 
   Entity _createParticle(Entity spawnerEntity) {
     final entity = Entity();
     final angle = _random.nextDouble() * 2 * pi;
-    final speed = _random.nextDouble() * 50 + 20;
+    // افزایش محدوده سرعت اولیه برای ذرات سریع‌تر
+    final speed = _random.nextDouble() * 150 + 50; // سرعت بین 50 تا 200
     final spawnerPos = spawnerEntity.get<PositionComponent>()!;
 
     entity.add(PositionComponent(
         x: spawnerPos.x, y: spawnerPos.y, width: 5, height: 5));
     entity.add(VelocityComponent(x: cos(angle) * speed, y: sin(angle) * speed));
     entity.add(ParticleComponent(
-      maxAge: _random.nextDouble() * 3 + 2, // Lives for 2-5 seconds
+      maxAge: _random.nextDouble() * 3 + 2, // عمر ذرات بین 2 تا 5 ثانیه
       initialColorValue: 0xFFFFFFFF,
-      finalColorValue: 0xFF4A148C, // Deep purple
+      finalColorValue: 0xFF4A148C, // بنفش تیره
     ));
     entity.add(TagsComponent({'particle'}));
     return entity;

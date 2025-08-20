@@ -3,11 +3,15 @@ import 'package:nexus/src/components/velocity_component.dart';
 import 'package:nexus/src/core/entity.dart';
 import 'package:nexus/src/core/system.dart';
 
-/// A system that applies velocity to entities to create movement.
+/// سیستمی که سرعت را به موجودیت‌ها اعمال می‌کند تا حرکت ایجاد شود.
 ///
-/// This system looks for entities that have both a [PositionComponent] and a
-/// [VelocityComponent]. In each frame, it updates the entity's position
-/// based on its current velocity and the delta time.
+/// این سیستم به دنبال موجودیت‌هایی می‌گردد که هم [PositionComponent] و هم
+/// [VelocityComponent] دارند. در هر فریم، موقعیت موجودیت را بر اساس
+/// سرعت فعلی و زمان دلتا به‌روزرسانی می‌کند.
+///
+/// توجه: منطق حذف ذرات بر اساس خروج از محدوده حذف شده است تا
+/// مدیریت چرخه حیات ذرات (حذف بر اساس سن) توسط ParticleLifecycleSystem
+/// صورت گیرد، همانطور که کاربر درخواست کرده است.
 class PhysicsSystem extends System {
   @override
   bool matches(Entity entity) {
@@ -20,24 +24,27 @@ class PhysicsSystem extends System {
     final pos = entity.get<PositionComponent>()!;
     final vel = entity.get<VelocityComponent>()!;
 
-    // به‌روزرسانی موقعیت بر اساس سرعت و دلتا تایم.
+    // به‌روزرسانی موقعیت بر اساس سرعت و زمان دلتا.
     pos.x += vel.x * dt;
     pos.y += vel.y * dt;
 
-    // --- حذف منطق مرزی که باعث توقف ذرات می‌شود ---
-    // این منطق باعث می‌شد ذرات در y=500 متوقف شوند و شاید از دید خارج شوند.
-    // برای شبیه‌سازی کیهانی، بهتر است اجازه دهیم ذرات آزادانه حرکت کنند.
-    // اگر نیاز به مرز دارید، می‌توانید یک سیستم جداگانه برای آن ایجاد کنید
-    // که ذرات را حذف کند یا آن‌ها را به داخل صفحه برگرداند،
-    // اما نه با حذف VelocityComponent به صورت دائمی.
+    // --- حذف منطق حذف ذرات خارج از محدوده ---
+    // این بخش حذف شده است تا ذرات بر اساس سن خود (توسط ParticleLifecycleSystem)
+    // از بین بروند، نه بر اساس خروج از مرزهای صفحه.
     /*
-    if (pos.y > 500) {
-      pos.y = 500; // Clamp the position to the boundary line.
-      entity.remove<VelocityComponent>(); // Stop all future movement.
+    const double boundsPadding = 100.0;
+    if (pos.x < -boundsPadding ||
+        pos.x > 400 + boundsPadding ||
+        pos.y < -boundsPadding ||
+        pos.y > 600 + boundsPadding) {
+      Future.microtask(() => world.removeEntity(entity.id));
+    } else {
+      entity.add(pos);
     }
     */
 
     // کامپوننت را دوباره اضافه کنید تا سیستم رندرینگ از تغییر مطلع شود.
+    // این خط باید همیشه وجود داشته باشد تا تغییرات موقعیت به UI ارسال شوند.
     entity.add(pos);
   }
 }
