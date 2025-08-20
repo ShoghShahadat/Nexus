@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/widgets.dart';
-import 'package:get_it/get_it.dart'; // Import GetIt
+import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
 
 /// A Flutter widget that hosts and runs a NexusWorld.
@@ -66,14 +66,29 @@ class _NexusWidgetState extends State<NexusWidget> {
         .listen(widget.renderingSystem.updateFromPackets);
   }
 
-  void _resetManager() {
-    print("--- Hot Reload Detected: Resetting Nexus World ---");
-    _manager.dispose();
+  /// --- FINAL FIX: Implemented safe, stateful Hot Reload logic ---
+  void _resetManager() async {
+    print("--- Hot Reload Detected: Attempting stateful reset ---");
 
-    // --- FINAL FIX: Reset the service locator before re-initializing ---
-    // This clears all registered singletons, preventing the "already registered" error.
+    _manager.send(SaveDataEvent());
+    await Future.delayed(const Duration(milliseconds: 50));
+    await _manager.dispose();
+
+    // 1. Safely check if the StorageAdapter is registered before getting it.
+    StorageAdapter? preservedStorage;
+    if (GetIt.I.isRegistered<StorageAdapter>()) {
+      preservedStorage = GetIt.I.get<StorageAdapter>();
+    }
+
+    // 2. Reset the service locator.
     GetIt.I.reset(dispose: false);
 
+    // 3. If we successfully preserved the adapter, re-register it.
+    if (preservedStorage != null) {
+      GetIt.I.registerSingleton<StorageAdapter>(preservedStorage);
+    }
+
+    // 4. Re-initialize the manager with the new code.
     _initializeManager();
   }
 

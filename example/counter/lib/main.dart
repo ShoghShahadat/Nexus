@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_it/get_it.dart';
@@ -6,7 +7,33 @@ import 'package:nexus/nexus.dart';
 import 'package:nexus_example/counter_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// --- Custom Storage Adapter using SharedPreferences ---
+// --- FINAL FIX: Create a single, static instance for debug mode ---
+// Static variables in Dart preserve their state across Hot Reloads.
+// This is the key to stateful Hot Reload.
+final InMemoryStorageAdapter _debugStorage = InMemoryStorageAdapter();
+
+class InMemoryStorageAdapter implements StorageAdapter {
+  final Map<String, Map<String, dynamic>> _data = {};
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Future<Map<String, dynamic>?> load(String key) async {
+    return _data[key.replaceFirst('nexus_', '')];
+  }
+
+  @override
+  Future<void> save(String key, Map<String, dynamic> data) async {
+    _data[key.replaceFirst('nexus_', '')] = data;
+  }
+
+  @override
+  Future<Map<String, Map<String, dynamic>>> loadAll() async {
+    return _data;
+  }
+}
+
 class PrefsAdapter implements StorageAdapter {
   late SharedPreferences _prefs;
 
@@ -41,7 +68,6 @@ class PrefsAdapter implements StorageAdapter {
   }
 }
 
-// --- Events & Custom Components for the example ---
 class CounterUpdatedEvent {
   final int newValue;
   CounterUpdatedEvent(this.newValue);
@@ -52,15 +78,20 @@ class MoodChangedEvent {
   MoodChangedEvent(this.newMood);
 }
 
-/// Initializes services required by the logic isolate.
 Future<void> isolateInitializer() async {
-  final storage = PrefsAdapter();
+  // Use the single static instance in debug mode, or a new PrefsAdapter in release.
+  final StorageAdapter storage = kDebugMode ? _debugStorage : PrefsAdapter();
   await storage.init();
-  GetIt.instance.registerSingleton<StorageAdapter>(storage);
-  GetIt.instance.registerSingleton(CounterCubit());
+
+  if (!GetIt.I.isRegistered<StorageAdapter>()) {
+    GetIt.I.registerSingleton<StorageAdapter>(storage);
+  }
+
+  if (!GetIt.I.isRegistered<CounterCubit>()) {
+    GetIt.I.registerSingleton(CounterCubit());
+  }
 }
 
-/// This function now only defines the blueprint of the world.
 NexusWorld provideCounterWorld() {
   final world = NexusWorld();
 
@@ -69,8 +100,6 @@ NexusWorld provideCounterWorld() {
   world.addSystem(HistorySystem());
   world.addSystem(RuleSystem());
   world.addSystem(PersistenceSystem());
-
-  // --- ENTITY DEFINITIONS ---
 
   final counterDisplay = Entity();
   counterDisplay.add(CustomWidgetComponent(widgetType: 'counter_display'));
@@ -141,14 +170,12 @@ NexusWorld provideCounterWorld() {
   return world;
 }
 
-/// Main entry point.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerCoreComponents();
   runApp(const MyApp());
 }
 
-/// The root widget.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -229,7 +256,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// System that listens to BLoC state changes.
 class CounterSystem extends BlocSystem<CounterCubit, int> {
   @override
   void onStateChange(int state) {
@@ -243,7 +269,7 @@ class CounterSystem extends BlocSystem<CounterCubit, int> {
         world.eventBus.fire(CounterUpdatedEvent(state));
       }
     } catch (e) {
-      // This can happen if the entity hasn't been created yet. It's safe to ignore.
+      // Safe to ignore.
     }
   }
 }

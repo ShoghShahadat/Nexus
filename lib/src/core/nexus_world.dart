@@ -17,18 +17,18 @@ class NexusWorld {
   NexusWorld({GetIt? serviceLocator, EventBus? eventBus})
       : services = serviceLocator ?? GetIt.instance {
     this.eventBus = eventBus ?? EventBus();
-    services.registerSingleton<EventBus>(this.eventBus);
+    // --- FIX: Prevent crash on Hot Reload by checking if already registered ---
+    if (!services.isRegistered<EventBus>()) {
+      services.registerSingleton<EventBus>(this.eventBus);
+    }
   }
 
-  // --- NEW: Asynchronous initialization method ---
   /// Initializes the world, running any async setup required by its systems.
-  /// This should be called before the main update loop begins.
   Future<void> init() async {
     for (final system in _systems) {
       await system.init();
     }
   }
-  // --- END NEW ---
 
   void loadModule(NexusModule module) {
     _modules.add(module);
@@ -60,9 +60,9 @@ class NexusWorld {
     if (entity != null) {
       _removedEntityIdsThisFrame.add(id);
       for (final system in _systems) {
-        if (system.matches(entity)) {
-          system.onEntityRemoved(entity);
-        }
+        // A matching check is not strictly needed here but is good practice.
+        // onEntityRemoved should be safe to call even if it doesn't match.
+        system.onEntityRemoved(entity);
       }
       entity.dispose();
     }
@@ -87,9 +87,11 @@ class NexusWorld {
   }
 
   void update(double dt) {
-    final entities = List<Entity>.from(_entities.values);
+    // Create a copy to prevent concurrent modification errors if systems add/remove entities.
+    final entitiesList = List<Entity>.from(_entities.values);
     for (final system in _systems) {
-      for (final entity in entities) {
+      for (final entity in entitiesList) {
+        // Ensure the entity hasn't been removed by a previous system in the same frame.
         if (_entities.containsKey(entity.id) && system.matches(entity)) {
           system.update(entity, dt);
         }

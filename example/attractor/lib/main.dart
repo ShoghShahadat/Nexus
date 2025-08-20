@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
+import 'package:get_it/get_it.dart';
 
 import 'particle_painter.dart';
 import 'components/explosion_component.dart';
@@ -14,18 +15,53 @@ import 'systems/meteor_burn_system.dart';
 import 'systems/meteor_targeting_system.dart';
 import 'systems/collision_system.dart';
 
-/// The entry point for the background isolate.
+// --- Create a single, static instance for stateful Hot Reload ---
+final InMemoryStorageAdapter _debugStorage = InMemoryStorageAdapter();
+
+class InMemoryStorageAdapter implements StorageAdapter {
+  final Map<String, Map<String, dynamic>> _data = {};
+
+  @override
+  Future<void> init() async {}
+
+  @override
+  Future<Map<String, dynamic>?> load(String key) async {
+    return _data[key.replaceFirst('nexus_', '')];
+  }
+
+  @override
+  Future<void> save(String key, Map<String, dynamic> data) async {
+    _data[key.replaceFirst('nexus_', '')] = data;
+  }
+
+  @override
+  Future<Map<String, Map<String, dynamic>>> loadAll() async {
+    return _data;
+  }
+}
+
+// --- Isolate initializer for the attractor example ---
+Future<void> isolateInitializer() async {
+  final StorageAdapter storage = _debugStorage;
+  await storage.init();
+
+  if (!GetIt.I.isRegistered<StorageAdapter>()) {
+    GetIt.I.registerSingleton<StorageAdapter>(storage);
+  }
+}
+
 NexusWorld provideAttractorWorld() {
   final world = NexusWorld();
 
-  // Add all necessary systems to the world.
+  // Add all systems.
   world.addSystem(AnimationSystem());
+  world.addSystem(PersistenceSystem());
   world.addSystem(ParticleExplosionSystem());
   world.addSystem(ComplexMovementSystem());
   world.addSystem(MeteorSpawnerSystem());
-  world.addSystem(MeteorTargetingSystem()); // New system
+  world.addSystem(MeteorTargetingSystem());
   world.addSystem(MeteorBurnSystem());
-  world.addSystem(CollisionSystem()); // New system
+  world.addSystem(CollisionSystem());
   world.addSystem(PointerSystem());
   world.addSystem(ParticleSpawningSystem());
   world.addSystem(ParticleLifecycleSystem());
@@ -34,6 +70,8 @@ NexusWorld provideAttractorWorld() {
 
   // Create the central attractor entity.
   final attractor = Entity();
+  // --- FIX: Corrected the constructor call to use a positional argument ---
+  attractor.add(PersistenceComponent('attractor_state'));
   attractor.add(PositionComponent(x: 200, y: 300, width: 20, height: 20));
   attractor.add(AttractorComponent(strength: 1.0));
   attractor.add(TagsComponent({'attractor'}));
@@ -54,12 +92,9 @@ NexusWorld provideAttractorWorld() {
   return world;
 }
 
-/// Main entry point for the Flutter app.
 void main() {
-  // Register all core components from the Nexus package.
   registerCoreComponents();
 
-  // --- NEW: Register our custom local components for serialization ---
   ComponentFactoryRegistry.I.register('ExplodingParticleComponent',
       (json) => ExplodingParticleComponent.fromJson(json));
   ComponentFactoryRegistry.I.register('ComplexMovementComponent',
@@ -72,7 +107,6 @@ void main() {
   runApp(const MyApp());
 }
 
-/// The root widget of the application.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -90,15 +124,18 @@ class MyApp extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          return RepaintBoundary(
-            child: CustomPaint(
-              painter: ParticlePainter(
-                particleIds: particleIds,
-                meteorIds: meteorIds,
-                attractorId: attractorId,
-                controller: controller,
+          return GestureDetector(
+            onPanUpdate: (details) => manager.send(SaveDataEvent()),
+            child: RepaintBoundary(
+              child: CustomPaint(
+                painter: ParticlePainter(
+                  particleIds: particleIds,
+                  meteorIds: meteorIds,
+                  attractorId: attractorId,
+                  controller: controller,
+                ),
+                child: const SizedBox.expand(),
               ),
-              child: const SizedBox.expand(),
             ),
           );
         },
@@ -117,6 +154,7 @@ class MyApp extends StatelessWidget {
         body: NexusWidget(
           worldProvider: provideAttractorWorld,
           renderingSystem: renderingSystem,
+          isolateInitializer: isolateInitializer,
         ),
       ),
     );

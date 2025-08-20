@@ -54,8 +54,9 @@ class NexusIsolateManager implements NexusManager {
     _sendPort?.send(message);
   }
 
+  /// --- FIX: Changed method signature to match the NexusManager interface ---
   @override
-  void dispose() {
+  Future<void> dispose() async {
     _sendPort?.send('shutdown');
     _receivePort.close();
     _renderPacketController.close();
