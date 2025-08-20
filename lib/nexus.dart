@@ -30,6 +30,7 @@ export 'src/components/animation_component.dart';
 export 'src/components/animation_progress_component.dart';
 export 'src/components/attractor_component.dart';
 export 'src/components/bloc_component.dart';
+export 'src/components/children_component.dart';
 export 'src/components/clickable_component.dart';
 export 'src/components/counter_state_component.dart';
 export 'src/components/custom_widget_component.dart';
@@ -42,8 +43,6 @@ export 'src/components/spawner_component.dart';
 export 'src/components/tags_component.dart';
 export 'src/components/velocity_component.dart';
 export 'src/components/widget_component.dart';
-// *** FIX: Export the new ChildrenComponent from the core library ***
-export 'src/components/children_component.dart';
 
 // --- Systems ---
 export 'src/systems/animation_system.dart';
@@ -63,5 +62,8 @@ export 'src/systems/shape_selection_system.dart';
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';
 export 'src/flutter/nexus_widget.dart';
+// *** FIX: Export all manager classes. ***
+export 'src/flutter/nexus_manager.dart';
 export 'src/flutter/nexus_isolate_manager.dart';
+export 'src/flutter/nexus_single_thread_manager.dart';
 export 'src/flutter/builder_tags.dart';

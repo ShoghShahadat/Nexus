@@ -1,7 +1,6 @@
 import 'package:nexus/nexus.dart';
 
-// *** FIX: ChildrenComponent has been removed from this file. ***
-// It is now part of the core Nexus library.
+// ... (Other components remain unchanged)
 
 /// Component for holding the data of a summary card.
 class SummaryCardComponent extends Component with SerializableComponent {
@@ -70,12 +69,16 @@ class TaskItemComponent extends Component with SerializableComponent {
   final String assignedTo;
   final String priority;
   final bool isCompleted;
+  final String description;
+  final String createdDate;
 
   TaskItemComponent({
     required this.title,
     required this.assignedTo,
     required this.priority,
     required this.isCompleted,
+    required this.description,
+    required this.createdDate,
   });
 
   factory TaskItemComponent.fromJson(Map<String, dynamic> json) {
@@ -84,6 +87,8 @@ class TaskItemComponent extends Component with SerializableComponent {
       assignedTo: json['assignedTo'] as String,
       priority: json['priority'] as String,
       isCompleted: json['isCompleted'] as bool,
+      description: json['description'] as String,
+      createdDate: json['createdDate'] as String,
     );
   }
 
@@ -93,10 +98,13 @@ class TaskItemComponent extends Component with SerializableComponent {
         'assignedTo': assignedTo,
         'priority': priority,
         'isCompleted': isCompleted,
+        'description': description,
+        'createdDate': createdDate,
       };
 
   @override
-  List<Object?> get props => [title, assignedTo, priority, isCompleted];
+  List<Object?> get props =>
+      [title, assignedTo, priority, isCompleted, description, createdDate];
 }
 
 /// A simple animation component for entry states (fade-in, slide-in).
@@ -116,4 +124,51 @@ class EntryAnimationComponent extends Component with SerializableComponent {
 
   @override
   List<Object?> get props => [delay];
+}
+
+/// A component to manage the expanded/collapsed state of a task.
+class ExpandedStateComponent extends Component with SerializableComponent {
+  final double progress;
+  final bool isExpanding;
+
+  ExpandedStateComponent({this.progress = 0.0, this.isExpanding = true});
+
+  factory ExpandedStateComponent.fromJson(Map<String, dynamic> json) {
+    return ExpandedStateComponent(
+      progress: (json['progress'] as num).toDouble(),
+      isExpanding: json['isExpanding'] as bool,
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() =>
+      {'progress': progress, 'isExpanding': isExpanding};
+
+  @override
+  List<Object?> get props => [progress, isExpanding];
+}
+
+/// A component for the high-frequency, real-time chart.
+class RealtimeChartComponent extends Component with SerializableComponent {
+  final List<double> data;
+  // *** NEW: A counter for total frames processed. ***
+  final int frameCount;
+
+  RealtimeChartComponent(this.data, {this.frameCount = 0});
+
+  factory RealtimeChartComponent.fromJson(Map<String, dynamic> json) {
+    return RealtimeChartComponent(
+      (json['data'] as List).map((e) => (e as num).toDouble()).toList(),
+      frameCount: json['frameCount'] as int,
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'data': data,
+        'frameCount': frameCount,
+      };
+
+  @override
+  List<Object?> get props => [data, frameCount];
 }

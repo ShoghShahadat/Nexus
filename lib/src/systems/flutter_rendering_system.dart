@@ -2,26 +2,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 
-// *** FIX: Removed all dependencies on the example project. ***
-
+// *** FIX: Changed parameter type from concrete implementation to the abstract interface. ***
 /// A function signature for building a widget based on an entity's ID and data.
-typedef EntityWidgetBuilderFunc = Widget Function(
-    BuildContext context,
-    EntityId id,
-    FlutterRenderingSystem controller,
-    NexusIsolateManager manager);
+typedef EntityWidgetBuilderFunc = Widget Function(BuildContext context,
+    EntityId id, FlutterRenderingSystem controller, NexusManager manager);
 
 /// A UI-side controller that recursively builds a Flutter widget tree from a
 /// hierarchical entity structure.
 class FlutterRenderingSystem extends ChangeNotifier {
   final Map<EntityId, Map<Type, Component>> _componentCache = {};
   final Map<String, EntityWidgetBuilderFunc> builders;
-  NexusIsolateManager? _isolateManager;
+  // *** FIX: Changed the manager type to the abstract NexusManager. ***
+  NexusManager? _manager;
 
   FlutterRenderingSystem({required this.builders});
 
-  void setManager(NexusIsolateManager manager) {
-    _isolateManager = manager;
+  // *** FIX: Changed the parameter type to the abstract NexusManager. ***
+  void setManager(NexusManager manager) {
+    _manager = manager;
   }
 
   T? get<T extends Component>(EntityId id) {
@@ -59,9 +57,8 @@ class FlutterRenderingSystem extends ChangeNotifier {
     }
   }
 
-  // *** FIX: Removed @override annotation as this method does not override anything. ***
   Widget build(BuildContext context) {
-    if (_isolateManager == null || _componentCache.isEmpty) {
+    if (_manager == null || _componentCache.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -98,17 +95,16 @@ class FlutterRenderingSystem extends ChangeNotifier {
     switch (widgetType) {
       case 'column':
         return Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch, // Stretch to fill width
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: children,
         );
       case 'wrap':
         return Padding(
-          padding: const EdgeInsets.all(16.0), // Add padding around the wrap
+          padding: const EdgeInsets.all(16.0),
           child: Wrap(
             spacing: 16.0,
             runSpacing: 16.0,
-            alignment: WrapAlignment.center, // Center the cards
+            alignment: WrapAlignment.center,
             children: children,
           ),
         );
@@ -120,7 +116,8 @@ class FlutterRenderingSystem extends ChangeNotifier {
       default:
         final builder = builders[widgetType];
         if (builder != null) {
-          return builder(context, id, this, _isolateManager!);
+          // The manager passed to the builder is now correctly typed.
+          return builder(context, id, this, _manager!);
         }
     }
 

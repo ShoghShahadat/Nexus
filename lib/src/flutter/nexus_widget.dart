@@ -1,15 +1,14 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/events/pointer_events.dart';
 
-/// A Flutter widget that hosts and runs a NexusWorld in a background isolate.
-///
-/// This widget manages the lifecycle of the NexusIsolateManager and connects
-/// it to the FlutterRenderingSystem to build the UI reactively.
+// *** FIX: Removed unnecessary specific imports. ***
+// All required classes are exported from 'package:nexus/nexus.dart'.
+
+/// A Flutter widget that hosts and runs a NexusWorld.
 class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
   final FlutterRenderingSystem renderingSystem;
-  // FIX: Added initializer for custom component registration.
   final void Function()? isolateInitializer;
 
   const NexusWidget({
@@ -24,25 +23,31 @@ class NexusWidget extends StatefulWidget {
 }
 
 class _NexusWidgetState extends State<NexusWidget> {
-  late final NexusIsolateManager _isolateManager;
+  late final NexusManager _manager;
 
   @override
   void initState() {
     super.initState();
-    _isolateManager = NexusIsolateManager();
-    widget.renderingSystem.setManager(_isolateManager);
-    // FIX: Pass the initializer to the spawn method.
-    _isolateManager.spawn(
+    if (kIsWeb) {
+      _manager = NexusSingleThreadManager();
+    } else {
+      _manager = NexusIsolateManager();
+    }
+
+    // This call is now type-safe because setManager expects a NexusManager.
+    widget.renderingSystem.setManager(_manager);
+
+    _manager.spawn(
       widget.worldProvider,
       isolateInitializer: widget.isolateInitializer,
     );
-    _isolateManager.renderPacketStream
+    _manager.renderPacketStream
         .listen(widget.renderingSystem.updateFromPackets);
   }
 
   @override
   void dispose() {
-    _isolateManager.dispose();
+    _manager.dispose();
     super.dispose();
   }
 
@@ -52,7 +57,7 @@ class _NexusWidgetState extends State<NexusWidget> {
       onPointerMove: (event) {
         final NexusPointerMoveEvent pointerEvent = NexusPointerMoveEvent(
             event.localPosition.dx, event.localPosition.dy);
-        _isolateManager.send(pointerEvent);
+        _manager.send(pointerEvent);
       },
       child: AnimatedBuilder(
         animation: widget.renderingSystem,

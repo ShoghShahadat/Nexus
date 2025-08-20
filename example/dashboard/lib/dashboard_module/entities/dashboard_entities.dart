@@ -2,7 +2,7 @@ import 'package:nexus/nexus.dart';
 import 'package:nexus_example/dashboard_module/components/dashboard_components.dart';
 import 'package:nexus_example/dashboard_module/data/mock_data_provider.dart';
 
-/// Provides all entities for the dashboard, now structured hierarchically.
+/// Provides all entities for the dashboard, structured hierarchically.
 class DashboardEntityProvider extends EntityProvider {
   @override
   void createEntities(NexusWorld world) {
@@ -21,14 +21,14 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
 
   @override
   List<Entity> assemble() {
-    // Create individual widget entities first.
     final summaryCards = _createSummaryCards();
     final chart = _createChart();
+    // *** NEW: Create the real-time chart entity. ***
+    final realtimeChart = _createRealtimeChart();
     final taskList = _createTaskList();
 
-    // Create layout container entities.
     final summaryGrid = _createLayoutEntity(
-      widgetType: 'wrap', // Use a Wrap for responsive grid
+      widgetType: 'wrap',
       children: summaryCards.map((e) => e.id).toList(),
     );
 
@@ -37,29 +37,29 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
       children: taskList.map((e) => e.id).toList(),
     );
 
-    // Create the main root entity that will be the main Column.
     final rootEntity = _createLayoutEntity(
       widgetType: 'column',
-      tag: 'root', // A special tag to identify the entry point for rendering.
+      tag: 'root',
       children: [
         summaryGrid.id,
         chart.id,
+        // *** NEW: Add the real-time chart to the layout. ***
+        realtimeChart.id,
         taskColumn.id,
       ],
     );
 
-    // Return all created entities to be added to the world.
     return [
       rootEntity,
       summaryGrid,
       chart,
+      realtimeChart, // Add to the list of entities
       taskColumn,
       ...summaryCards,
       ...taskList,
     ];
   }
 
-  /// Helper to create a layout container entity.
   Entity _createLayoutEntity(
       {required String widgetType,
       required List<EntityId> children,
@@ -73,16 +73,14 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
     return entity;
   }
 
-  /// Creates entities for the summary cards. They no longer have positions.
   List<Entity> _createSummaryCards() {
     final cards = dataProvider.getSummaryCards();
     return List.generate(cards.length, (i) {
       final cardData = cards[i];
       final entity = Entity();
-      // No PositionComponent needed here anymore!
       entity.add(CustomWidgetComponent(
         widgetType: 'summary_card',
-        properties: {'width': 200.0, 'height': 120.0},
+        properties: {'width': 220.0, 'height': 120.0},
       ));
       entity.add(cardData);
       entity.add(EntryAnimationComponent(delay: 0.1 * i));
@@ -90,19 +88,30 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
     });
   }
 
-  /// Creates the entity for the bar chart.
   Entity _createChart() {
     final entity = Entity();
     entity.add(CustomWidgetComponent(
       widgetType: 'chart',
-      properties: {'height': 250.0},
+      properties: {'height': 280.0},
     ));
     entity.add(dataProvider.getChartData());
     entity.add(EntryAnimationComponent(delay: 0.4));
     return entity;
   }
 
-  /// Creates entities for the task list items.
+  // *** NEW: A method to create the real-time chart entity. ***
+  Entity _createRealtimeChart() {
+    final entity = Entity();
+    entity.add(CustomWidgetComponent(
+      widgetType: 'realtime_chart',
+      properties: {'height': 150.0},
+    ));
+    // Initialize with empty data; the system will populate it immediately.
+    entity.add(RealtimeChartComponent([]));
+    entity.add(EntryAnimationComponent(delay: 0.6));
+    return entity;
+  }
+
   List<Entity> _createTaskList() {
     final tasks = dataProvider.getTasks();
     return List.generate(tasks.length, (i) {
@@ -110,15 +119,35 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
       final entity = Entity();
       entity.add(CustomWidgetComponent(widgetType: 'task_item'));
       entity.add(taskData);
-      entity.add(EntryAnimationComponent(delay: 0.5 + (0.05 * i)));
+      entity.add(EntryAnimationComponent(delay: 0.7 + (0.05 * i)));
+
+      if (taskData.isCompleted) {
+        entity.add(ExpandedStateComponent(progress: 1.0, isExpanding: true));
+      }
+
       entity.add(ClickableComponent((e) {
+        if (e.has<AnimationComponent>()) return;
+
         final currentTask = e.get<TaskItemComponent>()!;
+        final expansionState = e.get<ExpandedStateComponent>();
+
         e.add(TaskItemComponent(
           title: currentTask.title,
           assignedTo: currentTask.assignedTo,
           priority: currentTask.priority,
           isCompleted: !currentTask.isCompleted,
+          description: currentTask.description,
+          createdDate: currentTask.createdDate,
         ));
+
+        if (expansionState == null) {
+          e.add(ExpandedStateComponent(isExpanding: true));
+        } else {
+          e.add(ExpandedStateComponent(
+            progress: expansionState.progress,
+            isExpanding: false,
+          ));
+        }
       }));
       return entity;
     });

@@ -1,9 +1,9 @@
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:nexus_example/dashboard_module/components/dashboard_components.dart';
 
 /// This class is responsible for generating mock data for the dashboard.
-/// In a real application, this data would come from an API, database, or another service.
 class MockDataProvider {
   final Random _random = Random();
 
@@ -45,7 +45,7 @@ class MockDataProvider {
     );
   }
 
-  /// Generates a list of mock tasks.
+  /// Generates a list of mock tasks with more details.
   List<TaskItemComponent> getTasks() {
     return [
       TaskItemComponent(
@@ -53,36 +53,54 @@ class MockDataProvider {
         assignedTo: 'Mr. Rezaei',
         priority: 'High',
         isCompleted: false,
+        description:
+            'Create mockups and prototypes for the main dashboard, including all UI components.',
+        createdDate: '2024-08-15',
       ),
       TaskItemComponent(
         title: 'Implement the authentication mechanism',
         assignedTo: 'Ms. Ahmadi',
         priority: 'High',
         isCompleted: false,
+        description:
+            'Set up Firebase Authentication and create login/signup flows.',
+        createdDate: '2024-08-12',
       ),
       TaskItemComponent(
         title: 'Connect to the payment API',
         assignedTo: 'Mr. Mohammadi',
         priority: 'Medium',
         isCompleted: true,
+        description:
+            'Integrate the Stripe API for handling payments and subscriptions.',
+        createdDate: '2024-08-10',
       ),
       TaskItemComponent(
         title: 'Write unit tests for the user module',
         assignedTo: 'Ms. Sharifi',
         priority: 'Low',
         isCompleted: false,
+        description:
+            'Ensure at least 80% code coverage for all services and repositories in the user module.',
+        createdDate: '2024-08-18',
       ),
       TaskItemComponent(
         title: 'Prepare project documentation',
         assignedTo: 'Mr. Karimi',
         priority: 'Medium',
         isCompleted: true,
+        description:
+            'Document the API endpoints and the overall architecture of the project.',
+        createdDate: '2024-08-05',
       ),
       TaskItemComponent(
         title: 'Review and fix reported bugs',
         assignedTo: 'Ms. Ahmadi',
         priority: 'High',
         isCompleted: false,
+        description:
+            'Address all critical bugs reported in the last sprint from the QA team.',
+        createdDate: '2024-08-19',
       ),
     ];
   }

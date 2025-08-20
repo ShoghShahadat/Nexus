@@ -1,26 +1,24 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/core/render_packet.dart';
-import 'package:nexus/src/events/input_events.dart';
+import 'package:nexus/src/flutter/nexus_manager.dart';
 
-/// A class that manages the background isolate where the NexusWorld runs.
-/// It handles spawning, communication, and termination of the logic thread.
-class NexusIsolateManager {
+// *** MODIFIED: This class now implements the common NexusManager interface. ***
+// Its core logic remains the same, designed for mobile/desktop platforms.
+
+/// Manages the background isolate where the NexusWorld runs.
+class NexusIsolateManager implements NexusManager {
   Isolate? _isolate;
   SendPort? _sendPort;
   final ReceivePort _receivePort = ReceivePort();
 
   final _renderPacketController =
       StreamController<List<RenderPacket>>.broadcast();
+  @override
   Stream<List<RenderPacket>> get renderPacketStream =>
       _renderPacketController.stream;
 
-  /// Spawns a new isolate to run the NexusWorld.
-  ///
-  /// [worldProvider] creates the NexusWorld instance.
-  /// [isolateInitializer] is an optional function that runs inside the new
-  /// isolate for setup, perfect for registering custom components.
+  @override
   Future<void> spawn(
     NexusWorld Function() worldProvider, {
     void Function()? isolateInitializer,
@@ -37,7 +35,6 @@ class NexusIsolateManager {
       }
     });
 
-    // FIX: Pass the initializer function to the isolate entry point.
     final entryPointArgs = [
       _receivePort.sendPort,
       isolateInitializer,
@@ -50,15 +47,14 @@ class NexusIsolateManager {
       debugName: 'NexusLogicIsolate',
     );
     _sendPort = await completer.future;
-    // We no longer send the worldProvider here; it's part of the initial args.
   }
 
-  /// Sends a command or event to the background isolate.
+  @override
   void send(dynamic message) {
     _sendPort?.send(message);
   }
 
-  /// Terminates the background isolate.
+  @override
   void dispose() {
     _sendPort?.send('shutdown');
     _receivePort.close();
@@ -70,32 +66,25 @@ class NexusIsolateManager {
 
 /// The entry point for the background isolate.
 void _isolateEntryPoint(List<dynamic> args) async {
-  // FIX: Unpack arguments
   final mainSendPort = args[0] as SendPort;
   final isolateInitializer = args[1] as void Function()?;
   final worldProvider = args[2] as NexusWorld Function();
 
-  // FIX: Run initializers for both core and custom components.
   registerCoreComponents();
   isolateInitializer?.call();
 
   final isolateReceivePort = ReceivePort();
   mainSendPort.send(isolateReceivePort.sendPort);
 
-  NexusWorld? world;
-  Timer? timer;
-  final stopwatch = Stopwatch();
+  final world = worldProvider();
+  final stopwatch = Stopwatch()..start();
 
-  // The world is now created right away.
-  world = worldProvider();
-  stopwatch.start();
-
-  timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+  final timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
     final dt =
         stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     stopwatch.reset();
 
-    world!.update(dt);
+    world.update(dt);
 
     final packets = <RenderPacket>[];
     for (final entity in world.entities.values) {
@@ -125,11 +114,12 @@ void _isolateEntryPoint(List<dynamic> args) async {
 
   isolateReceivePort.listen((message) {
     if (message is EntityTapEvent) {
-      world?.eventBus.fire(message);
+      world.eventBus.fire(message);
     } else if (message is NexusPointerMoveEvent) {
-      world?.eventBus.fire(message);
+      world.eventBus.fire(message);
     } else if (message == 'shutdown') {
-      timer?.cancel();
+      timer.cancel();
+      world.clear();
       isolateReceivePort.close();
     }
   });

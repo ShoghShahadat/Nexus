@@ -1,0 +1,85 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "nexus",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "nexus (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "nexus (release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "attractor",
+            "cwd": "example\\attractor",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "attractor (profile mode)",
+            "cwd": "example\\attractor",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "attractor (release mode)",
+            "cwd": "example\\attractor",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "counter",
+            "cwd": "example\\counter",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "counter (profile mode)",
+            "cwd": "example\\counter",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "counter (release mode)",
+            "cwd": "example\\counter",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "dashboard",
+            "cwd": "example\\dashboard",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "dashboard (profile mode)",
+            "cwd": "example\\dashboard",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "dashboard (release mode)",
+            "cwd": "example\\dashboard",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}
