@@ -4,7 +4,6 @@ import 'package:flutter/widgets.dart';
 import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
 
-/// A Flutter widget that hosts and runs a NexusWorld.
 class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
   final FlutterRenderingSystem renderingSystem;
@@ -42,16 +41,10 @@ class _NexusWidgetState extends State<NexusWidget> {
 
   void _initializeManager() {
     if (!kIsWeb && !kDebugMode) {
-      print("--- Nexus running in RELEASE mode (Multi-Threaded Isolate) ---");
       _manager = NexusIsolateManager();
     } else {
-      if (kDebugMode) {
-        print(
-            "--- Nexus running in DEBUG mode (Single-Threaded for Hot Reload) ---");
-      }
       _manager = NexusSingleThreadManager();
     }
-
     widget.renderingSystem.setManager(_manager);
     _spawnWorld();
   }
@@ -66,30 +59,23 @@ class _NexusWidgetState extends State<NexusWidget> {
         .listen(widget.renderingSystem.updateFromPackets);
   }
 
-  /// --- FINAL FIX: Implemented safe, stateful Hot Reload logic ---
   void _resetManager() async {
-    print("--- Hot Reload Detected: Attempting stateful reset ---");
+    print("--- Hot Reload Detected: Beginning stateful reset ---");
 
-    _manager.send(SaveDataEvent());
-    await Future.delayed(const Duration(milliseconds: 50));
-    await _manager.dispose();
+    // --- NEW: Call the new dispose method with the hot reload flag ---
+    await _manager.dispose(isHotReload: true);
 
-    // 1. Safely check if the StorageAdapter is registered before getting it.
     StorageAdapter? preservedStorage;
     if (GetIt.I.isRegistered<StorageAdapter>()) {
       preservedStorage = GetIt.I.get<StorageAdapter>();
     }
-
-    // 2. Reset the service locator.
     GetIt.I.reset(dispose: false);
-
-    // 3. If we successfully preserved the adapter, re-register it.
     if (preservedStorage != null) {
       GetIt.I.registerSingleton<StorageAdapter>(preservedStorage);
     }
 
-    // 4. Re-initialize the manager with the new code.
     _initializeManager();
+    print("--- Stateful reset complete ---");
   }
 
   @override
@@ -102,9 +88,13 @@ class _NexusWidgetState extends State<NexusWidget> {
   Widget build(BuildContext context) {
     return Listener(
       onPointerMove: (event) {
-        final NexusPointerMoveEvent pointerEvent = NexusPointerMoveEvent(
+        final pointerEvent = NexusPointerMoveEvent(
             event.localPosition.dx, event.localPosition.dy);
         _manager.send(pointerEvent);
+        // --- NEW: We now also send a save event on move for real-time persistence ---
+        if (kDebugMode) {
+          _manager.send(SaveDataEvent());
+        }
       },
       child: AnimatedBuilder(
         animation: widget.renderingSystem,

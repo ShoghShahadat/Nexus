@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:nexus/nexus.dart';
 
-/// Manages the background isolate where the NexusWorld runs.
 class NexusIsolateManager implements NexusManager {
   Isolate? _isolate;
   SendPort? _sendPort;
@@ -23,9 +22,7 @@ class NexusIsolateManager implements NexusManager {
     RootIsolateToken? rootIsolateToken,
   }) async {
     if (_isolate != null) return;
-
     final completer = Completer<SendPort>();
-
     _receivePort.listen((message) {
       if (message is SendPort) {
         completer.complete(message);
@@ -33,14 +30,12 @@ class NexusIsolateManager implements NexusManager {
         _renderPacketController.add(message);
       }
     });
-
     final entryPointArgs = [
       _receivePort.sendPort,
       isolateInitializer,
       worldProvider,
       rootIsolateToken,
     ];
-
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
       entryPointArgs,
@@ -54,19 +49,20 @@ class NexusIsolateManager implements NexusManager {
     _sendPort?.send(message);
   }
 
-  /// --- FIX: Changed method signature to match the NexusManager interface ---
   @override
-  Future<void> dispose() async {
+  Future<void> dispose({bool isHotReload = false}) async {
+    // Note: Stateful Hot Reload is a debug-only feature and doesn't apply
+    // to isolate mode, but we implement the signature for consistency.
     _sendPort?.send('shutdown');
     _receivePort.close();
-    _renderPacketController.close();
+    await _renderPacketController.close();
     _isolate?.kill(priority: Isolate.immediate);
     _isolate = null;
   }
 }
 
-/// The entry point for the background isolate.
 void _isolateEntryPoint(List<dynamic> args) async {
+  // ... (rest of the isolate code remains the same)
   final mainSendPort = args[0] as SendPort;
   final isolateInitializer = args[1] as Future<void> Function()?;
   final worldProvider = args[2] as NexusWorld Function();
