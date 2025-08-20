@@ -31,6 +31,38 @@ class FlutterRenderingSystem extends ChangeNotifier {
     return _componentCache[id]?[T] as T?;
   }
 
+  /// Retrieves a list of entity IDs that have a specific tag from the cache.
+  /// This is useful for builders that need to render a collection of entities
+  /// based on their tags (e.g., all particles).
+  List<EntityId> getAllIdsWithTag(String tag) {
+    final List<EntityId> ids = [];
+    for (final entry in _componentCache.entries) {
+      final tagsComp = entry.value[TagsComponent] as TagsComponent?;
+      if (tagsComp != null && tagsComp.hasTag(tag)) {
+        ids.add(entry.key);
+      }
+    }
+    return ids;
+  }
+
+  /// Adds a UI-only entity directly to the rendering system's cache.
+  ///
+  /// This is used for entities that exist purely on the UI thread and are
+  /// not managed by the background NexusWorld logic. It also adds a dummy
+  /// `PositionComponent` to ensure compatibility with the `build` method's
+  /// expectation for positioning, even if the widget itself handles its size/position.
+  void addUiEntity(EntityId id, Set<String> tags) {
+    if (!_componentCache.containsKey(id)) {
+      _componentCache[id] = {};
+    }
+    // Add a dummy PositionComponent. The actual positioning will depend on the builder,
+    // but this satisfies the `build` method's check for a PositionComponent.
+    _componentCache[id]![PositionComponent] =
+        PositionComponent(x: 0, y: 0, width: 0, height: 0);
+    _componentCache[id]![TagsComponent] = TagsComponent(tags);
+    notifyListeners(); // Notify listeners that new UI entities have been added
+  }
+
   /// Updates the internal cache with data from RenderPackets and notifies the UI.
   void updateFromPackets(List<RenderPacket> packets) {
     bool needsNotify = false;
@@ -74,7 +106,10 @@ class FlutterRenderingSystem extends ChangeNotifier {
         final pos = get<PositionComponent>(entityId);
         final tags = get<TagsComponent>(entityId);
 
-        if (pos == null || tags == null) return const SizedBox.shrink();
+        if (pos == null || tags == null) {
+          // This entity cannot be rendered if it lacks essential components.
+          return const SizedBox.shrink();
+        }
 
         // Find the first tag that has a registered builder.
         TaggedWidgetBuilder? builder;
@@ -85,10 +120,13 @@ class FlutterRenderingSystem extends ChangeNotifier {
           }
         }
 
-        if (builder == null) return const SizedBox.shrink();
+        if (builder == null) {
+          // No builder found for any of the entity's tags.
+          return const SizedBox.shrink();
+        }
 
         return Positioned(
-          key: ValueKey(entityId),
+          key: ValueKey(entityId), // Use ValueKey for efficient widget updates
           left: pos.x,
           top: pos.y,
           width: pos.width,

@@ -3,34 +3,31 @@ import 'package:nexus/src/components/position_component.dart';
 import 'package:nexus/src/components/tags_component.dart';
 import 'package:nexus/src/core/serialization/serializable_component.dart';
 import 'package:nexus/src/components/animation_progress_component.dart';
+import 'package:nexus/src/components/attractor_component.dart';
 import 'package:nexus/src/components/counter_state_component.dart';
 import 'package:nexus/src/components/custom_widget_component.dart';
 import 'package:nexus/src/components/morphing_component.dart';
+import 'package:nexus/src/components/particle_component.dart';
 import 'package:nexus/src/components/shape_path_component.dart';
+import 'package:nexus/src/components/spawner_component.dart';
+import 'package:nexus/src/components/velocity_component.dart';
 
 /// A function signature for a factory that creates a [Component] from a JSON map.
 typedef ComponentFactory = Component Function(Map<String, dynamic> json);
 
 /// A registry for mapping component type names to their deserialization factories.
-///
-/// This is essential for the UI thread to dynamically reconstruct
-/// components of various types from a RenderPacket.
 class ComponentFactoryRegistry {
   final Map<String, ComponentFactory> _factories = {};
 
-  /// A globally accessible singleton instance.
   static final ComponentFactoryRegistry I =
       ComponentFactoryRegistry._internal();
 
   ComponentFactoryRegistry._internal();
 
-  /// Registers a component factory for a given type name.
   void register(String typeName, ComponentFactory factory) {
     _factories[typeName] = factory;
   }
 
-  /// Creates a component instance from a JSON map using the registered factory.
-  /// Throws an exception if no factory is registered for the given type name.
   Component create(String typeName, Map<String, dynamic> json) {
     final factory = _factories[typeName];
     if (factory == null) {
@@ -43,9 +40,7 @@ class ComponentFactoryRegistry {
 }
 
 /// A helper function to register all default serializable components.
-/// This should be called once at application startup.
 void registerCoreComponents() {
-  // Using string literals for type names is a robust way to avoid compiler issues.
   ComponentFactoryRegistry.I.register(
       'PositionComponent', (json) => PositionComponent.fromJson(json));
   ComponentFactoryRegistry.I
@@ -60,4 +55,12 @@ void registerCoreComponents() {
       'ShapePathComponent', (json) => ShapePathComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
       'CustomWidgetComponent', (json) => CustomWidgetComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'ParticleComponent', (json) => ParticleComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'AttractorComponent', (json) => AttractorComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'VelocityComponent', (json) => VelocityComponent.fromJson(json));
+  ComponentFactoryRegistry.I
+      .register('SpawnerComponent', (json) => SpawnerComponent.fromJson(json));
 }

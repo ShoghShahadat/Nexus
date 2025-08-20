@@ -23,32 +23,40 @@ export 'src/core/render_packet.dart';
 // --- Events ---
 export 'src/events/shape_events.dart';
 export 'src/events/input_events.dart';
+export 'src/events/pointer_events.dart';
 
 // --- Components ---
 export 'src/components/animation_component.dart';
 export 'src/components/animation_progress_component.dart';
+export 'src/components/attractor_component.dart';
 export 'src/components/bloc_component.dart';
 export 'src/components/clickable_component.dart';
 export 'src/components/counter_state_component.dart';
 export 'src/components/custom_widget_component.dart';
 export 'src/components/lifecycle_component.dart';
 export 'src/components/morphing_component.dart';
+export 'src/components/particle_component.dart';
 export 'src/components/position_component.dart';
 export 'src/components/shape_path_component.dart';
+export 'src/components/spawner_component.dart';
 export 'src/components/tags_component.dart';
 export 'src/components/velocity_component.dart';
 export 'src/components/widget_component.dart';
 
 // --- Systems ---
 export 'src/systems/animation_system.dart';
+export 'src/systems/attraction_system.dart';
 export 'src/systems/bloc_system.dart';
 export 'src/systems/flutter_rendering_system.dart';
+export 'src/systems/input_system.dart';
 export 'src/systems/lifecycle_system.dart';
 export 'src/systems/morphing_system.dart';
+export 'src/systems/particle_lifecycle_system.dart';
+export 'src/systems/particle_spawning_system.dart';
 export 'src/systems/physics_system.dart';
+export 'src/systems/pointer_system.dart';
 export 'src/systems/pulsing_warning_system.dart';
 export 'src/systems/shape_selection_system.dart';
-export 'src/systems/input_system.dart';
 
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';
