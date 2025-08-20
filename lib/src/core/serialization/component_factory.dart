@@ -57,7 +57,11 @@ void registerCoreComponents() {
       'ChildrenComponent', (json) => ChildrenComponent.fromJson(json));
   ComponentFactoryRegistry.I
       .register('HistoryComponent', (json) => HistoryComponent.fromJson(json));
-  // *** NEW: Register RenderStrategyComponent ***
   ComponentFactoryRegistry.I.register('RenderStrategyComponent',
       (json) => RenderStrategyComponent.fromJson(json));
+  // *** NEW: Register new components ***
+  ComponentFactoryRegistry.I.register(
+      'BlackboardComponent', (json) => BlackboardComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'PersistenceComponent', (json) => PersistenceComponent.fromJson(json));
 }

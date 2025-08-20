@@ -1,10 +1,6 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:nexus/nexus.dart';
-
-// *** NEW FILE ***
-// This abstract class defines a common interface for both the Isolate-based
-// and single-threaded managers. This allows NexusWidget to remain agnostic
-// about the execution model.
 
 /// An abstract interface for managing the NexusWorld lifecycle and communication.
 abstract class NexusManager {
@@ -16,9 +12,11 @@ abstract class NexusManager {
   /// [worldProvider] is a function that creates the NexusWorld instance.
   /// [isolateInitializer] is an optional function for setup code that needs to
   /// run in the same context as the world (e.g., registering components).
+  // --- FIX: Added RootIsolateToken for platform channel communication ---
   Future<void> spawn(
     NexusWorld Function() worldProvider, {
-    void Function()? isolateInitializer,
+    Future<void> Function()? isolateInitializer,
+    RootIsolateToken? rootIsolateToken,
   });
 
   /// Sends a message or event from the UI to the NexusWorld.

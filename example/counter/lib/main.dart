@@ -1,6 +1,45 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus_example/counter_cubit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// --- Custom Storage Adapter using SharedPreferences ---
+class PrefsAdapter implements StorageAdapter {
+  late SharedPreferences _prefs;
+
+  @override
+  Future<void> init() async {
+    _prefs = await SharedPreferences.getInstance();
+  }
+
+  @override
+  Future<Map<String, dynamic>?> load(String key) async {
+    final data = _prefs.getString(key);
+    if (data == null) return null;
+    return jsonDecode(data);
+  }
+
+  @override
+  Future<void> save(String key, Map<String, dynamic> data) async {
+    await _prefs.setString(key, jsonEncode(data));
+  }
+
+  @override
+  Future<Map<String, Map<String, dynamic>>> loadAll() async {
+    final allData = <String, Map<String, dynamic>>{};
+    final keys = _prefs.getKeys().where((k) => k.startsWith('nexus_'));
+    for (final key in keys) {
+      final loadedData = await load(key);
+      if (loadedData != null) {
+        allData[key.replaceFirst('nexus_', '')] = loadedData;
+      }
+    }
+    return allData;
+  }
+}
 
 // --- Events & Custom Components for the example ---
 class CounterUpdatedEvent {
@@ -8,175 +47,99 @@ class CounterUpdatedEvent {
   CounterUpdatedEvent(this.newValue);
 }
 
-class WarningTagComponent extends Component with SerializableComponent {
-  WarningTagComponent();
-  factory WarningTagComponent.fromJson(Map<String, dynamic> json) =>
-      WarningTagComponent();
-  @override
-  Map<String, dynamic> toJson() => {};
-  @override
-  List<Object?> get props => [];
+class MoodChangedEvent {
+  final String newMood;
+  MoodChangedEvent(this.newMood);
 }
 
-// --- NEW: Define Behavior Components ---
-class MovableComponent extends Component with SerializableComponent {
-  final double speed;
-  MovableComponent(this.speed);
-  factory MovableComponent.fromJson(Map<String, dynamic> json) =>
-      MovableComponent(json['speed']);
-  @override
-  Map<String, dynamic> toJson() => {'speed': speed};
-  @override
-  List<Object?> get props => [speed];
+/// Initializes services required by the logic isolate.
+Future<void> isolateInitializer() async {
+  final storage = PrefsAdapter();
+  await storage.init();
+  GetIt.instance.registerSingleton<StorageAdapter>(storage);
 }
 
-class TalkativeComponent extends Component with SerializableComponent {
-  final String sound;
-  TalkativeComponent(this.sound);
-  factory TalkativeComponent.fromJson(Map<String, dynamic> json) =>
-      TalkativeComponent(json['sound']);
-  @override
-  Map<String, dynamic> toJson() => {'sound': sound};
-  @override
-  List<Object?> get props => [sound];
-}
-
-// --- NEW: Define Archetypes ---
-final animalArchetype = Archetype([
-  MovableComponent(5.0),
-]);
-
-final humanArchetype = Archetype([
-  TalkativeComponent("Hello Nexus!"),
-]);
-
-/// تابع اصلی که NexusWorld را برای Isolate پس‌زمینه فراهم می‌کند.
+/// This function now only defines the blueprint of the world.
 NexusWorld provideCounterWorld() {
   final world = NexusWorld();
 
-  // 1. ثبت سرویس‌ها
-  final cubit = CounterCubit();
-  world.services.registerSingleton(cubit);
-
-  // 2. افزودن سیستم‌ها
   world.addSystem(CounterSystem());
   world.addSystem(InputSystem());
   world.addSystem(HistorySystem());
   world.addSystem(RuleSystem());
-  world.addSystem(ArchetypeSystem()); // NEW: Add the archetype system
+  world.addSystem(PersistenceSystem());
 
-  // 3. ایجاد موجودیت‌ها
-
-  // موجودیت برای نمایشگر شمارنده
   final counterDisplay = Entity();
+  counterDisplay.add(PersistenceComponent('counter_entity'));
   counterDisplay
       .add(PositionComponent(x: 100, y: 150, width: 200, height: 100));
-  counterDisplay.add(BlocComponent<CounterCubit, int>(cubit));
-  counterDisplay.add(CounterStateComponent(cubit.state));
   counterDisplay.add(TagsComponent({'counter_display'}));
+  counterDisplay.add(BlackboardComponent({'mood': 'happy'}));
+  counterDisplay.add(CounterStateComponent(0));
   counterDisplay.add(HistoryComponent(
-    trackedComponents: {'CounterStateComponent'},
+    trackedComponents: {'CounterStateComponent', 'BlackboardComponent'},
   ));
 
-  // RuleComponent for simple warning tag
   counterDisplay.add(RuleComponent(
     triggers: {CounterUpdatedEvent},
-    condition: (entity, event) {
-      final counterEvent = event as CounterUpdatedEvent;
-      final isWarning = counterEvent.newValue > 5;
-      final hasWarningTag = entity.has<WarningTagComponent>();
-      return isWarning != hasWarningTag;
-    },
+    condition: (entity, event) => true,
     actions: (entity, event) {
-      final counterEvent = event as CounterUpdatedEvent;
-      if (counterEvent.newValue > 5) {
-        entity.add(WarningTagComponent());
-      } else {
-        entity.remove<WarningTagComponent>();
+      final newMood =
+          (event as CounterUpdatedEvent).newValue > 5 ? 'angry' : 'happy';
+      final blackboard = entity.get<BlackboardComponent>()!;
+      if (blackboard.get<String>('mood') != newMood) {
+        blackboard.set('mood', newMood);
+        entity.add(blackboard);
+        world.eventBus.fire(MoodChangedEvent(newMood));
       }
     },
   ));
 
-  // --- NEW: ArchetypeComponent for complex behaviors ---
-  counterDisplay.add(ArchetypeComponent(
-    triggers: {CounterUpdatedEvent}, // Also triggered by counter updates
-    archetypes: [
-      // Condition to become an "Animal"
-      ConditionalArchetype(
-        archetype: animalArchetype,
-        condition: (entity, event) =>
-            (event as CounterUpdatedEvent).newValue > 3,
-      ),
-      // Condition to become a "Human" (more specific animal)
-      ConditionalArchetype(
-        archetype: humanArchetype,
-        condition: (entity, event) =>
-            (event as CounterUpdatedEvent).newValue > 7,
-      ),
-    ],
-  ));
-  // --- END NEW ---
-
   world.addEntity(counterDisplay);
 
-  // Buttons...
   final incrementButton = Entity();
   incrementButton.add(PositionComponent(x: 210, y: 320, width: 80, height: 50));
-  incrementButton.add(ClickableComponent((_) => cubit.increment()));
+  incrementButton.add(ClickableComponent((entity) {
+    world.services.get<CounterCubit>().increment();
+    world.eventBus.fire(SaveDataEvent());
+  }));
   incrementButton.add(TagsComponent({'increment_button'}));
   world.addEntity(incrementButton);
 
   final decrementButton = Entity();
   decrementButton.add(PositionComponent(x: 110, y: 320, width: 80, height: 50));
-  decrementButton.add(ClickableComponent((_) => cubit.decrement()));
+  decrementButton.add(ClickableComponent((entity) {
+    world.services.get<CounterCubit>().decrement();
+    world.eventBus.fire(SaveDataEvent());
+  }));
   decrementButton.add(TagsComponent({'decrement_button'}));
   world.addEntity(decrementButton);
-
-  final undoButton = Entity();
-  undoButton.add(PositionComponent(x: 110, y: 380, width: 80, height: 50));
-  undoButton.add(ClickableComponent(
-      (_) => world.eventBus.fire(UndoEvent(counterDisplay.id))));
-  undoButton.add(TagsComponent({'undo_button'}));
-  world.addEntity(undoButton);
-
-  final redoButton = Entity();
-  redoButton.add(PositionComponent(x: 210, y: 380, width: 80, height: 50));
-  redoButton.add(ClickableComponent(
-      (_) => world.eventBus.fire(RedoEvent(counterDisplay.id))));
-  redoButton.add(TagsComponent({'redo_button'}));
-  world.addEntity(redoButton);
 
   return world;
 }
 
-/// نقطه شروع برنامه Flutter.
-void main() {
+/// Main entry point.
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   registerCoreComponents();
-  ComponentFactoryRegistry.I.register(
-      'WarningTagComponent', (json) => WarningTagComponent.fromJson(json));
-  // --- NEW: Register behavior components ---
-  ComponentFactoryRegistry.I
-      .register('MovableComponent', (json) => MovableComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register(
-      'TalkativeComponent', (json) => TalkativeComponent.fromJson(json));
-
   runApp(const MyApp());
 }
 
-/// ویجت اصلی برنامه.
+/// The root widget.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // --- FIX: Use the correct static getter for RootIsolateToken ---
+    final rootIsolateToken = RootIsolateToken.instance;
+
     final renderingSystem = FlutterRenderingSystem(
       builders: {
-        'counter_display': (context, id, controller, manager) {
+        'counter_display': (context, id, controller, manager, child) {
           final state = controller.get<CounterStateComponent>(id);
-          final hasWarning = controller.get<WarningTagComponent>(id) != null;
-          // --- NEW: Check for behavior components ---
-          final movable = controller.get<MovableComponent>(id);
-          final talkative = controller.get<TalkativeComponent>(id);
+          final blackboard = controller.get<BlackboardComponent>(id);
+          final mood = blackboard?.get<String>('mood') ?? 'unknown';
 
           if (state == null) return const SizedBox.shrink();
 
@@ -189,54 +152,32 @@ class MyApp extends StatelessWidget {
                   Text(
                     '${state.value}',
                     style: TextStyle(
-                      fontSize: 50,
+                      fontSize: 80,
                       fontWeight: FontWeight.bold,
-                      color: hasWarning ? Colors.redAccent : Colors.black,
+                      color: mood == 'angry' ? Colors.redAccent : Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  // --- NEW: Display active behaviors ---
-                  if (movable != null)
-                    Text("Behavior: Movable (Speed: ${movable.speed})"),
-                  if (talkative != null)
-                    Text("Behavior: Talkative (Says: '${talkative.sound}')"),
+                  const SizedBox(height: 10),
+                  Text(
+                    "Mood: $mood",
+                    style: const TextStyle(
+                        fontSize: 20, fontStyle: FontStyle.italic),
+                  ),
                 ],
               ),
             ),
           );
         },
-        'increment_button': (context, id, controller, manager) {
+        'increment_button': (context, id, controller, manager, child) {
           return ElevatedButton(
             onPressed: () => manager.send(EntityTapEvent(id)),
             child: const Icon(Icons.add),
           );
         },
-        'decrement_button': (context, id, controller, manager) {
+        'decrement_button': (context, id, controller, manager, child) {
           return ElevatedButton(
             onPressed: () => manager.send(EntityTapEvent(id)),
             child: const Icon(Icons.remove),
-          );
-        },
-        'undo_button': (context, id, controller, manager) {
-          final counterId =
-              controller.getAllIdsWithTag('counter_display').first;
-          final history = controller.get<HistoryComponent>(counterId);
-          final canUndo = history?.canUndo ?? false;
-
-          return ElevatedButton(
-            onPressed: canUndo ? () => manager.send(EntityTapEvent(id)) : null,
-            child: const Icon(Icons.undo),
-          );
-        },
-        'redo_button': (context, id, controller, manager) {
-          final counterId =
-              controller.getAllIdsWithTag('counter_display').first;
-          final history = controller.get<HistoryComponent>(counterId);
-          final canRedo = history?.canRedo ?? false;
-
-          return ElevatedButton(
-            onPressed: canRedo ? () => manager.send(EntityTapEvent(id)) : null,
-            child: const Icon(Icons.redo),
           );
         },
       },
@@ -246,27 +187,30 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Nexus Counter Example'),
+          title: const Text('Nexus Persistence Example'),
         ),
         body: NexusWidget(
-          worldProvider: provideCounterWorld,
-          renderingSystem: renderingSystem,
-          isolateInitializer: () {
-            ComponentFactoryRegistry.I.register('WarningTagComponent',
-                (json) => WarningTagComponent.fromJson(json));
-            // --- NEW: Register behavior components in isolate ---
-            ComponentFactoryRegistry.I.register(
-                'MovableComponent', (json) => MovableComponent.fromJson(json));
-            ComponentFactoryRegistry.I.register('TalkativeComponent',
-                (json) => TalkativeComponent.fromJson(json));
+          worldProvider: () {
+            final world = provideCounterWorld();
+            if (!GetIt.instance.isRegistered<CounterCubit>()) {
+              GetIt.instance.registerSingleton(CounterCubit());
+            }
+            final cubit = GetIt.instance.get<CounterCubit>();
+            final counterEntity = world.entities.values
+                .firstWhere((e) => e.has<PersistenceComponent>());
+            counterEntity.add(BlocComponent<CounterCubit, int>(cubit));
+            return world;
           },
+          renderingSystem: renderingSystem,
+          isolateInitializer: isolateInitializer,
+          rootIsolateToken: rootIsolateToken,
         ),
       ),
     );
   }
 }
 
-/// سیستمی که به تغییرات وضعیت در CounterCubit گوش می‌دهد.
+/// System that listens to BLoC state changes.
 class CounterSystem extends BlocSystem<CounterCubit, int> {
   @override
   void onStateChange(Entity entity, int state) {

@@ -1,8 +1,5 @@
 import 'package:get_it/get_it.dart';
-import 'package:nexus/src/core/entity.dart';
-import 'package:nexus/src/core/event_bus.dart';
-import 'package:nexus/src/core/nexus_module.dart';
-import 'package:nexus/src/core/system.dart';
+import 'package:nexus/nexus.dart';
 
 /// Manages all the entities, systems, and modules in the Nexus world.
 class NexusWorld {
@@ -22,6 +19,16 @@ class NexusWorld {
     this.eventBus = eventBus ?? EventBus();
     services.registerSingleton<EventBus>(this.eventBus);
   }
+
+  // --- NEW: Asynchronous initialization method ---
+  /// Initializes the world, running any async setup required by its systems.
+  /// This should be called before the main update loop begins.
+  Future<void> init() async {
+    for (final system in _systems) {
+      await system.init();
+    }
+  }
+  // --- END NEW ---
 
   void loadModule(NexusModule module) {
     _modules.add(module);
@@ -88,9 +95,6 @@ class NexusWorld {
         }
       }
     }
-
-    // --- FIX: Removed the clearing of dirty flags from here. ---
-    // This will now be handled by the managers after packets are created.
   }
 
   void clear() {

@@ -24,6 +24,12 @@ abstract class System {
   /// [dt] is the delta time, the time elapsed since the last frame in seconds.
   void update(Entity entity, double dt);
 
+  // --- NEW: Asynchronous initialization method ---
+  /// An optional async method for systems that need to perform setup
+  /// before the main game loop starts (e.g., loading data from a database).
+  Future<void> init() async {}
+  // --- END NEW ---
+
   /// A lifecycle method called when the system is added to the world.
   void onAddedToWorld(NexusWorld world) {
     this.world = world;

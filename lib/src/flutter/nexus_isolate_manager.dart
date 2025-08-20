@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:isolate';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:nexus/nexus.dart';
 
 /// Manages the background isolate where the NexusWorld runs.
@@ -17,7 +19,8 @@ class NexusIsolateManager implements NexusManager {
   @override
   Future<void> spawn(
     NexusWorld Function() worldProvider, {
-    void Function()? isolateInitializer,
+    Future<void> Function()? isolateInitializer,
+    RootIsolateToken? rootIsolateToken,
   }) async {
     if (_isolate != null) return;
 
@@ -34,7 +37,8 @@ class NexusIsolateManager implements NexusManager {
     final entryPointArgs = [
       _receivePort.sendPort,
       isolateInitializer,
-      worldProvider
+      worldProvider,
+      rootIsolateToken,
     ];
 
     _isolate = await Isolate.spawn(
@@ -63,85 +67,89 @@ class NexusIsolateManager implements NexusManager {
 /// The entry point for the background isolate.
 void _isolateEntryPoint(List<dynamic> args) async {
   final mainSendPort = args[0] as SendPort;
-  final isolateInitializer = args[1] as void Function()?;
+  final isolateInitializer = args[1] as Future<void> Function()?;
   final worldProvider = args[2] as NexusWorld Function();
-
-  registerCoreComponents();
-  isolateInitializer?.call();
+  final rootIsolateToken = args[3] as RootIsolateToken?;
 
   final isolateReceivePort = ReceivePort();
   mainSendPort.send(isolateReceivePort.sendPort);
 
-  final world = worldProvider();
-  final stopwatch = Stopwatch()..start();
+  try {
+    if (rootIsolateToken != null) {
+      BackgroundIsolateBinaryMessenger.ensureInitialized(rootIsolateToken);
+    }
 
-  final timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
-    final dt =
-        stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
-    stopwatch.reset();
+    if (isolateInitializer != null) {
+      await isolateInitializer();
+    }
 
-    // 1. Run all game logic. This will mark components as dirty.
-    world.update(dt);
+    registerCoreComponents();
 
-    // 2. Create packets based on the dirty components.
-    final packets = <RenderPacket>[];
-    for (final entity in world.entities.values) {
-      // On the very first frame, all components are dirty.
-      // We send all serializable components.
-      final isFirstFrame = entity.dirtyComponents.isNotEmpty &&
-          !world.entities.values.any((e) => e.dirtyComponents.isEmpty);
+    final world = worldProvider();
 
-      if (entity.dirtyComponents.isEmpty && !isFirstFrame) continue;
+    await world.init();
 
-      final componentsToSend = isFirstFrame
-          ? entity.allComponents
-          : entity.dirtyComponents
-              .map((type) => entity.getByType(type))
-              .whereType<Component>();
+    final stopwatch = Stopwatch()..start();
 
-      final serializableComponents = <String, Map<String, dynamic>>{};
-      for (final component in componentsToSend) {
-        if (component is SerializableComponent) {
-          serializableComponents[component.runtimeType.toString()] =
-              (component as SerializableComponent).toJson();
+    final timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      final dt =
+          stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
+      stopwatch.reset();
+
+      world.update(dt);
+
+      final packets = <RenderPacket>[];
+      for (final entity in world.entities.values) {
+        if (entity.dirtyComponents.isEmpty) continue;
+
+        final serializableComponents = <String, Map<String, dynamic>>{};
+        for (final componentType in entity.dirtyComponents) {
+          final component = entity.getByType(componentType);
+          if (component is SerializableComponent) {
+            serializableComponents[component.runtimeType.toString()] =
+                (component as SerializableComponent).toJson();
+          }
+        }
+
+        if (serializableComponents.isNotEmpty) {
+          packets.add(
+              RenderPacket(id: entity.id, components: serializableComponents));
         }
       }
 
-      if (serializableComponents.isNotEmpty) {
-        packets.add(
-            RenderPacket(id: entity.id, components: serializableComponents));
+      final removedEntityIds = world.getAndClearRemovedEntities();
+      for (final id in removedEntityIds) {
+        packets.add(RenderPacket(id: id, components: {}, isRemoved: true));
       }
-    }
 
-    final removedEntityIds = world.getAndClearRemovedEntities();
-    for (final id in removedEntityIds) {
-      packets.add(RenderPacket(id: id, components: {}, isRemoved: true));
-    }
+      if (packets.isNotEmpty) {
+        mainSendPort.send(packets);
+      }
 
-    // 3. Send packets if there's anything to send.
-    if (packets.isNotEmpty) {
-      mainSendPort.send(packets);
-    }
+      for (final entity in world.entities.values) {
+        entity.clearDirty();
+      }
+    });
 
-    // --- FIX: 4. Clear dirty flags AFTER packets have been created. ---
-    for (final entity in world.entities.values) {
-      entity.clearDirty();
-    }
-  });
-
-  isolateReceivePort.listen((message) {
-    if (message is EntityTapEvent) {
-      world.eventBus.fire(message);
-    } else if (message is NexusPointerMoveEvent) {
-      world.eventBus.fire(message);
-    } else if (message is UndoEvent) {
-      world.eventBus.fire(message);
-    } else if (message is RedoEvent) {
-      world.eventBus.fire(message);
-    } else if (message == 'shutdown') {
-      timer.cancel();
-      world.clear();
-      isolateReceivePort.close();
-    }
-  });
+    isolateReceivePort.listen((message) {
+      if (message is SaveDataEvent) {
+        world.eventBus.fire(message);
+      } else if (message is EntityTapEvent) {
+        world.eventBus.fire(message);
+      } else if (message is NexusPointerMoveEvent) {
+        world.eventBus.fire(message);
+      } else if (message is UndoEvent) {
+        world.eventBus.fire(message);
+      } else if (message is RedoEvent) {
+        world.eventBus.fire(message);
+      } else if (message == 'shutdown') {
+        timer.cancel();
+        world.clear();
+        isolateReceivePort.close();
+      }
+    });
+  } catch (e, stacktrace) {
+    debugPrint('[Isolate] FATAL ERROR during initialization: $e');
+    debugPrint(stacktrace.toString());
+  }
 }

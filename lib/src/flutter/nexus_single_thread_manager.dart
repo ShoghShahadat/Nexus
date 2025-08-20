@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/scheduler.dart';
 import 'package:nexus/nexus.dart';
 
@@ -17,10 +18,16 @@ class NexusSingleThreadManager implements NexusManager {
   @override
   Future<void> spawn(
     NexusWorld Function() worldProvider, {
-    void Function()? isolateInitializer,
+    Future<void> Function()? isolateInitializer,
+    RootIsolateToken? rootIsolateToken, // Added for signature consistency
   }) async {
-    isolateInitializer?.call();
+    if (isolateInitializer != null) {
+      await isolateInitializer();
+    }
     _world = worldProvider();
+
+    await _world!.init();
+
     _stopwatch.start();
 
     _ticker = Ticker((_) {
@@ -30,25 +37,15 @@ class NexusSingleThreadManager implements NexusManager {
           _stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
       _stopwatch.reset();
 
-      // 1. Run logic, marking components as dirty.
       _world!.update(dt);
 
-      // 2. Create packets from dirty components.
       final packets = <RenderPacket>[];
       for (final entity in _world!.entities.values) {
-        final isFirstFrame = entity.dirtyComponents.isNotEmpty &&
-            !_world!.entities.values.any((e) => e.dirtyComponents.isEmpty);
-
-        if (entity.dirtyComponents.isEmpty && !isFirstFrame) continue;
-
-        final componentsToSend = isFirstFrame
-            ? entity.allComponents
-            : entity.dirtyComponents
-                .map((type) => entity.getByType(type))
-                .whereType<Component>();
+        if (entity.dirtyComponents.isEmpty) continue;
 
         final serializableComponents = <String, Map<String, dynamic>>{};
-        for (final component in componentsToSend) {
+        for (final componentType in entity.dirtyComponents) {
+          final component = entity.getByType(componentType);
           if (component is SerializableComponent) {
             serializableComponents[component.runtimeType.toString()] =
                 (component as SerializableComponent).toJson();
@@ -65,12 +62,10 @@ class NexusSingleThreadManager implements NexusManager {
         packets.add(RenderPacket(id: id, components: {}, isRemoved: true));
       }
 
-      // 3. Send packets.
       if (packets.isNotEmpty) {
         _renderPacketController.add(packets);
       }
 
-      // --- FIX: 4. Clear dirty flags AFTER creating packets. ---
       for (final entity in _world!.entities.values) {
         entity.clearDirty();
       }
