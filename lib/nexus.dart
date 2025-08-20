@@ -24,7 +24,7 @@ export 'src/core/render_packet.dart';
 export 'src/events/shape_events.dart';
 export 'src/events/input_events.dart';
 export 'src/events/pointer_events.dart';
-export 'src/events/history_events.dart'; // NEW
+export 'src/events/history_events.dart';
 
 // --- Components ---
 export 'src/components/animation_component.dart';
@@ -44,7 +44,8 @@ export 'src/components/spawner_component.dart';
 export 'src/components/tags_component.dart';
 export 'src/components/velocity_component.dart';
 export 'src/components/widget_component.dart';
-export 'src/components/history_component.dart'; // NEW
+export 'src/components/history_component.dart';
+export 'src/components/rule_component.dart'; // NEW
 
 // --- Systems ---
 export 'src/systems/animation_system.dart';
@@ -60,12 +61,12 @@ export 'src/systems/physics_system.dart';
 export 'src/systems/pointer_system.dart';
 export 'src/systems/pulsing_warning_system.dart';
 export 'src/systems/shape_selection_system.dart';
-export 'src/systems/history_system.dart'; // NEW
+export 'src/systems/history_system.dart';
+export 'src/systems/rule_system.dart'; // NEW
 
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';
 export 'src/flutter/nexus_widget.dart';
-// *** FIX: Export all manager classes. ***
 export 'src/flutter/nexus_manager.dart';
 export 'src/flutter/nexus_isolate_manager.dart';
 export 'src/flutter/nexus_single_thread_manager.dart';

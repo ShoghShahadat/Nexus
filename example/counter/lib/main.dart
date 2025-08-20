@@ -2,71 +2,119 @@ import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus_example/counter_cubit.dart';
 
-// --- تحلیل اولیه ---
-// این فایل یک اپلیکیشن شمارنده کاملاً کاربردی و ساده را با استفاده از فریم‌ورک Nexus پیاده‌سازی می‌کند.
-// هدف، نمایش مفاهیم اصلی ECS در یک سناریوی واقعی اما بدون پیچیدگی‌های اضافی است.
-//
-// معماری:
-// 1. NexusWorld در یک Isolate پس‌زمینه اجرا می‌شود تا منطق برنامه، UI را مسدود نکند.
-// 2. یک CounterCubit (از پکیج BLoC) به عنوان سرویس برای مدیریت وضعیت شمارنده ثبت می‌شود.
-// 3. سه Entity ایجاد می‌شود: یکی برای نمایش عدد شمارنده، و دو تا برای دکمه‌های افزایش و کاهش.
-// 4. دو System اصلی وجود دارد:
-//    - CounterSystem: به تغییرات Cubit گوش می‌دهد و کامپوننت داده‌ای شمارنده (CounterStateComponent) را به‌روز می‌کند.
-//    - InputSystem: رویدادهای کلیک از UI را دریافت کرده و متدهای Cubit را فراخوانی می‌کند.
-// 5. FlutterRenderingSystem در UI Thread اجرا می‌شود و بر اساس داده‌های دریافتی از Isolate پس‌زمینه،
-//    ویجت‌های متناظر را می‌سازد.
+// --- NEW: Define a custom event for counter updates ---
+class CounterUpdatedEvent {
+  final int newValue;
+  CounterUpdatedEvent(this.newValue);
+}
+
+// --- NEW: Define a simple component to tag the entity for UI changes ---
+class WarningTagComponent extends Component with SerializableComponent {
+  WarningTagComponent();
+
+  factory WarningTagComponent.fromJson(Map<String, dynamic> json) =>
+      WarningTagComponent();
+
+  @override
+  Map<String, dynamic> toJson() => {};
+
+  @override
+  List<Object?> get props => [];
+}
 
 /// تابع اصلی که NexusWorld را برای Isolate پس‌زمینه فراهم می‌کند.
 NexusWorld provideCounterWorld() {
   final world = NexusWorld();
 
-  // 1. ثبت سرویس‌ها: CounterCubit به عنوان یک Singleton ثبت می‌شود.
-  // تمام سیستم‌ها و موجودیت‌ها در این World به این نمونه دسترسی خواهند داشت.
+  // 1. ثبت سرویس‌ها
   final cubit = CounterCubit();
   world.services.registerSingleton(cubit);
 
-  // 2. افزودن سیستم‌ها:
-  world.addSystem(
-      CounterSystem()); // سیستمی برای همگام‌سازی وضعیت Cubit با Entity.
-  world.addSystem(
-      InputSystem()); // سیستمی برای مدیریت ورودی‌های کاربر (کلیک‌ها).
+  // 2. افزودن سیستم‌ها
+  world.addSystem(CounterSystem());
+  world.addSystem(InputSystem());
+  world.addSystem(HistorySystem());
+  world.addSystem(RuleSystem()); // NEW: Add the rule system
 
-  // 3. ایجاد موجودیت‌ها (Entities):
+  // 3. ایجاد موجودیت‌ها
 
   // موجودیت برای نمایشگر شمارنده
   final counterDisplay = Entity();
   counterDisplay
       .add(PositionComponent(x: 100, y: 200, width: 200, height: 100));
-  counterDisplay.add(BlocComponent<CounterCubit, int>(cubit)); // اتصال به Cubit
-  counterDisplay.add(CounterStateComponent(cubit.state)); // نگهداری وضعیت فعلی
-  counterDisplay
-      .add(TagsComponent({'counter_display'})); // تگ برای شناسایی در UI
+  counterDisplay.add(BlocComponent<CounterCubit, int>(cubit));
+  counterDisplay.add(CounterStateComponent(cubit.state));
+  counterDisplay.add(TagsComponent({'counter_display'}));
+  counterDisplay.add(HistoryComponent(
+    trackedComponents: {'CounterStateComponent'},
+  ));
+
+  // --- NEW: Add the RuleComponent ---
+  counterDisplay.add(RuleComponent(
+    triggers: {CounterUpdatedEvent}, // Listen for our custom event
+    condition: (entity, event) {
+      // The condition checks the value from the event
+      final counterEvent = event as CounterUpdatedEvent;
+      final isWarning = counterEvent.newValue > 5;
+      final hasWarningTag = entity.has<WarningTagComponent>();
+      // Return true only if the state needs to change
+      return isWarning != hasWarningTag;
+    },
+    actions: (entity, event) {
+      final counterEvent = event as CounterUpdatedEvent;
+      if (counterEvent.newValue > 5) {
+        // Add a warning tag if value is high
+        entity.add(WarningTagComponent());
+        print("Rule Applied: Added WarningTagComponent");
+      } else {
+        // Remove the warning tag if value is low
+        entity.remove<WarningTagComponent>();
+        print("Rule Applied: Removed WarningTagComponent");
+      }
+    },
+  ));
+  // --- END NEW ---
+
   world.addEntity(counterDisplay);
 
   // موجودیت برای دکمه افزایش
   final incrementButton = Entity();
   incrementButton.add(PositionComponent(x: 210, y: 320, width: 80, height: 50));
-  incrementButton
-      .add(ClickableComponent((_) => cubit.increment())); // منطق کلیک
-  incrementButton.add(TagsComponent({'increment_button'})); // تگ برای UI
+  incrementButton.add(ClickableComponent((_) => cubit.increment()));
+  incrementButton.add(TagsComponent({'increment_button'}));
   world.addEntity(incrementButton);
 
   // موجودیت برای دکمه کاهش
   final decrementButton = Entity();
   decrementButton.add(PositionComponent(x: 110, y: 320, width: 80, height: 50));
-  decrementButton
-      .add(ClickableComponent((_) => cubit.decrement())); // منطق کلیک
-  decrementButton.add(TagsComponent({'decrement_button'})); // تگ برای UI
+  decrementButton.add(ClickableComponent((_) => cubit.decrement()));
+  decrementButton.add(TagsComponent({'decrement_button'}));
   world.addEntity(decrementButton);
+
+  // دکمه‌های Undo/Redo
+  final undoButton = Entity();
+  undoButton.add(PositionComponent(x: 110, y: 380, width: 80, height: 50));
+  undoButton.add(ClickableComponent(
+      (_) => world.eventBus.fire(UndoEvent(counterDisplay.id))));
+  undoButton.add(TagsComponent({'undo_button'}));
+  world.addEntity(undoButton);
+
+  final redoButton = Entity();
+  redoButton.add(PositionComponent(x: 210, y: 380, width: 80, height: 50));
+  redoButton.add(ClickableComponent(
+      (_) => world.eventBus.fire(RedoEvent(counterDisplay.id))));
+  redoButton.add(TagsComponent({'redo_button'}));
+  world.addEntity(redoButton);
 
   return world;
 }
 
 /// نقطه شروع برنامه Flutter.
 void main() {
-  // این تابع برای ثبت کامپوننت‌های سریال‌پذیر ضروری است تا ارتباط بین
-  // Isolate پس‌زمینه و UI Thread به درستی کار کند.
   registerCoreComponents();
+  // --- NEW: Register our new serializable component ---
+  ComponentFactoryRegistry.I.register(
+      'WarningTagComponent', (json) => WarningTagComponent.fromJson(json));
   runApp(const MyApp());
 }
 
@@ -76,12 +124,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // پیکربندی سیستم رندرینگ که وظیفه تبدیل داده‌های Entity به ویجت‌های Flutter را دارد.
     final renderingSystem = FlutterRenderingSystem(
       builders: {
-        // Builder برای نمایشگر شمارنده
         'counter_display': (context, id, controller, manager) {
           final state = controller.get<CounterStateComponent>(id);
+          // --- NEW: Check for the warning tag ---
+          final hasWarning = controller.get<WarningTagComponent>(id) != null;
           if (state == null) return const SizedBox.shrink();
 
           return Material(
@@ -89,24 +137,48 @@ class MyApp extends StatelessWidget {
             child: Center(
               child: Text(
                 '${state.value}',
-                style:
-                    const TextStyle(fontSize: 50, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 50,
+                  fontWeight: FontWeight.bold,
+                  // Change color based on the warning tag
+                  color: hasWarning ? Colors.redAccent : Colors.black,
+                ),
               ),
             ),
           );
         },
-        // Builder برای دکمه افزایش
         'increment_button': (context, id, controller, manager) {
           return ElevatedButton(
             onPressed: () => manager.send(EntityTapEvent(id)),
             child: const Icon(Icons.add),
           );
         },
-        // Builder برای دکمه کاهش
         'decrement_button': (context, id, controller, manager) {
           return ElevatedButton(
             onPressed: () => manager.send(EntityTapEvent(id)),
             child: const Icon(Icons.remove),
+          );
+        },
+        'undo_button': (context, id, controller, manager) {
+          final counterId =
+              controller.getAllIdsWithTag('counter_display').first;
+          final history = controller.get<HistoryComponent>(counterId);
+          final canUndo = history?.canUndo ?? false;
+
+          return ElevatedButton(
+            onPressed: canUndo ? () => manager.send(EntityTapEvent(id)) : null,
+            child: const Icon(Icons.undo),
+          );
+        },
+        'redo_button': (context, id, controller, manager) {
+          final counterId =
+              controller.getAllIdsWithTag('counter_display').first;
+          final history = controller.get<HistoryComponent>(counterId);
+          final canRedo = history?.canRedo ?? false;
+
+          return ElevatedButton(
+            onPressed: canRedo ? () => manager.send(EntityTapEvent(id)) : null,
+            child: const Icon(Icons.redo),
           );
         },
       },
@@ -121,20 +193,26 @@ class MyApp extends StatelessWidget {
         body: NexusWidget(
           worldProvider: provideCounterWorld,
           renderingSystem: renderingSystem,
+          // --- NEW: Add initializer for the new component ---
+          isolateInitializer: () {
+            ComponentFactoryRegistry.I.register('WarningTagComponent',
+                (json) => WarningTagComponent.fromJson(json));
+          },
         ),
       ),
     );
   }
 }
 
-/// سیستمی که به تغییرات وضعیت در CounterCubit گوش می‌دهد و
-/// CounterStateComponent متناظر را به‌روزرسانی می‌کند.
+/// سیستمی که به تغییرات وضعیت در CounterCubit گوش می‌دهد.
 class CounterSystem extends BlocSystem<CounterCubit, int> {
   @override
   void onStateChange(Entity entity, int state) {
-    // هر بار که وضعیت Cubit تغییر می‌کند، این متد فراخوانی شده و
-    // کامپوننت داده‌ای Entity را با مقدار جدید به‌روز می‌کند.
-    // این تغییر به صورت خودکار به UI ارسال خواهد شد.
-    entity.add(CounterStateComponent(state));
+    final currentState = entity.get<CounterStateComponent>();
+    if (currentState == null || currentState.value != state) {
+      entity.add(CounterStateComponent(state));
+      // --- NEW: Fire a custom event when the counter changes ---
+      world.eventBus.fire(CounterUpdatedEvent(state));
+    }
   }
 }
