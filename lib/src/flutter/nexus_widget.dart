@@ -1,15 +1,16 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/events/app_lifecycle_event.dart';
 
 class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
   final FlutterRenderingSystem renderingSystem;
   final Future<void> Function()? isolateInitializer;
   final RootIsolateToken? rootIsolateToken;
+  final Widget? child;
 
   const NexusWidget({
     super.key,
@@ -17,6 +18,7 @@ class NexusWidget extends StatefulWidget {
     required this.renderingSystem,
     this.isolateInitializer,
     this.rootIsolateToken,
+    this.child,
   });
 
   @override
@@ -26,22 +28,23 @@ class NexusWidget extends StatefulWidget {
 class _NexusWidgetState extends State<NexusWidget> {
   late NexusManager _manager;
   late final AppLifecycleListener _lifecycleListener;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _initializeManager();
 
-    // Setup the lifecycle listener to bridge events to the logic isolate.
-    // شنونده چرخه حیات را برای ارسال رویدادها به isolate منطق تنظیم می‌کنیم.
     _lifecycleListener = AppLifecycleListener(
       onStateChange: _onLifecycleStateChanged,
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusScope.of(context).requestFocus(_focusNode);
+    });
   }
 
   void _onLifecycleStateChanged(AppLifecycleState state) {
-    // Map Flutter's state to our custom, isolate-safe enum.
-    // وضعیت فلاتر را به enum سفارشی و امن برای isolate خودمان مپ می‌کنیم.
     final AppLifecycleStatus status;
     switch (state) {
       case AppLifecycleState.resumed:
@@ -61,6 +64,17 @@ class _NexusWidgetState extends State<NexusWidget> {
         break;
     }
     _manager.send(AppLifecycleEvent(status));
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    final nexusEvent = NexusKeyEvent(
+      logicalKeyId: event.logicalKey.keyId,
+      character: event.character,
+      // Use runtimeType check for modern Flutter keyboard events.
+      // از بررسی نوع در زمان اجرا برای رویدادهای کیبورد مدرن فلاتر استفاده می‌کنیم.
+      isKeyDown: event is KeyDownEvent || event is KeyRepeatEvent,
+    );
+    _manager.send(nexusEvent);
   }
 
   @override
@@ -112,26 +126,33 @@ class _NexusWidgetState extends State<NexusWidget> {
   @override
   void dispose() {
     _lifecycleListener.dispose();
+    _focusNode.dispose();
     _manager.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Listener(
-      onPointerMove: (event) {
-        final pointerEvent = NexusPointerMoveEvent(
-            event.localPosition.dx, event.localPosition.dy);
-        _manager.send(pointerEvent);
-        if (kDebugMode) {
-          _manager.send(SaveDataEvent());
-        }
-      },
-      child: AnimatedBuilder(
-        animation: widget.renderingSystem,
-        builder: (context, child) {
-          return widget.renderingSystem.build(context);
+    // Use the modern KeyboardListener instead of the deprecated RawKeyboardListener.
+    // از KeyboardListener مدرن به جای RawKeyboardListener منسوخ شده استفاده می‌کنیم.
+    return KeyboardListener(
+      focusNode: _focusNode,
+      onKeyEvent: _handleKeyEvent,
+      child: Listener(
+        onPointerMove: (event) {
+          final pointerEvent = NexusPointerMoveEvent(
+              event.localPosition.dx, event.localPosition.dy);
+          _manager.send(pointerEvent);
+          if (kDebugMode) {
+            _manager.send(SaveDataEvent());
+          }
         },
+        child: AnimatedBuilder(
+          animation: widget.renderingSystem,
+          builder: (context, child) {
+            return widget.renderingSystem.build(context);
+          },
+        ),
       ),
     );
   }

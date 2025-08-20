@@ -28,6 +28,7 @@ export 'src/core/render_packet.dart';
 
 // --- Events ---
 export 'src/events/app_lifecycle_event.dart';
+export 'src/events/hardware_input_events.dart';
 export 'src/events/shape_events.dart';
 export 'src/events/input_events.dart';
 export 'src/events/pointer_events.dart';
@@ -47,6 +48,8 @@ export 'src/components/children_component.dart';
 export 'src/components/clickable_component.dart';
 export 'src/components/counter_state_component.dart';
 export 'src/components/custom_widget_component.dart';
+export 'src/components/input_focus_component.dart';
+export 'src/components/keyboard_input_component.dart';
 export 'src/components/lifecycle_component.dart';
 export 'src/components/morphing_component.dart';
 export 'src/components/particle_component.dart';
@@ -64,6 +67,7 @@ export 'src/components/widget_component.dart';
 export 'src/components/history_component.dart';
 
 // --- Systems ---
+export 'src/systems/advanced_input_system.dart';
 export 'src/systems/animation_system.dart';
 export 'src/systems/api_system.dart';
 export 'src/systems/app_lifecycle_system.dart';
@@ -71,6 +75,7 @@ export 'src/systems/archetype_system.dart';
 export 'src/systems/attraction_system.dart';
 export 'src/systems/bloc_system.dart';
 export 'src/systems/flutter_rendering_system.dart';
+export 'src/systems/hardware_input_system.dart';
 export 'src/systems/input_system.dart';
 export 'src/systems/lifecycle_system.dart';
 export 'src/systems/morphing_system.dart';
