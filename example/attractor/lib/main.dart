@@ -1,31 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
-import 'particle_painter.dart';
 import 'package:collection/collection.dart';
+
+import 'particle_painter.dart';
+import 'components/explosion_component.dart';
+import 'components/complex_movement_component.dart';
+import 'systems/explosion_system.dart';
+import 'systems/complex_movement_system.dart';
 
 /// The entry point for the background isolate.
 NexusWorld provideAttractorWorld() {
   final world = NexusWorld();
 
+  // Add all necessary systems to the world.
+  world.addSystem(AnimationSystem());
+  world.addSystem(ParticleExplosionSystem());
+  world.addSystem(ComplexMovementSystem()); // Our new movement system
   world.addSystem(PointerSystem());
   world.addSystem(ParticleSpawningSystem());
   world.addSystem(ParticleLifecycleSystem());
   world.addSystem(PhysicsSystem());
   world.addSystem(AttractionSystem());
 
+  // Create the central attractor entity.
   final attractor = Entity();
   attractor.add(PositionComponent(x: 200, y: 300, width: 20, height: 20));
   attractor.add(AttractorComponent(strength: 1.0));
   attractor.add(TagsComponent({'attractor'}));
   world.addEntity(attractor);
 
+  // Create a spawner entity linked to the attractor's position.
   final spawner = Entity();
-  // --- FIX: Removed PositionComponent from spawner ---
-  // --- NEW: Link the spawner to the attractor's position ---
   spawner.add(SpawnerLinkComponent(targetTag: 'attractor'));
   spawner.add(SpawnerComponent(spawnRate: 200));
   world.addEntity(spawner);
 
+  // Create a root entity for the UI to build the canvas.
   final root = Entity();
   root.add(CustomWidgetComponent(widgetType: 'particle_canvas'));
   root.add(TagsComponent({'root'}));
@@ -36,10 +46,15 @@ NexusWorld provideAttractorWorld() {
 
 /// Main entry point for the Flutter app.
 void main() {
+  // Register all core components from the Nexus package.
   registerCoreComponents();
-  // We need to register our new component for serialization
-  ComponentFactoryRegistry.I.register(
-      'SpawnerLinkComponent', (json) => SpawnerLinkComponent.fromJson(json));
+
+  // --- NEW: Register our custom local components for serialization ---
+  ComponentFactoryRegistry.I.register('ExplodingParticleComponent',
+      (json) => ExplodingParticleComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register('ComplexMovementComponent',
+      (json) => ComplexMovementComponent.fromJson(json));
+
   runApp(const MyApp());
 }
 

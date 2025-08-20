@@ -15,29 +15,30 @@ class AnimationSystem extends System {
 
   @override
   void update(Entity entity, double dt) {
-    // We can safely use `!` because `matches` guarantees the component exists.
     final anim = entity.get<AnimationComponent>()!;
 
     if (!anim.isPlaying || anim.isFinished) {
       return;
     }
 
-    // Update internal state
     anim.update(dt);
-
-    // Apply the new value
     anim.onUpdate(entity, anim.curvedValue);
 
-    // Handle completion
     if (anim.isFinished) {
       anim.onComplete?.call(entity);
 
       if (anim.repeat) {
         anim.reset();
       } else if (anim.removeOnComplete) {
-        // Use a post-frame callback to avoid concurrent modification issues
-        // while iterating over components in the entity.
-        Future.microtask(() => entity.remove<AnimationComponent>());
+        // --- FIX: Prevent "use after free" error ---
+        // Schedule a microtask to remove the component, but first, check
+        // if the entity still exists in the world. This is crucial because the
+        // onComplete callback might have already removed and disposed the entity.
+        Future.microtask(() {
+          if (world.entities.containsKey(entity.id)) {
+            entity.remove<AnimationComponent>();
+          }
+        });
       }
     }
   }
