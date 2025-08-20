@@ -1,10 +1,9 @@
 import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus_example/components/meteor_component.dart';
+import '../components/meteor_component.dart';
 
-/// A system, defined locally, that handles the burning, shrinking, and particle
-/// shedding of meteors.
+/// A system that handles the burning, shrinking, and particle shedding of meteors.
 class MeteorBurnSystem extends System {
   final Random _random = Random();
 
@@ -21,14 +20,17 @@ class MeteorBurnSystem extends System {
     meteor.health -= dt * 0.3;
 
     if (meteor.health <= 0) {
-      // --- NEW: Award points when a meteor burns up ---
-      // --- جدید: اهدای امتیاز هنگام سوختن کامل شهاب‌سنگ ---
       final rootEntity = world.entities.values.firstWhereOrNull(
           (e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
+
+      // --- FIX: Only award points if the game is not over ---
+      // --- اصلاح: امتیاز فقط در صورتی داده می‌شود که بازی تمام نشده باشد ---
       if (rootEntity != null) {
         final blackboard = rootEntity.get<BlackboardComponent>()!;
-        blackboard.increment('score', 5); // 5 points for a burn-up
-        rootEntity.add(blackboard);
+        if (!(blackboard.get<bool>('is_game_over') ?? false)) {
+          blackboard.increment('score', 5);
+          rootEntity.add(blackboard);
+        }
       }
 
       for (int i = 0; i < 20; i++) {

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import './components/explosion_component.dart';
-import './components/meteor_component.dart';
 
 /// A custom painter to efficiently render a large number of particles, the attractor, and meteors.
+/// This version restores the original visual aesthetics.
+/// یک نقاش سفارشی برای رندر بهینه تعداد زیادی ذره، جاذب و شهاب‌سنگ.
+/// این نسخه، زیبایی بصری اصلی را بازمی‌گرداند.
 class ParticlePainter extends CustomPainter {
   final List<EntityId> particleIds;
   final List<EntityId> meteorIds;
@@ -23,12 +25,12 @@ class ParticlePainter extends CustomPainter {
     final attractorPaint = Paint()..color = Colors.yellowAccent;
     final meteorPaint = Paint();
 
-    // Draw all the meteors
+    // Draw all the meteors with a fiery gradient
+    // تمام شهاب‌سنگ‌ها را با یک گرادینت آتشین رسم می‌کند
     for (final id in meteorIds) {
       final pos = controller.get<PositionComponent>(id);
       if (pos == null) continue;
 
-      // Create a fiery gradient for the meteor
       final rect =
           Rect.fromCircle(center: Offset(pos.x, pos.y), radius: pos.width / 2);
       meteorPaint.shader = const RadialGradient(
@@ -40,6 +42,7 @@ class ParticlePainter extends CustomPainter {
     }
 
     // Draw all the particles
+    // تمام ذرات را رسم می‌کند
     for (final id in particleIds) {
       final pos = controller.get<PositionComponent>(id);
       final particle = controller.get<ParticleComponent>(id);
@@ -48,11 +51,15 @@ class ParticlePainter extends CustomPainter {
       if (pos == null || particle == null) continue;
 
       if (exploding != null) {
+        // Exploding particles turn red and fade out
+        // ذرات در حال انفجار قرمز شده و محو می‌شوند
         final explosionProgress = exploding.progress;
         particlePaint.color =
             Colors.redAccent.withOpacity(1.0 - explosionProgress);
         canvas.drawCircle(Offset(pos.x, pos.y), pos.width / 2, particlePaint);
       } else {
+        // Normal particles are white and fade out over their lifetime
+        // ذرات عادی سفید هستند و در طول عمر خود محو می‌شوند
         final progress = (particle.age / particle.maxAge).clamp(0.0, 1.0);
         final color = Color.lerp(Color(particle.initialColorValue),
             Color(particle.finalColorValue), progress)!;
@@ -68,6 +75,7 @@ class ParticlePainter extends CustomPainter {
     }
 
     // Draw the attractor
+    // جاذب را رسم می‌کند
     final attractorPos = controller.get<PositionComponent>(attractorId);
     if (attractorPos != null) {
       canvas.drawCircle(

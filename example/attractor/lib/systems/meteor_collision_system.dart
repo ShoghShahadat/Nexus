@@ -1,13 +1,10 @@
 import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus_example/components/meteor_component.dart';
-import 'package:nexus_example/components/meteor_target_component.dart';
+import '../components/meteor_component.dart';
+import '../components/meteor_target_component.dart';
 
 /// A system that checks for collisions between homing meteors and their targets.
-/// Renamed to avoid conflict with the core CollisionSystem.
-/// سیستمی که برخورد بین شهاب‌سنگ‌های هدایت‌شونده و اهدافشان را بررسی می‌کند.
-/// برای جلوگیری از تداخل با CollisionSystem هسته، تغییر نام داده شد.
 class MeteorCollisionSystem extends System {
   final Random _random = Random();
 
@@ -36,26 +33,28 @@ class MeteorCollisionSystem extends System {
     final collisionThreshold = (meteorPos.width / 2) + (targetPos.width / 2);
 
     if (distance < collisionThreshold) {
-      // --- NEW: Apply damage and award points on collision ---
-      // --- جدید: اعمال آسیب و اهدای امتیاز در برخورد ---
-      final health = targetEntity.get<HealthComponent>();
-      if (health != null) {
-        targetEntity.add(HealthComponent(
-          maxHealth: health.maxHealth,
-          currentHealth: health.currentHealth - 25, // Each hit costs 25 HP
-        ));
-      }
-
       final rootEntity = world.entities.values.firstWhereOrNull(
           (e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
+
+      // --- FIX: Only award points if the game is not over ---
+      // --- اصلاح: امتیاز فقط در صورتی داده می‌شود که بازی تمام نشده باشد ---
       if (rootEntity != null) {
         final blackboard = rootEntity.get<BlackboardComponent>()!;
-        blackboard.increment('score', 10); // 10 points for a direct hit
-        rootEntity.add(blackboard);
+        if (!(blackboard.get<bool>('is_game_over') ?? false)) {
+          final health = targetEntity.get<HealthComponent>();
+          if (health != null) {
+            targetEntity.add(HealthComponent(
+              maxHealth: health.maxHealth,
+              currentHealth: health.currentHealth - 25,
+            ));
+          }
+          blackboard.increment('score', 10);
+          rootEntity.add(blackboard);
+        }
       }
 
       _createCollisionExplosion(meteorPos);
-      world.removeEntity(entity.id); // Destroy the meteor.
+      world.removeEntity(entity.id);
     }
   }
 

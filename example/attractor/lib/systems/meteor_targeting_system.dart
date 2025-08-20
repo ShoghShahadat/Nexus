@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 import '../components/meteor_component.dart';
 import '../components/meteor_target_component.dart';
@@ -10,7 +11,6 @@ class MeteorTargetingSystem extends System {
 
   @override
   bool matches(Entity entity) {
-    // This system runs exactly once on a meteor that has a target but no velocity yet.
     return entity.has<MeteorComponent>() &&
         entity.has<MeteorTargetComponent>() &&
         !entity.has<VelocityComponent>();
@@ -19,34 +19,28 @@ class MeteorTargetingSystem extends System {
   @override
   void update(Entity entity, double dt) {
     final pos = entity.get<PositionComponent>()!;
-    final target = entity.get<MeteorTargetComponent>()!;
+    final targetComp = entity.get<MeteorTargetComponent>()!;
 
-    double targetX, targetY;
-
-    // If the meteor has a specific target (the attractor)
-    if (target.targetId != null) {
-      final targetEntity = world.entities[target.targetId!];
-      if (targetEntity != null) {
-        final targetPos = targetEntity.get<PositionComponent>()!;
-        targetX = targetPos.x;
-        targetY = targetPos.y;
-      } else {
-        // Target disappeared, fall back to random.
-        targetX = _random.nextDouble() * 400;
-        targetY = _random.nextDouble() * 800;
-      }
-    } else {
-      // If the meteor has a random trajectory
-      const screenWidth = 400.0;
-      const screenHeight = 800.0;
-      targetX = screenWidth / 2 + (_random.nextDouble() - 0.5) * 200;
-      targetY = screenHeight / 2 + (_random.nextDouble() - 0.5) * 400;
+    final targetEntity = world.entities[targetComp.targetId!];
+    if (targetEntity == null) {
+      world.removeEntity(entity.id);
+      return;
     }
 
-    final angle = atan2(targetY - pos.y, targetX - pos.x);
-    final speed = _random.nextDouble() * 100 + 150; // Speed between 150-250
+    final targetPos = targetEntity.get<PositionComponent>()!;
+    final angle = atan2(targetPos.y - pos.y, targetPos.x - pos.x);
 
-    // Add the velocity to "launch" the meteor.
+    // --- NEW: Calculate speed based on game time ---
+    // --- جدید: محاسبه سرعت بر اساس زمان بازی ---
+    final root = world.entities.values.firstWhereOrNull(
+        (e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
+    final gameTime =
+        root?.get<BlackboardComponent>()?.get<double>('game_time') ?? 0.0;
+
+    // Speed starts at 150 and increases to a max of 400 over 60 seconds
+    // سرعت از ۱۵۰ شروع شده و در طول ۶۰ ثانیه به حداکثر ۴۰۰ می‌رسد
+    final speed = (150 + (gameTime / 60.0) * 250).clamp(150.0, 400.0);
+
     entity.add(VelocityComponent(x: cos(angle) * speed, y: sin(angle) * speed));
   }
 }

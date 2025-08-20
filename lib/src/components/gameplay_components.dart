@@ -11,7 +11,9 @@ class SpawnerComponent extends Component {
   /// A factory function that creates a new entity instance (a "prefab").
   /// یک تابع factory که یک نمونه موجودیت جدید ("prefab") ایجاد می‌کند.
   final Entity Function() prefab;
-  final double fireRate; // Shots per second
+  // --- FIX: Made fireRate mutable to allow for dynamic difficulty ---
+  // --- اصلاح: fireRate برای امکان سختی پویا، قابل تغییر شد ---
+  double fireRate; // Shots per second
   double cooldown;
   bool wantsToFire;
 
