@@ -1,11 +1,6 @@
 import 'package:nexus/src/core/component.dart';
 
 /// A component that holds a list of simple string tags.
-///
-/// Tags are a flexible way to categorize or identify entities without creating
-/// many specific component classes. Systems can then query for entities
-
-/// that have a specific tag.
 class TagsComponent extends Component {
   final Set<String> tags;
 
@@ -19,4 +14,7 @@ class TagsComponent extends Component {
 
   /// Removes a tag.
   void remove(String tag) => tags.remove(tag);
+
+  @override
+  List<Object?> get props => [tags];
 }

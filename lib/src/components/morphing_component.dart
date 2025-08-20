@@ -2,9 +2,6 @@ import 'package:flutter/widgets.dart';
 import 'package:nexus/src/core/component.dart';
 
 /// A component that holds the data for a path morphing animation.
-///
-/// The [MorphingSystem] uses this data to smoothly transition a shape
-/// from an [initialPath] to a [targetPath].
 class MorphingComponent extends Component {
   /// The starting shape of the morph.
   final Path initialPath;
@@ -18,8 +15,7 @@ class MorphingComponent extends Component {
   /// The curve to apply to the animation's progress.
   final Curve curve;
 
-  /// The currently interpolated path, calculated by the [MorphingSystem]
-  /// each frame. This is the path that should be rendered.
+  /// The currently interpolated path, calculated by the [MorphingSystem].
   Path currentPath;
 
   MorphingComponent({
@@ -28,4 +24,8 @@ class MorphingComponent extends Component {
     this.duration = const Duration(milliseconds: 500),
     this.curve = Curves.easeInOut,
   }) : currentPath = initialPath;
+
+  @override
+  List<Object?> get props =>
+      [initialPath, targetPath, duration, curve, currentPath];
 }

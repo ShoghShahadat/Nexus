@@ -4,12 +4,7 @@ import 'package:nexus/src/core/event_bus.dart';
 import 'package:nexus/src/core/nexus_module.dart';
 import 'package:nexus/src/core/system.dart';
 
-/// Manages all the entities and systems in the Nexus world.
-///
-/// The NexusWorld is the central hub of the architecture. It holds all the
-/// application objects (Entities), the logic controllers (Systems), and a
-/// service locator for dependency injection. It is responsible for running
-/// the main update loop and managing modules.
+/// Manages all the entities, systems, and modules in the Nexus world.
 class NexusWorld {
   final Map<EntityId, Entity> _entities = {};
   final List<System> _systems = [];
@@ -26,16 +21,24 @@ class NexusWorld {
     services.registerSingleton<EventBus>(this.eventBus);
   }
 
-  /// Loads a module into the world.
-  ///
-  /// This adds all the module's systems to the world and calls the module's
-  /// `onLoad` lifecycle method.
+  /// Loads a module into the world, registering its systems and creating its entities.
   void loadModule(NexusModule module) {
     _modules.add(module);
-    for (final system in module.systems) {
-      addSystem(system);
+
+    // Load systems from all system providers.
+    for (final provider in module.systemProviders) {
+      for (final system in provider.systems) {
+        addSystem(system);
+      }
     }
+
+    // Call the module's onLoad lifecycle method.
     module.onLoad(this);
+
+    // Create entities from all entity providers.
+    for (final provider in module.entityProviders) {
+      provider.createEntities(this);
+    }
   }
 
   void addEntity(Entity entity) {
@@ -71,7 +74,6 @@ class NexusWorld {
     }
   }
 
-  /// The main update loop for the world.
   void update(double dt) {
     final entities = List<Entity>.from(_entities.values);
     for (final system in _systems) {

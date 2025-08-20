@@ -12,15 +12,24 @@ typedef EntityId = int;
 class Entity extends ChangeNotifier {
   static int _nextId = 0;
   final EntityId id;
-  // Reverting to a Map<Type, Component> is the most performant and
-  // type-safe approach when systems are strongly typed.
   final Map<Type, Component> _components = {};
 
   Entity() : id = _nextId++;
 
-  /// Adds a component to the entity and notifies listeners of the change.
-  /// If a component of the same type already exists, it will be replaced.
+  /// Adds a component to the entity and notifies listeners ONLY if the new
+  /// component is different from the existing one of the same type.
+  ///
+  /// This intelligent update mechanism prevents unnecessary UI rebuilds by
+  /// performing a value-based equality check before notifying listeners.
   void add<T extends Component>(T component) {
+    final existingComponent = _components[T];
+
+    // Optimization: If a component of the same type exists and is equal to
+    // the new one, do nothing to avoid redundant notifications.
+    if (existingComponent != null && existingComponent == component) {
+      return;
+    }
+
     _components[T] = component;
     notifyListeners();
   }
@@ -35,7 +44,6 @@ class Entity extends ChangeNotifier {
   }
 
   /// Retrieves a component of a specific type from the entity.
-  /// This is now a direct and fast map lookup.
   T? get<T extends Component>() {
     return _components[T] as T?;
   }

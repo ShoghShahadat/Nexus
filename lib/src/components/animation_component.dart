@@ -3,10 +3,6 @@ import 'package:nexus/src/core/component.dart';
 import 'package:nexus/src/core/entity.dart';
 
 /// A component that drives animations on an entity.
-///
-/// This component holds the configuration for an animation, such as its
-/// duration, curve, and the logic to apply the animated value to other
-/// components on the entity.
 class AnimationComponent extends Component {
   /// The total duration of the animation.
   final Duration duration;
@@ -15,10 +11,6 @@ class AnimationComponent extends Component {
   final Curve curve;
 
   /// A callback executed on each frame of the animation.
-  ///
-  /// The [value] parameter is the interpolated progress of the animation
-  /// (from 0.0 to 1.0) after the curve has been applied.
-  /// The [entity] is the entity being animated.
   final void Function(Entity entity, double value) onUpdate;
 
   /// An optional callback executed when the animation completes.
@@ -78,7 +70,6 @@ class AnimationComponent extends Component {
   }
 
   /// Internal method to update the animation's progress.
-  /// Called by the [AnimationSystem].
   void update(double dt) {
     if (!_isPlaying || _isFinished) return;
 
@@ -93,7 +84,13 @@ class AnimationComponent extends Component {
   }
 
   /// Internal method to get the current curved value.
-  /// Called by the [AnimationSystem].
   double get curvedValue => curve
       .transform((_elapsed / duration.inMilliseconds * 1000).clamp(0.0, 1.0));
+
+  // Note: Functions (onUpdate, onComplete) are not included in props because
+  // they don't have a meaningful equality check. The internal state (_elapsed,
+  // etc.) is also excluded as it represents runtime state, not configuration.
+  @override
+  List<Object?> get props =>
+      [duration, curve, autostart, repeat, removeOnComplete];
 }
