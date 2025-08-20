@@ -19,6 +19,7 @@ export 'src/core/storage/storage_adapter.dart';
 // --- Services ---
 export 'src/services/network/http_method.dart';
 export 'src/services/network/i_network_service.dart';
+export 'src/services/network/i_web_socket_service.dart';
 
 // --- Serialization ---
 export 'src/core/serialization/serializable_component.dart';
@@ -65,6 +66,7 @@ export 'src/components/spawner_link_component.dart';
 export 'src/components/tags_component.dart';
 export 'src/components/timer_component.dart';
 export 'src/components/velocity_component.dart';
+export 'src/components/web_socket_components.dart';
 export 'src/components/widget_component.dart';
 export 'src/components/history_component.dart';
 
@@ -93,6 +95,7 @@ export 'src/systems/pulsing_warning_system.dart';
 export 'src/systems/rule_system.dart';
 export 'src/systems/shape_selection_system.dart';
 export 'src/systems/timer_system.dart';
+export 'src/systems/web_socket_system.dart';
 export 'src/systems/history_system.dart';
 
 // --- Flutter Bridge ---
