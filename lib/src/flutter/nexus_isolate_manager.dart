@@ -80,17 +80,27 @@ void _isolateEntryPoint(List<dynamic> args) async {
         stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     stopwatch.reset();
 
+    // 1. Run all game logic. This will mark components as dirty.
     world.update(dt);
 
+    // 2. Create packets based on the dirty components.
     final packets = <RenderPacket>[];
     for (final entity in world.entities.values) {
-      if (entity.dirtyComponents.isEmpty) continue;
+      // On the very first frame, all components are dirty.
+      // We send all serializable components.
+      final isFirstFrame = entity.dirtyComponents.isNotEmpty &&
+          !world.entities.values.any((e) => e.dirtyComponents.isEmpty);
+
+      if (entity.dirtyComponents.isEmpty && !isFirstFrame) continue;
+
+      final componentsToSend = isFirstFrame
+          ? entity.allComponents
+          : entity.dirtyComponents
+              .map((type) => entity.getByType(type))
+              .whereType<Component>();
 
       final serializableComponents = <String, Map<String, dynamic>>{};
-      for (final componentType in entity.dirtyComponents) {
-        // --- FIX: Use the new getByType method ---
-        final component = entity.getByType(componentType);
-        // --- END FIX ---
+      for (final component in componentsToSend) {
         if (component is SerializableComponent) {
           serializableComponents[component.runtimeType.toString()] =
               (component as SerializableComponent).toJson();
@@ -108,8 +118,14 @@ void _isolateEntryPoint(List<dynamic> args) async {
       packets.add(RenderPacket(id: id, components: {}, isRemoved: true));
     }
 
+    // 3. Send packets if there's anything to send.
     if (packets.isNotEmpty) {
       mainSendPort.send(packets);
+    }
+
+    // --- FIX: 4. Clear dirty flags AFTER packets have been created. ---
+    for (final entity in world.entities.values) {
+      entity.clearDirty();
     }
   });
 
