@@ -12,6 +12,9 @@ class NexusWorld {
   final GetIt services;
   late final EventBus eventBus;
 
+  // یک Set برای نگهداری ID موجودیت‌هایی که در این فریم حذف شده‌اند.
+  final Set<EntityId> _removedEntityIdsThisFrame = {};
+
   Map<EntityId, Entity> get entities => Map.unmodifiable(_entities);
   List<System> get systems => List.unmodifiable(_systems);
 
@@ -53,6 +56,8 @@ class NexusWorld {
   Entity? removeEntity(EntityId id) {
     final entity = _entities.remove(id);
     if (entity != null) {
+      // اضافه کردن ID موجودیت حذف شده به لیست موقت
+      _removedEntityIdsThisFrame.add(id);
       for (final system in _systems) {
         if (system.matches(entity)) {
           system.onEntityRemoved(entity);
@@ -61,6 +66,13 @@ class NexusWorld {
       entity.dispose();
     }
     return entity;
+  }
+
+  /// موجودیت‌های حذف شده در این فریم را برمی‌گرداند و لیست را پاک می‌کند.
+  Set<EntityId> getAndClearRemovedEntities() {
+    final Set<EntityId> removed = Set.from(_removedEntityIdsThisFrame);
+    _removedEntityIdsThisFrame.clear();
+    return removed;
   }
 
   void addSystem(System system) {
@@ -99,5 +111,6 @@ class NexusWorld {
     _systems.clear();
     _modules.clear();
     eventBus.destroy();
+    _removedEntityIdsThisFrame.clear(); // پاک کردن لیست موجودیت‌های حذف شده
   }
 }

@@ -81,6 +81,7 @@ void _isolateEntryPoint(SendPort mainSendPort) async {
         world!.update(dt);
 
         final packets = <RenderPacket>[];
+        // اضافه کردن RenderPacket برای موجودیت‌های به‌روز شده
         for (final entity in world!.entities.values) {
           final serializableComponents = <String, Map<String, dynamic>>{};
           for (final component in entity.allComponents) {
@@ -95,6 +96,13 @@ void _isolateEntryPoint(SendPort mainSendPort) async {
                 id: entity.id, components: serializableComponents));
           }
         }
+
+        // اضافه کردن RenderPacket برای موجودیت‌های حذف شده
+        final removedEntityIds = world!.getAndClearRemovedEntities();
+        for (final id in removedEntityIds) {
+          packets.add(RenderPacket(id: id, components: {}, isRemoved: true));
+        }
+
         if (packets.isNotEmpty) {
           mainSendPort.send(packets);
         }
