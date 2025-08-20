@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
-// import 'package:flutter/foundation.dart'; // حذف import برای debugPrint
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/core/render_packet.dart';
-import 'package:nexus/src/events/input_events.dart'; // وارد کردن NexusPointerMoveEvent
+import 'package:nexus/src/events/input_events.dart';
 
 /// A class that manages the background isolate where the NexusWorld runs.
 /// It handles spawning, communication, and termination of the logic thread.
@@ -73,7 +72,8 @@ void _isolateEntryPoint(SendPort mainSendPort) async {
       world = message();
       stopwatch.start();
 
-      timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      // کاهش زمان به‌روزرسانی به 8 میلی‌ثانیه برای فریم ریت بالاتر (حدود 125 FPS)
+      timer = Timer.periodic(const Duration(milliseconds: 8), (timer) {
         final dt =
             stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
         stopwatch.reset();
@@ -105,7 +105,6 @@ void _isolateEntryPoint(SendPort mainSendPort) async {
       timer?.cancel();
       isolateReceivePort.close();
     } else if (message is NexusPointerMoveEvent) {
-      // نام کلاس تغییر یافت
       world?.eventBus.fire(message);
     }
   });

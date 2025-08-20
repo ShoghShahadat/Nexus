@@ -45,9 +45,9 @@ class AttractionSystem extends System {
 
     if (distSq < 25) return; // از نیروهای شدید در فاصله نزدیک جلوگیری می‌کند.
 
-    // افزایش قدرت جاذبه برای کشش بیشتر ذرات
-    final force =
-        attractorComp.strength * 50000 / distSq; // افزایش ضریب 1000 به 50000
+    // تنظیم دقیق‌تر قدرت جاذبه برای نرمی بیشتر
+    // کاهش ضریب 50000 به 30000 برای حرکت روان‌تر
+    final force = attractorComp.strength * 30000 / distSq;
     final angle = atan2(dy, dx);
 
     // اعمال شتاب

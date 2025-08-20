@@ -28,12 +28,17 @@ class ParticleSpawningSystem extends System {
   Entity _createParticle(Entity spawnerEntity) {
     final entity = Entity();
     final angle = _random.nextDouble() * 2 * pi;
-    // افزایش محدوده سرعت اولیه برای ذرات سریع‌تر
+    // محدوده سرعت اولیه برای ذرات
     final speed = _random.nextDouble() * 150 + 50; // سرعت بین 50 تا 200
+
     final spawnerPos = spawnerEntity.get<PositionComponent>()!;
 
+    // کاهش اندازه ذرات برای نرمی بصری بیشتر
     entity.add(PositionComponent(
-        x: spawnerPos.x, y: spawnerPos.y, width: 5, height: 5));
+        x: spawnerPos.x,
+        y: spawnerPos.y,
+        width: 3,
+        height: 3)); // اندازه ذرات به 3x3 کاهش یافت
     entity.add(VelocityComponent(x: cos(angle) * speed, y: sin(angle) * speed));
     entity.add(ParticleComponent(
       maxAge: _random.nextDouble() * 3 + 2, // عمر ذرات بین 2 تا 5 ثانیه

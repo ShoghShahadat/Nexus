@@ -19,7 +19,9 @@ NexusWorld provideCosmicWorld() {
   final spawner = Entity();
   // ذرات از بالای صفحه و مرکز شروع به تولید می‌کنند.
   spawner.add(PositionComponent(x: 200, y: 100));
-  spawner.add(SpawnerComponent(spawnRate: 200)); // نرخ تولید ذرات در ثانیه
+  // افزایش نرخ تولید ذرات برای چگالی بیشتر و حس نرمی بالاتر
+  spawner.add(SpawnerComponent(
+      spawnRate: 500)); // نرخ تولید ذرات در ثانیه (افزایش یافته)
   world.addEntity(spawner);
 
   // --- افزودن سیستم‌ها ---
