@@ -1,6 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/components/decoration_components.dart';
 
 typedef EntityWidgetBuilderFunc = Widget Function(
     BuildContext context,
@@ -29,8 +32,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
     return _componentCache[id]?[T] as T?;
   }
 
-  // --- NEW: Restored this useful helper method ---
-  /// Finds all entity IDs that have a specific tag.
   List<EntityId> getAllIdsWithTag(String tag) {
     final ids = <EntityId>[];
     for (final entry in _componentCache.entries) {
@@ -41,7 +42,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
     }
     return ids;
   }
-  // --- END NEW ---
 
   ChangeNotifier _getNotifier(EntityId id) {
     return _entityNotifiers.putIfAbsent(id, () => ChangeNotifier());
@@ -94,6 +94,86 @@ class FlutterRenderingSystem extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // --- NEW: Decoration Helper Methods ---
+
+  /// Converts our serializable `StyleColor` into a Flutter `Color` or `Gradient`.
+  /// `StyleColor` سریالایزبل ما را به `Color` یا `Gradient` فلاتر تبدیل می‌کند.
+  dynamic _buildStyleColor(StyleColor styleColor) {
+    if (styleColor is SolidColor) {
+      return Color(styleColor.value);
+    }
+    if (styleColor is GradientColor) {
+      return LinearGradient(
+        colors: styleColor.colors.map((c) => Color(c)).toList(),
+        stops: styleColor.stops,
+        begin: Alignment(styleColor.beginX, styleColor.beginY),
+        end: Alignment(styleColor.endX, styleColor.endY),
+      );
+    }
+    return null;
+  }
+
+  /// Converts our serializable `BoxShadowStyle` into a Flutter `BoxShadow`.
+  /// `BoxShadowStyle` سریالایزبل ما را به `BoxShadow` فلاتر تبدیل می‌کند.
+  BoxShadow _buildBoxShadow(BoxShadowStyle shadowStyle) {
+    return BoxShadow(
+      color: Color(shadowStyle.color),
+      offset: Offset(shadowStyle.offsetX, shadowStyle.offsetY),
+      blurRadius: shadowStyle.blurRadius,
+      spreadRadius: shadowStyle.spreadRadius,
+    );
+  }
+
+  /// Builds a Flutter `BoxDecoration` from our `DecorationComponent`, handling animations.
+  /// یک `BoxDecoration` فلاتر از `DecorationComponent` ما می‌سازد و انیمیشن‌ها را مدیریت می‌کند.
+  BoxDecoration? _buildDecoration(EntityId id) {
+    final deco = get<DecorationComponent>(id);
+    if (deco == null) return null;
+
+    final animProgress = get<AnimationProgressComponent>(id)?.progress;
+
+    // If there's an active animation, interpolate between the start and end states.
+    // اگر انیمیشن فعالی وجود دارد، بین حالت‌های شروع و پایان درون‌یابی می‌کند.
+    if (animProgress != null && deco.animateTo != null) {
+      final start = deco;
+      final end = deco.animateTo!;
+
+      // Interpolate colors/gradients
+      final lerpedColor = Color.lerp(
+          start.color is SolidColor
+              ? Color((start.color as SolidColor).value)
+              : null,
+          end.color is SolidColor
+              ? Color((end.color as SolidColor).value)
+              : null,
+          animProgress);
+
+      // Interpolate shadows
+      final lerpedShadows = (start.boxShadow != null && end.boxShadow != null)
+          ? List.generate(
+              start.boxShadow!.length,
+              (i) => BoxShadow.lerp(_buildBoxShadow(start.boxShadow![i]),
+                  _buildBoxShadow(end.boxShadow![i]), animProgress)!)
+          : null;
+
+      return BoxDecoration(
+        color: lerpedColor,
+        boxShadow: lerpedShadows,
+      );
+    }
+
+    // If no animation, just build the decoration from the current state.
+    // اگر انیمیشنی وجود ندارد، دکوراسیون را از وضعیت فعلی می‌سازد.
+    final color = deco.color != null ? _buildStyleColor(deco.color!) : null;
+    return BoxDecoration(
+      color: color is Color ? color : null,
+      gradient: color is Gradient ? color : null,
+      boxShadow: deco.boxShadow?.map(_buildBoxShadow).toList(),
+    );
+  }
+
+  // --- Main Build Logic ---
 
   Widget build(BuildContext context) {
     if (_manager == null || _componentCache.isEmpty) {
@@ -164,15 +244,19 @@ class FlutterRenderingSystem extends ChangeNotifier {
         }
 
         final builder = builders[customWidgetComp.widgetType];
-        Widget finalWidget;
+        Widget builtChild;
 
         if (builder != null) {
-          final parentShell =
-              builder(context, id, this, _manager!, childrenWidget);
-          finalWidget = parentShell;
+          builtChild = builder(context, id, this, _manager!, childrenWidget);
         } else {
-          finalWidget = childrenWidget;
+          builtChild = childrenWidget;
         }
+
+        // --- MODIFIED: Apply decoration if it exists ---
+        final decoration = _buildDecoration(id);
+        Widget finalWidget = decoration != null
+            ? Container(decoration: decoration, child: builtChild)
+            : builtChild;
 
         if (strategy == RenderBehavior.staticScope) {
           _selfWidgetCache[id] = finalWidget;
