@@ -26,6 +26,8 @@ class _NexusWidgetState extends State<NexusWidget> {
   void initState() {
     super.initState();
     _isolateManager = NexusIsolateManager();
+    // Provide the manager to the rendering system so it can be used by builders.
+    widget.renderingSystem.setManager(_isolateManager);
     _isolateManager.spawn(widget.worldProvider);
     _isolateManager.renderPacketStream
         .listen(widget.renderingSystem.updateFromPackets);

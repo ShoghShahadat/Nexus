@@ -4,6 +4,7 @@ import 'package:nexus_example/counter_cubit.dart';
 import 'package:nexus_example/counter_module/counter_module.dart';
 import 'package:nexus_example/counter_module/ui/button_painters.dart';
 import 'package:nexus_example/counter_module/ui/morphing_painter.dart';
+import 'package:nexus_example/counter_module/utils/shape_utils.dart';
 
 // --- World Provider ---
 // This function will be executed in the background isolate.
@@ -15,11 +16,11 @@ NexusWorld provideNexusWorld() {
   world.services.registerSingleton(CounterCubit());
 
   // --- Global Systems ---
-  // FlutterRenderingSystem is no longer added here.
   world.addSystem(AnimationSystem());
   world.addSystem(PulsingWarningSystem());
   world.addSystem(MorphingSystem());
   world.addSystem(LifecycleSystem());
+  world.addSystem(InputSystem()); // Add the new InputSystem
 
   // --- Load Feature Modules ---
   final counterModule = CounterModule();
@@ -32,9 +33,18 @@ void main() {
   // Register all serializable components for the ComponentFactory.
   // This is crucial for communication between isolates.
   registerCoreComponents();
+  ComponentFactoryRegistry.I.register('MorphingLogicComponent',
+      (json) => MorphingLogicComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'ShapePathComponent', (json) => ShapePathComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'CounterStateComponent', (json) => CounterStateComponent.fromJson(json));
 
   runApp(const MyApp());
 }
+
+// The local definition of CounterStateComponent has been removed.
+// The app will now use the serializable version from the core library.
 
 /// The root widget of the application.
 class MyApp extends StatelessWidget {
@@ -47,39 +57,64 @@ class MyApp extends StatelessWidget {
     // We define how entities are rendered based on their tags.
     final renderingSystem = FlutterRenderingSystem(
       builders: {
-        'counter_display': (context, id, controller) {
-          final state = controller.get<CounterStateComponent>(id)!.value;
-          final morph = controller.get<MorphingComponent>(id)!;
+        'counter_display': (context, id, controller, manager) {
+          final stateComp = controller.get<CounterStateComponent>(id);
+          final morph = controller.get<MorphingLogicComponent>(id);
+          final pos = controller.get<PositionComponent>(id);
+
+          if (stateComp == null || morph == null || pos == null) {
+            return const SizedBox.shrink();
+          }
+
+          final state = stateComp.value;
           final color = state >= 0 ? Colors.deepPurple : Colors.redAccent;
+          final path = getPolygonPath(
+              Size(pos.width, pos.height), morph.targetSides,
+              cornerRadius: 12.0);
+
           return CustomPaint(
             painter: MorphingPainter(
-                path: morph.currentPath, color: color, text: 'Count: $state'),
+                path: path, color: color, text: 'Count: $state'),
           );
         },
-        'increment_button': (context, id, controller) {
+        'increment_button': (context, id, controller, manager) {
           return ElevatedButton(
             onPressed: () {
-              // Note: Input handling would require sending events to the isolate.
-              // This is a more advanced topic. For now, this demonstrates rendering.
+              // Send a tap event to the logic isolate.
+              manager.send(EntityTapEvent(id));
             },
             child: const Icon(Icons.add),
           );
         },
-        'decrement_button': (context, id, controller) {
+        'decrement_button': (context, id, controller, manager) {
           return ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              // Send a tap event to the logic isolate.
+              manager.send(EntityTapEvent(id));
+            },
             child: const Icon(Icons.remove),
           );
         },
-        'shape_button': (context, id, controller) {
-          final shapePath = controller.get<ShapePathComponent>(id)!.path;
+        'shape_button': (context, id, controller, manager) {
+          final shape = controller.get<ShapePathComponent>(id);
+          final pos = controller.get<PositionComponent>(id);
+
+          if (shape == null || pos == null) {
+            return const SizedBox.shrink();
+          }
+
+          final path = getPolygonPath(Size(pos.width, pos.height), shape.sides);
+
           return GestureDetector(
-            onTap: () {},
+            onTap: () {
+              // Send a tap event to the logic isolate.
+              manager.send(EntityTapEvent(id));
+            },
             child: Container(
               color: Colors.transparent,
               child: CustomPaint(
-                  size: const Size(60, 60),
-                  painter: ShapeButtonPainter(path: shapePath)),
+                  size: Size(pos.width, pos.height),
+                  painter: ShapeButtonPainter(path: path)),
             ),
           );
         },

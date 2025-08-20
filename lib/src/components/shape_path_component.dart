@@ -1,12 +1,23 @@
-import 'package:flutter/widgets.dart';
-import 'package:nexus/src/core/component.dart';
+import 'package:nexus/nexus.dart';
 
-/// A custom component created to hold the path data for a specific shape.
-class ShapePathComponent extends Component {
-  final Path path;
+/// A component that holds the description of a shape (number of sides).
+/// This makes it safe to be created and managed in a background isolate.
+class ShapePathComponent extends Component with SerializableComponent {
+  final int sides;
 
-  ShapePathComponent(this.path);
+  ShapePathComponent({required this.sides});
+
+  factory ShapePathComponent.fromJson(Map<String, dynamic> json) {
+    return ShapePathComponent(
+      sides: json['sides'] as int,
+    );
+  }
 
   @override
-  List<Object?> get props => [path];
+  Map<String, dynamic> toJson() => {
+        'sides': sides,
+      };
+
+  @override
+  List<Object?> get props => [sides];
 }

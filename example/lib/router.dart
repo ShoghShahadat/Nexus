@@ -6,15 +6,13 @@ import 'package:nexus_example/counter_cubit.dart';
 import 'package:nexus_example/counter_module/counter_module.dart';
 import 'package:nexus_example/counter_module/ui/button_painters.dart';
 import 'package:nexus_example/counter_module/ui/morphing_painter.dart';
+import 'package:nexus_example/counter_module/utils/shape_utils.dart';
 
 /// Defines the routes for the application using go_router.
 final router = GoRouter(
   initialLocation: '/counter',
   routes: [
-    // This is a Nexus-powered screen, now correctly implemented.
     CounterSceneRoute(path: '/counter'),
-
-    // This could be a regular, non-Nexus screen.
     GoRoute(
       path: '/settings',
       builder: (context, state) => const SettingsScreen(),
@@ -27,50 +25,64 @@ class CounterSceneRoute extends NexusRoute {
   CounterSceneRoute({required String path})
       : super(
           path: path,
-          // 1. Provide the world provider function to run in the isolate.
           worldProvider: _provideCounterWorld,
-          // 2. Provide the rendering system builder to run on the UI thread.
           renderingSystemBuilder: (context) {
             return FlutterRenderingSystem(
               builders: {
-                'counter_display': (context, id, controller) {
+                'counter_display': (context, id, controller, manager) {
                   final stateValue =
                       controller.get<CounterStateComponent>(id)?.value ?? 0;
-                  final morph = controller.get<MorphingComponent>(id);
-                  if (morph == null) return const SizedBox.shrink();
+                  final morphLogic = controller.get<MorphingLogicComponent>(id);
+                  final pos = controller.get<PositionComponent>(id);
+                  if (morphLogic == null || pos == null) {
+                    return const SizedBox.shrink();
+                  }
 
+                  final path = getPolygonPath(
+                      Size(pos.width, pos.height), morphLogic.targetSides,
+                      cornerRadius: 12);
                   final color =
                       stateValue >= 0 ? Colors.deepPurple : Colors.redAccent;
+
                   return CustomPaint(
                     painter: MorphingPainter(
-                        path: morph.currentPath,
-                        color: color,
-                        text: 'Count: $stateValue'),
+                        path: path, color: color, text: 'Count: $stateValue'),
                   );
                 },
-                'increment_button': (context, id, controller) {
+                'increment_button': (context, id, controller, manager) {
                   return ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      manager.send(EntityTapEvent(id));
+                    },
                     child: const Icon(Icons.add),
                   );
                 },
-                'decrement_button': (context, id, controller) {
+                'decrement_button': (context, id, controller, manager) {
                   return ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      manager.send(EntityTapEvent(id));
+                    },
                     child: const Icon(Icons.remove),
                   );
                 },
-                'shape_button': (context, id, controller) {
-                  final shapePath =
-                      controller.get<ShapePathComponent>(id)?.path;
-                  if (shapePath == null) return const SizedBox.shrink();
+                'shape_button': (context, id, controller, manager) {
+                  final shape = controller.get<ShapePathComponent>(id);
+                  final pos = controller.get<PositionComponent>(id);
+                  if (shape == null || pos == null) {
+                    return const SizedBox.shrink();
+                  }
+
+                  final path =
+                      getPolygonPath(Size(pos.width, pos.height), shape.sides);
+
                   return GestureDetector(
-                    onTap: () {},
+                    onTap: () {
+                      manager.send(EntityTapEvent(id));
+                    },
                     child: Container(
                       color: Colors.transparent,
-                      child: CustomPaint(
-                          size: const Size(60, 60),
-                          painter: ShapeButtonPainter(path: shapePath)),
+                      child:
+                          CustomPaint(painter: ShapeButtonPainter(path: path)),
                     ),
                   );
                 },
@@ -87,6 +99,8 @@ class CounterSceneRoute extends NexusRoute {
     world.addSystem(PulsingWarningSystem());
     world.addSystem(MorphingSystem());
     world.addSystem(LifecycleSystem());
+    world.addSystem(ShapeSelectionSystem());
+    world.addSystem(InputSystem()); // Add the input system here as well
     world.loadModule(CounterModule());
     return world;
   }

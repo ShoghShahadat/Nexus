@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
-import 'package:flutter/foundation.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/core/render_packet.dart';
+import 'package:nexus/src/events/input_events.dart';
 
 /// A class that manages the background isolate where the NexusWorld runs.
 /// It handles spawning, communication, and termination of the logic thread.
@@ -10,21 +10,27 @@ class NexusIsolateManager {
   Isolate? _isolate;
   SendPort? _sendPort;
   final ReceivePort _receivePort = ReceivePort();
+
+  // A dedicated broadcast stream controller for render packets.
+  final _renderPacketController =
+      StreamController<List<RenderPacket>>.broadcast();
   Stream<List<RenderPacket>> get renderPacketStream =>
-      _receivePort.where((event) => event is List<RenderPacket>).cast();
+      _renderPacketController.stream;
 
   /// Spawns a new isolate to run the NexusWorld.
-  ///
-  /// [worldProvider] is a function that creates and inits the NexusWorld.
-  /// This function will be executed inside the new isolate.
   Future<void> spawn(NexusWorld Function() worldProvider) async {
     if (_isolate != null) return;
 
-    // Listen for the SendPort from the isolate.
     final completer = Completer<SendPort>();
+
+    // The single listener for the ReceivePort.
     _receivePort.listen((message) {
       if (message is SendPort) {
+        // First message is always the SendPort from the isolate.
         completer.complete(message);
+      } else if (message is List<RenderPacket>) {
+        // Subsequent messages are render packets. Add them to our controller.
+        _renderPacketController.add(message);
       }
     });
 
@@ -48,13 +54,13 @@ class NexusIsolateManager {
   void dispose() {
     _sendPort?.send('shutdown');
     _receivePort.close();
+    _renderPacketController.close();
     _isolate?.kill(priority: Isolate.immediate);
     _isolate = null;
   }
 }
 
 /// The entry point for the background isolate.
-/// This function sets up the world and runs the main update loop.
 void _isolateEntryPoint(SendPort mainSendPort) async {
   final isolateReceivePort = ReceivePort();
   mainSendPort.send(isolateReceivePort.sendPort);
@@ -68,7 +74,6 @@ void _isolateEntryPoint(SendPort mainSendPort) async {
       world = message();
       stopwatch.start();
 
-      // Main logic loop using a periodic timer.
       timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
         final dt =
             stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
@@ -76,7 +81,6 @@ void _isolateEntryPoint(SendPort mainSendPort) async {
 
         world!.update(dt);
 
-        // After updating, gather renderable data and send it to the UI thread.
         final packets = <RenderPacket>[];
         for (final entity in world!.entities.values) {
           final serializableComponents = <String, Map<String, dynamic>>{};
@@ -94,6 +98,9 @@ void _isolateEntryPoint(SendPort mainSendPort) async {
         }
         mainSendPort.send(packets);
       });
+    } else if (message is EntityTapEvent) {
+      // If we receive a tap event from the UI, fire it on the world's event bus.
+      world?.eventBus.fire(message);
     } else if (message == 'shutdown') {
       timer?.cancel();
       isolateReceivePort.close();

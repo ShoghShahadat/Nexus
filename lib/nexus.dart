@@ -22,6 +22,7 @@ export 'src/core/render_packet.dart';
 
 // --- Events ---
 export 'src/events/shape_events.dart';
+export 'src/events/input_events.dart';
 
 // --- Components ---
 export 'src/components/animation_component.dart';
@@ -45,6 +46,7 @@ export 'src/systems/morphing_system.dart';
 export 'src/systems/physics_system.dart';
 export 'src/systems/pulsing_warning_system.dart';
 export 'src/systems/shape_selection_system.dart';
+export 'src/systems/input_system.dart';
 
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';

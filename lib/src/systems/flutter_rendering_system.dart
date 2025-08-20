@@ -5,8 +5,8 @@ import 'package:nexus/src/core/render_packet.dart';
 
 /// A function signature for building a widget based on an entity's ID and
 /// the current rendering controller.
-typedef TaggedWidgetBuilder = Widget Function(
-    BuildContext context, EntityId id, FlutterRenderingSystem controller);
+typedef TaggedWidgetBuilder = Widget Function(BuildContext context, EntityId id,
+    FlutterRenderingSystem controller, NexusIsolateManager manager);
 
 /// The FlutterRenderingSystem is no longer a traditional System that runs in
 /// the world's update loop. Instead, it's a UI-side controller that extends
@@ -16,8 +16,15 @@ typedef TaggedWidgetBuilder = Widget Function(
 class FlutterRenderingSystem extends ChangeNotifier {
   final Map<EntityId, Map<Type, Component>> _componentCache = {};
   final Map<String, TaggedWidgetBuilder> builders;
+  NexusIsolateManager? _isolateManager;
 
   FlutterRenderingSystem({required this.builders});
+
+  /// Sets the isolate manager for this rendering system. This is called by
+  /// the NexusWidget once the manager is created.
+  void setManager(NexusIsolateManager manager) {
+    _isolateManager = manager;
+  }
 
   /// Retrieves a component of a specific type for a given entity ID from the cache.
   T? get<T extends Component>(EntityId id) {
@@ -26,7 +33,9 @@ class FlutterRenderingSystem extends ChangeNotifier {
 
   /// Updates the internal cache with data from RenderPackets and notifies the UI.
   void updateFromPackets(List<RenderPacket> packets) {
+    bool needsNotify = false;
     for (final packet in packets) {
+      needsNotify = true;
       if (packet.isRemoved) {
         _componentCache.remove(packet.id);
         continue;
@@ -43,11 +52,17 @@ class FlutterRenderingSystem extends ChangeNotifier {
         _componentCache[packet.id]![component.runtimeType] = component;
       }
     }
-    notifyListeners();
+    if (needsNotify) {
+      notifyListeners();
+    }
   }
 
   /// Builds the widget representation of the current state of the world.
   Widget build(BuildContext context) {
+    if (_isolateManager == null) {
+      return const Center(
+          child: Text("Nexus Isolate Manager not initialized."));
+    }
     if (_componentCache.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -80,7 +95,7 @@ class FlutterRenderingSystem extends ChangeNotifier {
           height: pos.height,
           child: Transform.scale(
             scale: pos.scale,
-            child: builder(context, entityId, this),
+            child: builder(context, entityId, this, _isolateManager!),
           ),
         );
       }).toList(),

@@ -1,19 +1,12 @@
 import 'package:nexus/nexus.dart';
 import 'package:nexus_example/counter_cubit.dart';
-import 'package:nexus_example/counter_module/utils/shape_utils.dart';
-import 'dart:ui'; // For Size
 
 /// Assembles all entities related to the counter feature.
-///
-/// This class now extends the official [EntityAssembler] from the Nexus
-/// framework, providing a standardized structure for entity creation.
-/// NOTE: This assembler now contains NO FLUTTER-SPECIFIC CODE. It only
-/// deals with pure data components.
+/// This assembler now only creates isolate-safe data components.
 class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
   CounterEntityAssembler(NexusWorld world, CounterCubit cubit)
       : super(world, cubit);
 
-  // The cubit is now accessible via the 'context' property from the base class.
   CounterCubit get cubit => context;
 
   @override
@@ -29,49 +22,36 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
   /// Creates the main counter display entity.
   Entity _createCounterDisplay() {
     final entity = Entity();
-    final size = const Size(250, 100);
-    final initialPath = getPolygonPath(size, 4, cornerRadius: 12);
-
-    entity.add(PositionComponent(
-        x: 80, y: 250, width: size.width, height: size.height));
+    entity.add(PositionComponent(x: 80, y: 250, width: 250, height: 100));
     entity.add(BlocComponent<CounterCubit, int>(cubit));
     entity.add(CounterStateComponent(cubit.state));
-    entity.add(TagsComponent({'counter_display'})); // Tag for the UI
-    entity.add(
-        MorphingComponent(initialPath: initialPath, targetPath: initialPath));
-    // WidgetComponent is removed. The UI is now handled by FlutterRenderingSystem
-    // based on the 'counter_display' tag.
+    entity.add(TagsComponent({'counter_display'}));
+    entity.add(MorphingLogicComponent(initialSides: 4, targetSides: 4));
     return entity;
   }
 
   /// Creates the shape-shifting buttons.
   List<Entity> _createShapeButtons() {
     final List<Entity> buttons = [];
-    const buttonSize = Size(60, 60);
     final positions = [
-      const Offset(20, 450),
-      const Offset(90, 450),
-      const Offset(160, 450),
-      const Offset(230, 450),
-      const Offset(300, 450),
+      const [20.0, 450.0],
+      const [90.0, 450.0],
+      const [160.0, 450.0],
+      const [230.0, 450.0],
+      const [300.0, 450.0],
     ];
     final sides = [3, 4, 5, 6, 30];
 
     for (var i = 0; i < sides.length; i++) {
       final entity = Entity();
-      final shapePath = getPolygonPath(buttonSize, sides[i]);
-
       entity.add(PositionComponent(
-          x: positions[i].dx,
-          y: positions[i].dy,
-          width: buttonSize.width,
-          height: buttonSize.height));
-      entity.add(ShapePathComponent(shapePath));
+          x: positions[i][0], y: positions[i][1], width: 60, height: 60));
+      entity.add(ShapePathComponent(sides: sides[i]));
       entity.add(ClickableComponent((e) {
-        final path = e.get<ShapePathComponent>()!.path;
-        world.eventBus.fire(ShapeSelectedEvent(path));
+        // Fire the event with the number of sides (int), which is correct now.
+        world.eventBus.fire(ShapeSelectedEvent(sides[i]));
       }));
-      entity.add(TagsComponent({'shape_button'})); // Tag for the UI
+      entity.add(TagsComponent({'shape_button'}));
       buttons.add(entity);
     }
     return buttons;
@@ -82,7 +62,7 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
     final entity = Entity();
     entity.add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
     entity.add(ClickableComponent((_) => cubit.increment()));
-    entity.add(TagsComponent({'increment_button'})); // Tag for the UI
+    entity.add(TagsComponent({'increment_button'}));
     return entity;
   }
 
@@ -91,7 +71,7 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
     final entity = Entity();
     entity.add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
     entity.add(ClickableComponent((_) => cubit.decrement()));
-    entity.add(TagsComponent({'decrement_button'})); // Tag for the UI
+    entity.add(TagsComponent({'decrement_button'}));
     return entity;
   }
 }
