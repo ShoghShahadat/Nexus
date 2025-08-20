@@ -1,14 +1,14 @@
-import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus_example/counter_cubit.dart';
-import 'package:nexus_example/counter_module/ui/button_painters.dart';
-import 'package:nexus_example/counter_module/ui/morphing_painter.dart';
 import 'package:nexus_example/counter_module/utils/shape_utils.dart';
+import 'dart:ui'; // For Size
 
 /// Assembles all entities related to the counter feature.
 ///
 /// This class now extends the official [EntityAssembler] from the Nexus
 /// framework, providing a standardized structure for entity creation.
+/// NOTE: This assembler now contains NO FLUTTER-SPECIFIC CODE. It only
+/// deals with pure data components.
 class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
   CounterEntityAssembler(NexusWorld world, CounterCubit cubit)
       : super(world, cubit);
@@ -36,18 +36,11 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
         x: 80, y: 250, width: size.width, height: size.height));
     entity.add(BlocComponent<CounterCubit, int>(cubit));
     entity.add(CounterStateComponent(cubit.state));
-    entity.add(TagsComponent({'counter_display'}));
+    entity.add(TagsComponent({'counter_display'})); // Tag for the UI
     entity.add(
         MorphingComponent(initialPath: initialPath, targetPath: initialPath));
-    entity.add(WidgetComponent((context, entity) {
-      final state = entity.get<CounterStateComponent>()!.value;
-      final morph = entity.get<MorphingComponent>()!;
-      final color = state >= 0 ? Colors.deepPurple : Colors.redAccent;
-      return CustomPaint(
-        painter: MorphingPainter(
-            path: morph.currentPath, color: color, text: 'Count: $state'),
-      );
-    }));
+    // WidgetComponent is removed. The UI is now handled by FlutterRenderingSystem
+    // based on the 'counter_display' tag.
     return entity;
   }
 
@@ -78,16 +71,7 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
         final path = e.get<ShapePathComponent>()!.path;
         world.eventBus.fire(ShapeSelectedEvent(path));
       }));
-      entity.add(WidgetComponent((context, entity) {
-        return GestureDetector(
-          onTap: () => entity.get<ClickableComponent>()!.onTap(entity),
-          child: Container(
-            color: Colors.transparent,
-            child: CustomPaint(
-                size: buttonSize, painter: ShapeButtonPainter(path: shapePath)),
-          ),
-        );
-      }));
+      entity.add(TagsComponent({'shape_button'})); // Tag for the UI
       buttons.add(entity);
     }
     return buttons;
@@ -98,12 +82,7 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
     final entity = Entity();
     entity.add(PositionComponent(x: 220, y: 370, width: 110, height: 50));
     entity.add(ClickableComponent((_) => cubit.increment()));
-    entity.add(WidgetComponent((context, entity) {
-      return ElevatedButton(
-        onPressed: () => entity.get<ClickableComponent>()!.onTap(entity),
-        child: const Icon(Icons.add),
-      );
-    }));
+    entity.add(TagsComponent({'increment_button'})); // Tag for the UI
     return entity;
   }
 
@@ -112,12 +91,7 @@ class CounterEntityAssembler extends EntityAssembler<CounterCubit> {
     final entity = Entity();
     entity.add(PositionComponent(x: 80, y: 370, width: 110, height: 50));
     entity.add(ClickableComponent((_) => cubit.decrement()));
-    entity.add(WidgetComponent((context, entity) {
-      return ElevatedButton(
-        onPressed: () => entity.get<ClickableComponent>()!.onTap(entity),
-        child: const Icon(Icons.remove),
-      );
-    }));
+    entity.add(TagsComponent({'decrement_button'})); // Tag for the UI
     return entity;
   }
 }

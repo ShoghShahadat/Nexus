@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/nexus_router.dart';
 import 'package:nexus_example/counter_cubit.dart';
 import 'package:nexus_example/counter_module/counter_module.dart';
+import 'package:nexus_example/counter_module/ui/button_painters.dart';
+import 'package:nexus_example/counter_module/ui/morphing_painter.dart';
 
 /// Defines the routes for the application using go_router.
 final router = GoRouter(
   initialLocation: '/counter',
   routes: [
-    // This is a Nexus-powered screen.
+    // This is a Nexus-powered screen, now correctly implemented.
     CounterSceneRoute(path: '/counter'),
 
     // This could be a regular, non-Nexus screen.
@@ -21,53 +24,70 @@ final router = GoRouter(
 
 /// Defines the Counter screen as a self-contained Nexus Scene.
 class CounterSceneRoute extends NexusRoute {
-  CounterSceneRoute({required super.path})
+  CounterSceneRoute({required String path})
       : super(
-          // The builder now returns a Scaffold, providing the necessary app structure.
-          builder: (context, state) {
-            // Create the world specifically for this route instance.
-            final world = _buildCounterWorld();
+          path: path,
+          // 1. Provide the world provider function to run in the isolate.
+          worldProvider: _provideCounterWorld,
+          // 2. Provide the rendering system builder to run on the UI thread.
+          renderingSystemBuilder: (context) {
+            return FlutterRenderingSystem(
+              builders: {
+                'counter_display': (context, id, controller) {
+                  final stateValue =
+                      controller.get<CounterStateComponent>(id)?.value ?? 0;
+                  final morph = controller.get<MorphingComponent>(id);
+                  if (morph == null) return const SizedBox.shrink();
 
-            // Find the rendering system to build the UI.
-            final renderingSystem = world.systems.firstWhere(
-                    (s) => s is FlutterRenderingSystem,
-                    orElse: () => throw Exception(
-                        'NexusRoute requires a FlutterRenderingSystem to be present in the world.'))
-                as FlutterRenderingSystem;
-
-            // The NexusWidget is now the body of the Scaffold.
-            return Scaffold(
-              appBar: AppBar(
-                title: const Text('Nexus Counter Example'),
-                backgroundColor: Colors.deepPurple,
-                titleTextStyle:
-                    const TextStyle(color: Colors.white, fontSize: 20),
-              ),
-              body: NexusWidget(
-                world: world,
-                child: renderingSystem.build(context),
-              ),
+                  final color =
+                      stateValue >= 0 ? Colors.deepPurple : Colors.redAccent;
+                  return CustomPaint(
+                    painter: MorphingPainter(
+                        path: morph.currentPath,
+                        color: color,
+                        text: 'Count: $stateValue'),
+                  );
+                },
+                'increment_button': (context, id, controller) {
+                  return ElevatedButton(
+                    onPressed: () {},
+                    child: const Icon(Icons.add),
+                  );
+                },
+                'decrement_button': (context, id, controller) {
+                  return ElevatedButton(
+                    onPressed: () {},
+                    child: const Icon(Icons.remove),
+                  );
+                },
+                'shape_button': (context, id, controller) {
+                  final shapePath =
+                      controller.get<ShapePathComponent>(id)?.path;
+                  if (shapePath == null) return const SizedBox.shrink();
+                  return GestureDetector(
+                    onTap: () {},
+                    child: Container(
+                      color: Colors.transparent,
+                      child: CustomPaint(
+                          size: const Size(60, 60),
+                          painter: ShapeButtonPainter(path: shapePath)),
+                    ),
+                  );
+                },
+              },
             );
           },
         );
 
-  /// Helper method to encapsulate world creation logic.
-  static NexusWorld _buildCounterWorld() {
+  /// Helper method to create the world. Runs in the background.
+  static NexusWorld _provideCounterWorld() {
     final world = NexusWorld();
-
-    // Register services needed for this scene.
     world.services.registerSingleton(CounterCubit());
-
-    // Add global systems.
-    world.addSystem(FlutterRenderingSystem());
     world.addSystem(AnimationSystem());
     world.addSystem(PulsingWarningSystem());
     world.addSystem(MorphingSystem());
     world.addSystem(LifecycleSystem());
-
-    // Load feature modules for this scene.
     world.loadModule(CounterModule());
-
     return world;
   }
 }

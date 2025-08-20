@@ -16,16 +16,25 @@ class Entity extends ChangeNotifier {
 
   Entity() : id = _nextId++;
 
-  /// Adds a component to the entity and notifies listeners ONLY if the new
-  /// component is different from the existing one of the same type.
+  /// Adds a component to the entity and notifies listeners.
   ///
-  /// This intelligent update mechanism prevents unnecessary UI rebuilds by
-  /// performing a value-based equality check before notifying listeners.
+  /// This method is optimized to prevent unnecessary notifications.
+  /// - If the exact same component instance is passed, it assumes the component
+  ///   was mutated and always notifies listeners.
+  /// - If a new component instance is passed, it uses value-based equality
+  ///   to check if the data has actually changed before notifying.
   void add<T extends Component>(T component) {
     final existingComponent = _components[T];
 
-    // Optimization: If a component of the same type exists and is equal to
-    // the new one, do nothing to avoid redundant notifications.
+    // If it's the exact same instance, we assume it was mutated internally
+    // and a notification is desired.
+    if (identical(existingComponent, component)) {
+      notifyListeners();
+      return;
+    }
+
+    // If it's a new instance, but its value is the same as the existing one,
+    // do nothing to prevent redundant notifications and UI rebuilds.
     if (existingComponent != null && existingComponent == component) {
       return;
     }

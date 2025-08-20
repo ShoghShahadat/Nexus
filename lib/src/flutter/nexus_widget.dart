@@ -1,61 +1,51 @@
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
-import 'package:nexus/src/core/nexus_world.dart';
+import 'package:nexus/nexus.dart';
 
-/// A Flutter widget that hosts and runs a [NexusWorld].
+/// A Flutter widget that hosts and runs a NexusWorld in a background isolate.
 ///
-/// This widget is now much simpler. It only runs the high-frequency logic
-/// loop via a `Ticker`. The UI rendering is handled reactively by the
-/// `EntityWidgetBuilder`s created by the `FlutterRenderingSystem`, so this
-/// widget no longer needs to listen for changes or call `setState`.
+/// This widget manages the lifecycle of the NexusIsolateManager and connects
+/// it to the FlutterRenderingSystem to build the UI reactively.
 class NexusWidget extends StatefulWidget {
-  final NexusWorld world;
-  final Widget child;
+  final NexusWorld Function() worldProvider;
+  final FlutterRenderingSystem renderingSystem;
 
   const NexusWidget({
     super.key,
-    required this.world,
-    required this.child,
+    required this.worldProvider,
+    required this.renderingSystem,
   });
 
   @override
   State<NexusWidget> createState() => _NexusWidgetState();
 }
 
-class _NexusWidgetState extends State<NexusWidget>
-    with SingleTickerProviderStateMixin {
-  late final Ticker _ticker;
-  Duration _lastElapsed = Duration.zero;
+class _NexusWidgetState extends State<NexusWidget> {
+  late final NexusIsolateManager _isolateManager;
 
   @override
   void initState() {
     super.initState();
-    // The logic loop ticker. This runs at the screen's refresh rate.
-    _ticker = createTicker(_onTick)..start();
-  }
-
-  /// The high-frequency callback for the logic loop.
-  void _onTick(Duration elapsed) {
-    final delta = elapsed - _lastElapsed;
-    final dt = delta.inMicroseconds / Duration.microsecondsPerSecond;
-    _lastElapsed = elapsed;
-
-    // Update the world's logic without rebuilding this widget.
-    if (mounted) {
-      widget.world.update(dt);
-    }
+    _isolateManager = NexusIsolateManager();
+    _isolateManager.spawn(widget.worldProvider);
+    _isolateManager.renderPacketStream
+        .listen(widget.renderingSystem.updateFromPackets);
   }
 
   @override
   void dispose() {
-    _ticker.dispose();
+    _isolateManager.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // The child is built only once. All subsequent updates are handled
-    // by the reactive EntityWidgetBuilders within the child tree.
-    return widget.child;
+    // AnimatedBuilder listens to the rendering system (which is a ChangeNotifier)
+    // and rebuilds its child whenever the system calls notifyListeners().
+    return AnimatedBuilder(
+      animation: widget.renderingSystem,
+      builder: (context, child) {
+        return widget.renderingSystem.build(context);
+      },
+    );
   }
 }

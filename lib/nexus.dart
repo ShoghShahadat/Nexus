@@ -18,6 +18,7 @@ export 'src/core/utils/equatable_mixin.dart';
 export 'src/core/serialization/serializable_component.dart';
 export 'src/core/serialization/component_factory.dart';
 export 'src/core/serialization/world_serializer.dart';
+export 'src/core/render_packet.dart';
 
 // --- Events ---
 export 'src/events/shape_events.dart';
@@ -48,3 +49,4 @@ export 'src/systems/shape_selection_system.dart';
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';
 export 'src/flutter/nexus_widget.dart';
+export 'src/flutter/nexus_isolate_manager.dart';
