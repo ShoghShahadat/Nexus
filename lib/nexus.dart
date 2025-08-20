@@ -27,6 +27,7 @@ export 'src/core/serialization/world_serializer.dart';
 export 'src/core/render_packet.dart';
 
 // --- Events ---
+export 'src/events/app_lifecycle_event.dart';
 export 'src/events/shape_events.dart';
 export 'src/events/input_events.dart';
 export 'src/events/pointer_events.dart';
@@ -37,6 +38,7 @@ export 'src/components/animation_component.dart';
 export 'src/components/animation_progress_component.dart';
 export 'src/components/api_request_component.dart';
 export 'src/components/api_status_component.dart';
+export 'src/components/app_lifecycle_component.dart';
 export 'src/components/archetype_component.dart';
 export 'src/components/attractor_component.dart';
 export 'src/components/blackboard_component.dart';
@@ -64,6 +66,7 @@ export 'src/components/history_component.dart';
 // --- Systems ---
 export 'src/systems/animation_system.dart';
 export 'src/systems/api_system.dart';
+export 'src/systems/app_lifecycle_system.dart';
 export 'src/systems/archetype_system.dart';
 export 'src/systems/attraction_system.dart';
 export 'src/systems/bloc_system.dart';

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/widgets.dart';
 import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/events/app_lifecycle_event.dart';
 
 class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
@@ -24,11 +25,42 @@ class NexusWidget extends StatefulWidget {
 
 class _NexusWidgetState extends State<NexusWidget> {
   late NexusManager _manager;
+  late final AppLifecycleListener _lifecycleListener;
 
   @override
   void initState() {
     super.initState();
     _initializeManager();
+
+    // Setup the lifecycle listener to bridge events to the logic isolate.
+    // شنونده چرخه حیات را برای ارسال رویدادها به isolate منطق تنظیم می‌کنیم.
+    _lifecycleListener = AppLifecycleListener(
+      onStateChange: _onLifecycleStateChanged,
+    );
+  }
+
+  void _onLifecycleStateChanged(AppLifecycleState state) {
+    // Map Flutter's state to our custom, isolate-safe enum.
+    // وضعیت فلاتر را به enum سفارشی و امن برای isolate خودمان مپ می‌کنیم.
+    final AppLifecycleStatus status;
+    switch (state) {
+      case AppLifecycleState.resumed:
+        status = AppLifecycleStatus.resumed;
+        break;
+      case AppLifecycleState.inactive:
+        status = AppLifecycleStatus.inactive;
+        break;
+      case AppLifecycleState.paused:
+        status = AppLifecycleStatus.paused;
+        break;
+      case AppLifecycleState.detached:
+        status = AppLifecycleStatus.detached;
+        break;
+      case AppLifecycleState.hidden:
+        status = AppLifecycleStatus.hidden;
+        break;
+    }
+    _manager.send(AppLifecycleEvent(status));
   }
 
   @override
@@ -62,7 +94,6 @@ class _NexusWidgetState extends State<NexusWidget> {
   void _resetManager() async {
     print("--- Hot Reload Detected: Beginning stateful reset ---");
 
-    // --- NEW: Call the new dispose method with the hot reload flag ---
     await _manager.dispose(isHotReload: true);
 
     StorageAdapter? preservedStorage;
@@ -80,6 +111,7 @@ class _NexusWidgetState extends State<NexusWidget> {
 
   @override
   void dispose() {
+    _lifecycleListener.dispose();
     _manager.dispose();
     super.dispose();
   }
@@ -91,7 +123,6 @@ class _NexusWidgetState extends State<NexusWidget> {
         final pointerEvent = NexusPointerMoveEvent(
             event.localPosition.dx, event.localPosition.dy);
         _manager.send(pointerEvent);
-        // --- NEW: We now also send a save event on move for real-time persistence ---
         if (kDebugMode) {
           _manager.send(SaveDataEvent());
         }
