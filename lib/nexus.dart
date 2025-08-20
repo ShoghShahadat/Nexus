@@ -1,7 +1,4 @@
 /// The main library for the Nexus framework.
-///
-/// This file exports all the public-facing APIs of the Nexus package,
-/// allowing users to import all core functionalities with a single line.
 library nexus;
 
 // --- Core ---
@@ -13,8 +10,14 @@ export 'src/core/nexus_world.dart';
 export 'src/core/system.dart';
 export 'src/core/providers/entity_provider.dart';
 export 'src/core/providers/system_provider.dart';
-export 'src/core/assemblers/entity_assembler.dart'; // Exporting Assembler
-export 'src/core/logic/logic_function.dart'; // Exporting Logic Function
+export 'src/core/assemblers/entity_assembler.dart';
+export 'src/core/logic/logic_function.dart';
+export 'src/core/utils/equatable_mixin.dart';
+
+// --- Serialization ---
+export 'src/core/serialization/serializable_component.dart';
+export 'src/core/serialization/component_factory.dart';
+export 'src/core/serialization/world_serializer.dart';
 
 // --- Events ---
 export 'src/events/shape_events.dart';

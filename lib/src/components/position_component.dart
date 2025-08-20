@@ -1,7 +1,8 @@
 import 'package:nexus/src/core/component.dart';
+import 'package:nexus/src/core/serialization/serializable_component.dart';
 
 /// A component that stores the 2D position and size of an entity.
-class PositionComponent extends Component {
+class PositionComponent extends Component with SerializableComponent {
   double x;
   double y;
   double width;
@@ -15,6 +16,25 @@ class PositionComponent extends Component {
     this.height = 0.0,
     this.scale = 1.0,
   });
+
+  factory PositionComponent.fromJson(Map<String, dynamic> json) {
+    return PositionComponent(
+      x: (json['x'] as num).toDouble(),
+      y: (json['y'] as num).toDouble(),
+      width: (json['width'] as num).toDouble(),
+      height: (json['height'] as num).toDouble(),
+      scale: (json['scale'] as num).toDouble(),
+    );
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'x': x,
+        'y': y,
+        'width': width,
+        'height': height,
+        'scale': scale,
+      };
 
   @override
   List<Object?> get props => [x, y, width, height, scale];

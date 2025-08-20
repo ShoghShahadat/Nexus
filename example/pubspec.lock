@@ -49,14 +49,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
-  equatable:
-    dependency: transitive
-    description:
-      name: equatable
-      sha256: "567c64b3cb4cf82397aac55f4f0cbd3ca20d77c6c03bedbc4ceaddc08904aef7"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.7"
   fake_async:
     dependency: transitive
     description:
@@ -89,21 +81,13 @@ packages:
     source: hosted
     version: "7.7.0"
   go_router:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: go_router
       sha256: ced3fdc143c1437234ac3b8e985f3286cf138968bb83ca9a6f94d22f2951c6b9
       url: "https://pub.dev"
     source: hosted
     version: "16.2.0"
-  json_annotation:
-    dependency: transitive
-    description:
-      name: json_annotation
-      sha256: "1ce844379ca14835a50d2f019a3099f419082cfdd231cd86a142af94dd5c6bb1"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.9.0"
   leak_tracker:
     dependency: transitive
     description:
@@ -174,7 +158,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "1.0.0-dev.2"
+    version: "1.2.0-dev.1"
   path:
     dependency: transitive
     description:

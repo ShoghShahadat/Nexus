@@ -1,6 +1,6 @@
 name: nexus
 description: A highly scalable, clean, and data-oriented framework for Flutter, inspired by ECS and powered by BLoC and GetIt.
-version: 1.1.0-dev.1
+version: 1.2.0-dev.1
 homepage: https://github.com/ShoghShahadat/Nexus 
 repository: https://github.com/ShoghShahadat/Nexus 
 issue_tracker: https://github.com/ShoghShahadat/Nexus/issues
@@ -12,12 +12,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  bloc: ^8.1.4 # For state management components
-  get_it: ^7.7.0 # For service location and dependency injection
-  meta: ^1.11.0 # For annotations
-  collection: ^1.18.0 # Required for EquatableMixin's deep equality checks
-
+  bloc: ^8.1.4 
+  get_it: ^7.7.0 
+  meta: ^1.11.0 
+  collection: ^1.18.0
+  go_router: ^16.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
   lints: ^3.0.0
+
+# Note: go_router is NOT a dependency of the core nexus package.
+# It is an optional integration, demonstrated in the example app.
