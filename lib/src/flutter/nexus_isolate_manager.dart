@@ -11,19 +11,24 @@ class NexusIsolateManager {
   SendPort? _sendPort;
   final ReceivePort _receivePort = ReceivePort();
 
-  // A dedicated broadcast stream controller for render packets.
   final _renderPacketController =
       StreamController<List<RenderPacket>>.broadcast();
   Stream<List<RenderPacket>> get renderPacketStream =>
       _renderPacketController.stream;
 
   /// Spawns a new isolate to run the NexusWorld.
-  Future<void> spawn(NexusWorld Function() worldProvider) async {
+  ///
+  /// [worldProvider] creates the NexusWorld instance.
+  /// [isolateInitializer] is an optional function that runs inside the new
+  /// isolate for setup, perfect for registering custom components.
+  Future<void> spawn(
+    NexusWorld Function() worldProvider, {
+    void Function()? isolateInitializer,
+  }) async {
     if (_isolate != null) return;
 
     final completer = Completer<SendPort>();
 
-    // The single listener for the ReceivePort.
     _receivePort.listen((message) {
       if (message is SendPort) {
         completer.complete(message);
@@ -32,13 +37,20 @@ class NexusIsolateManager {
       }
     });
 
+    // FIX: Pass the initializer function to the isolate entry point.
+    final entryPointArgs = [
+      _receivePort.sendPort,
+      isolateInitializer,
+      worldProvider
+    ];
+
     _isolate = await Isolate.spawn(
       _isolateEntryPoint,
-      _receivePort.sendPort,
+      entryPointArgs,
       debugName: 'NexusLogicIsolate',
     );
     _sendPort = await completer.future;
-    _sendPort!.send(worldProvider);
+    // We no longer send the worldProvider here; it's part of the initial args.
   }
 
   /// Sends a command or event to the background isolate.
@@ -57,8 +69,15 @@ class NexusIsolateManager {
 }
 
 /// The entry point for the background isolate.
-void _isolateEntryPoint(SendPort mainSendPort) async {
+void _isolateEntryPoint(List<dynamic> args) async {
+  // FIX: Unpack arguments
+  final mainSendPort = args[0] as SendPort;
+  final isolateInitializer = args[1] as void Function()?;
+  final worldProvider = args[2] as NexusWorld Function();
+
+  // FIX: Run initializers for both core and custom components.
   registerCoreComponents();
+  isolateInitializer?.call();
 
   final isolateReceivePort = ReceivePort();
   mainSendPort.send(isolateReceivePort.sendPort);
@@ -67,53 +86,51 @@ void _isolateEntryPoint(SendPort mainSendPort) async {
   Timer? timer;
   final stopwatch = Stopwatch();
 
+  // The world is now created right away.
+  world = worldProvider();
+  stopwatch.start();
+
+  timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+    final dt =
+        stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
+    stopwatch.reset();
+
+    world!.update(dt);
+
+    final packets = <RenderPacket>[];
+    for (final entity in world.entities.values) {
+      final serializableComponents = <String, Map<String, dynamic>>{};
+      for (final component in entity.allComponents) {
+        if (component is SerializableComponent) {
+          serializableComponents[component.runtimeType.toString()] =
+              (component as SerializableComponent).toJson();
+        }
+      }
+
+      if (serializableComponents.isNotEmpty) {
+        packets.add(
+            RenderPacket(id: entity.id, components: serializableComponents));
+      }
+    }
+
+    final removedEntityIds = world.getAndClearRemovedEntities();
+    for (final id in removedEntityIds) {
+      packets.add(RenderPacket(id: id, components: {}, isRemoved: true));
+    }
+
+    if (packets.isNotEmpty) {
+      mainSendPort.send(packets);
+    }
+  });
+
   isolateReceivePort.listen((message) {
-    if (message is NexusWorld Function()) {
-      world = message();
-      stopwatch.start();
-
-      // کاهش زمان به‌روزرسانی به 8 میلی‌ثانیه برای فریم ریت بالاتر (حدود 125 FPS)
-      timer = Timer.periodic(const Duration(milliseconds: 8), (timer) {
-        final dt =
-            stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
-        stopwatch.reset();
-
-        world!.update(dt);
-
-        final packets = <RenderPacket>[];
-        // اضافه کردن RenderPacket برای موجودیت‌های به‌روز شده
-        for (final entity in world!.entities.values) {
-          final serializableComponents = <String, Map<String, dynamic>>{};
-          for (final component in entity.allComponents) {
-            if (component is SerializableComponent) {
-              serializableComponents[component.runtimeType.toString()] =
-                  (component as SerializableComponent).toJson();
-            }
-          }
-
-          if (serializableComponents.isNotEmpty) {
-            packets.add(RenderPacket(
-                id: entity.id, components: serializableComponents));
-          }
-        }
-
-        // اضافه کردن RenderPacket برای موجودیت‌های حذف شده
-        final removedEntityIds = world!.getAndClearRemovedEntities();
-        for (final id in removedEntityIds) {
-          packets.add(RenderPacket(id: id, components: {}, isRemoved: true));
-        }
-
-        if (packets.isNotEmpty) {
-          mainSendPort.send(packets);
-        }
-      });
-    } else if (message is EntityTapEvent) {
+    if (message is EntityTapEvent) {
+      world?.eventBus.fire(message);
+    } else if (message is NexusPointerMoveEvent) {
       world?.eventBus.fire(message);
     } else if (message == 'shutdown') {
       timer?.cancel();
       isolateReceivePort.close();
-    } else if (message is NexusPointerMoveEvent) {
-      world?.eventBus.fire(message);
     }
   });
 }

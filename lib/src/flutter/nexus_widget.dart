@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/events/pointer_events.dart'; // وارد کردن NexusPointerMoveEvent
+import 'package:nexus/src/events/pointer_events.dart';
 
 /// A Flutter widget that hosts and runs a NexusWorld in a background isolate.
 ///
@@ -9,11 +9,14 @@ import 'package:nexus/src/events/pointer_events.dart'; // وارد کردن Nexu
 class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
   final FlutterRenderingSystem renderingSystem;
+  // FIX: Added initializer for custom component registration.
+  final void Function()? isolateInitializer;
 
   const NexusWidget({
     super.key,
     required this.worldProvider,
     required this.renderingSystem,
+    this.isolateInitializer,
   });
 
   @override
@@ -27,9 +30,12 @@ class _NexusWidgetState extends State<NexusWidget> {
   void initState() {
     super.initState();
     _isolateManager = NexusIsolateManager();
-    // Provide the manager to the rendering system so it can be used by builders.
     widget.renderingSystem.setManager(_isolateManager);
-    _isolateManager.spawn(widget.worldProvider);
+    // FIX: Pass the initializer to the spawn method.
+    _isolateManager.spawn(
+      widget.worldProvider,
+      isolateInitializer: widget.isolateInitializer,
+    );
     _isolateManager.renderPacketStream
         .listen(widget.renderingSystem.updateFromPackets);
   }
@@ -42,17 +48,10 @@ class _NexusWidgetState extends State<NexusWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // AnimatedBuilder listens to the rendering system (which is a ChangeNotifier)
-    // and rebuilds its child whenever the system calls notifyListeners().
     return Listener(
-      // افزودن Listener برای دریافت رویدادهای اشاره‌گر
       onPointerMove: (event) {
-        // ایجاد صریح شیء NexusPointerMoveEvent و سپس ارسال آن.
-        // این کار به کامپایلر کمک می‌کند تا یک شیء واحد را تشخیص دهد
-        // و از خطای "Too many positional arguments" جلوگیری کند.
         final NexusPointerMoveEvent pointerEvent = NexusPointerMoveEvent(
-            event.localPosition.dx,
-            event.localPosition.dy); // نام کلاس تغییر یافت
+            event.localPosition.dx, event.localPosition.dy);
         _isolateManager.send(pointerEvent);
       },
       child: AnimatedBuilder(

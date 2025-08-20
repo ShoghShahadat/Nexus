@@ -1,28 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/core/serialization/component_factory.dart';
+import 'package:nexus_example/dashboard_module/components/dashboard_components.dart';
 import 'package:nexus_example/dashboard_module/dashboard_module.dart';
 import 'package:nexus_example/dashboard_module/ui/widget_builders.dart';
 
 /// The entry point for the background isolate.
-/// This function creates and configures the NexusWorld.
 NexusWorld provideDashboardWorld() {
   final world = NexusWorld();
 
-  // Add core systems required by the module's animations.
+  // Add core systems.
   world.addSystem(AnimationSystem());
   world.addSystem(LifecycleSystem());
+  // *** FIX: Add InputSystem to handle tap events. ***
+  world.addSystem(InputSystem());
 
-  // Load the entire dashboard feature as a self-contained module.
+  // Load the dashboard module.
   world.loadModule(DashboardModule());
-
   return world;
+}
+
+/// A helper function to register all serializable components from the dashboard module.
+void registerDashboardComponents() {
+  ComponentFactoryRegistry.I.register(
+      'SummaryCardComponent', (json) => SummaryCardComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'ChartDataComponent', (json) => ChartDataComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'TaskItemComponent', (json) => TaskItemComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register('EntryAnimationComponent',
+      (json) => EntryAnimationComponent.fromJson(json));
 }
 
 /// The main entry point for the Flutter application.
 void main() {
-  // Register all core serializable components. This is crucial for
-  // communication between the logic isolate and the UI thread.
+  // Register components for both UI and background isolates.
   registerCoreComponents();
+  registerDashboardComponents();
+
   runApp(const MyApp());
 }
 
@@ -32,7 +47,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Configure the rendering system, which maps entity tags to widget builders.
     final renderingSystem = FlutterRenderingSystem(
       builders: {
         'summary_card': buildSummaryCard,
@@ -45,17 +59,24 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Nexus Dashboard Demo',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
-        scaffoldBackgroundColor: const Color(0xFFF4F6F8),
+        primarySwatch: Colors.deepPurple,
+        scaffoldBackgroundColor: const Color(0xFFF0F2F5), // A softer background
+        fontFamily: 'Inter', // A modern, clean font
       ),
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Project Dashboard'),
-          elevation: 0,
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          elevation: 1,
         ),
-        body: NexusWidget(
-          worldProvider: provideDashboardWorld,
-          renderingSystem: renderingSystem,
+        // *** FIX: Wrap the body in a SingleChildScrollView to enable scrolling. ***
+        body: SingleChildScrollView(
+          child: NexusWidget(
+            worldProvider: provideDashboardWorld,
+            renderingSystem: renderingSystem,
+            isolateInitializer: registerDashboardComponents,
+          ),
         ),
       ),
     );

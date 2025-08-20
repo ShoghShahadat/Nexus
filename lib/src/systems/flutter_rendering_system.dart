@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:nexus/nexus.dart';
@@ -8,11 +9,9 @@ import 'package:nexus/src/core/render_packet.dart';
 typedef TaggedWidgetBuilder = Widget Function(BuildContext context, EntityId id,
     FlutterRenderingSystem controller, NexusIsolateManager manager);
 
-/// The FlutterRenderingSystem is no longer a traditional System that runs in
-/// the world's update loop. Instead, it's a UI-side controller that extends
-/// ChangeNotifier. It receives RenderPackets from the background isolate,
-/// caches the component data, and notifies its listeners (like NexusWidget)
-/// to rebuild the UI.
+/// A UI-side controller that extends ChangeNotifier. It receives RenderPackets
+/// from the background isolate, caches the component data, and notifies its
+/// listeners to rebuild the UI.
 class FlutterRenderingSystem extends ChangeNotifier {
   final Map<EntityId, Map<Type, Component>> _componentCache = {};
   final Map<String, TaggedWidgetBuilder> builders;
@@ -20,20 +19,14 @@ class FlutterRenderingSystem extends ChangeNotifier {
 
   FlutterRenderingSystem({required this.builders});
 
-  /// Sets the isolate manager for this rendering system. This is called by
-  /// the NexusWidget once the manager is created.
   void setManager(NexusIsolateManager manager) {
     _isolateManager = manager;
   }
 
-  /// Retrieves a component of a specific type for a given entity ID from the cache.
   T? get<T extends Component>(EntityId id) {
     return _componentCache[id]?[T] as T?;
   }
 
-  /// Retrieves a list of entity IDs that have a specific tag from the cache.
-  /// This is useful for builders that need to render a collection of entities
-  /// based on their tags (e.g., all particles).
   List<EntityId> getAllIdsWithTag(String tag) {
     final List<EntityId> ids = [];
     for (final entry in _componentCache.entries) {
@@ -45,7 +38,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
     return ids;
   }
 
-  /// Adds a UI-only entity directly to the rendering system's cache.
   void addUiEntity(EntityId id, Set<String> tags) {
     if (!_componentCache.containsKey(id)) {
       _componentCache[id] = {};
@@ -56,11 +48,8 @@ class FlutterRenderingSystem extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Updates the internal cache with data from RenderPackets and notifies the UI.
   void updateFromPackets(List<RenderPacket> packets) {
-    if (packets.isEmpty) {
-      return;
-    }
+    if (packets.isEmpty) return;
     bool needsNotify = false;
     for (final packet in packets) {
       needsNotify = true;
@@ -68,11 +57,9 @@ class FlutterRenderingSystem extends ChangeNotifier {
         _componentCache.remove(packet.id);
         continue;
       }
-
       if (!_componentCache.containsKey(packet.id)) {
         _componentCache[packet.id] = {};
       }
-
       for (final typeName in packet.components.keys) {
         final componentJson = packet.components[typeName]!;
         try {
@@ -80,7 +67,10 @@ class FlutterRenderingSystem extends ChangeNotifier {
               ComponentFactoryRegistry.I.create(typeName, componentJson);
           _componentCache[packet.id]![component.runtimeType] = component;
         } catch (e) {
-          // Error handling for deserialization can be added here.
+          if (kDebugMode) {
+            print(
+                '[RenderingSystem] ERROR deserializing component $typeName for ID ${packet.id}: $e');
+          }
         }
       }
     }
@@ -89,7 +79,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
     }
   }
 
-  /// Builds the widget representation of the current state of the world.
   @override
   Widget build(BuildContext context) {
     if (_isolateManager == null) {
@@ -100,15 +89,11 @@ class FlutterRenderingSystem extends ChangeNotifier {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final renderableEntities = _componentCache.keys.toList();
     final List<Widget> children = [];
-    for (final entityId in renderableEntities) {
+    for (final entityId in _componentCache.keys) {
       final pos = get<PositionComponent>(entityId);
       final tags = get<TagsComponent>(entityId);
-
-      if (pos == null || tags == null) {
-        continue;
-      }
+      if (pos == null || tags == null) continue;
 
       TaggedWidgetBuilder? builder;
       for (final tag in tags.tags) {
@@ -117,10 +102,7 @@ class FlutterRenderingSystem extends ChangeNotifier {
           break;
         }
       }
-
-      if (builder == null) {
-        continue;
-      }
+      if (builder == null) continue;
 
       children.add(
         Positioned(
@@ -137,10 +119,10 @@ class FlutterRenderingSystem extends ChangeNotifier {
       );
     }
 
-    // *** FIX: Wrap the Stack in a SizedBox.expand() ***
-    // This ensures the Stack fills the available space, preventing it from
-    // collapsing to 0x0 size when it only contains Positioned children.
-    return SizedBox.expand(
+    // *** FIX: Use a SizedBox with a fixed height to define the scrollable area. ***
+    // This allows the parent SingleChildScrollView to work correctly with the Stack.
+    return SizedBox(
+      height: 1200, // A height large enough to contain all elements
       child: Stack(children: children),
     );
   }

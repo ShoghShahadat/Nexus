@@ -3,14 +3,10 @@ import 'package:nexus_example/dashboard_module/components/dashboard_components.d
 import 'package:nexus_example/dashboard_module/data/mock_data_provider.dart';
 
 /// Provides all entities related to the dashboard feature.
-/// It uses the official EntityAssembler pattern for clean separation of concerns.
 class DashboardEntityProvider extends EntityProvider {
   @override
   void createEntities(NexusWorld world) {
-    // Instantiate the assembler.
     final assembler = DashboardEntityAssembler(world);
-
-    // Use the assembler to create and add all its entities to the world.
     for (final entity in assembler.assemble()) {
       world.addEntity(entity);
     }
@@ -18,11 +14,9 @@ class DashboardEntityProvider extends EntityProvider {
 }
 
 /// Assembles all entities related to the dashboard feature.
-/// This class contains the concrete logic for creating and configuring entities.
 class DashboardEntityAssembler extends EntityAssembler<void> {
   DashboardEntityAssembler(NexusWorld world) : super(world, null);
 
-  // A helper to get the data provider service.
   MockDataProvider get dataProvider => world.services.get<MockDataProvider>();
 
   @override
@@ -34,40 +28,45 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
     ];
   }
 
-  /// Creates entities for the summary cards at the top of the dashboard.
+  /// Creates entities for the summary cards with a new 2x2 grid layout.
   List<Entity> _createSummaryCards() {
     final cards = dataProvider.getSummaryCards();
     final List<Entity> entities = [];
-    double startX = 20.0;
     double cardWidth = 200.0;
+    double cardHeight = 120.0;
     double spacing = 20.0;
+    double startX = 20.0;
+    double startY = 20.0;
 
     for (int i = 0; i < cards.length; i++) {
       final cardData = cards[i];
       final entity = Entity();
 
+      // 2x2 Grid calculation
+      final row = i ~/ 2;
+      final col = i % 2;
+
       entity.add(PositionComponent(
-          x: startX + (cardWidth + spacing) * i,
-          y: 20.0,
+          x: startX + col * (cardWidth + spacing),
+          y: startY + row * (cardHeight + spacing),
           width: cardWidth,
-          height: 100.0));
-      entity.add(cardData); // Add the specific card data component
-      entity
-          .add(EntryAnimationComponent(delay: 0.1 * i)); // Staggered animation
-      entity.add(TagsComponent({'summary_card'})); // UI builder tag
+          height: cardHeight));
+      entity.add(cardData);
+      entity.add(EntryAnimationComponent(delay: 0.1 * i));
+      entity.add(TagsComponent({'summary_card'}));
 
       entities.add(entity);
     }
     return entities;
   }
 
-  /// Creates the entity for the bar chart.
+  /// Creates the entity for the bar chart, positioned below the cards.
   Entity _createChart() {
     final entity = Entity();
-    entity.add(PositionComponent(x: 20, y: 140, width: 420, height: 250));
-    entity.add(dataProvider.getChartData()); // Add chart data
+    entity.add(PositionComponent(x: 20, y: 300, width: 420, height: 250));
+    entity.add(dataProvider.getChartData());
     entity.add(EntryAnimationComponent(delay: 0.4));
-    entity.add(TagsComponent({'chart'})); // UI builder tag
+    entity.add(TagsComponent({'chart'}));
     return entity;
   }
 
@@ -75,9 +74,9 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
   List<Entity> _createTaskList() {
     final tasks = dataProvider.getTasks();
     final List<Entity> entities = [];
-    double startY = 410.0;
-    double itemHeight = 60.0;
-    double spacing = 10.0;
+    double startY = 570.0;
+    double itemHeight = 65.0;
+    double spacing = 15.0;
 
     for (int i = 0; i < tasks.length; i++) {
       final taskData = tasks[i];
@@ -86,11 +85,28 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
       entity.add(PositionComponent(
           x: 20,
           y: startY + (itemHeight + spacing) * i,
-          width: 840, // Wider to fit content
+          width: 420, // Adjusted width
           height: itemHeight));
-      entity.add(taskData); // Add the specific task data component
-      entity.add(EntryAnimationComponent(delay: 0.5 + (0.05 * i))); // Staggered
-      entity.add(TagsComponent({'task_item'})); // UI builder tag
+      entity.add(taskData);
+      entity.add(EntryAnimationComponent(delay: 0.5 + (0.05 * i)));
+      entity.add(TagsComponent({'task_item'}));
+
+      // *** FIX: Add ClickableComponent for interactivity ***
+      // This component's onTap callback runs in the background isolate.
+      entity.add(ClickableComponent((e) {
+        final currentTask = e.get<TaskItemComponent>();
+        if (currentTask == null) return;
+
+        // Create a new component with the toggled state.
+        final updatedTask = TaskItemComponent(
+          title: currentTask.title,
+          assignedTo: currentTask.assignedTo,
+          priority: currentTask.priority,
+          isCompleted: !currentTask.isCompleted, // Toggle the value
+        );
+        // Re-add the component to the entity to trigger an update.
+        e.add(updatedTask);
+      }));
 
       entities.add(entity);
     }
