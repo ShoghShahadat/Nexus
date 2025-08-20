@@ -55,7 +55,8 @@ class BorderAnimationProgress extends Component with SerializableComponent {
   List<Object?> get props => [progress];
 }
 
-void registerDashboardComponents() {
+// --- FIX: Changed signature to match the required Future<void> Function() ---
+Future<void> registerDashboardComponents() async {
   ComponentFactoryRegistry.I.register(
       'SummaryCardComponent', (json) => SummaryCardComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
@@ -76,7 +77,8 @@ void registerDashboardComponents() {
 
 void main() {
   registerCoreComponents();
-  registerDashboardComponents();
+  // No need to call this here, it will be called in the isolate.
+  // registerDashboardComponents();
   runApp(const MyApp());
 }
 
@@ -91,7 +93,6 @@ class MyApp extends StatelessWidget {
         'chart': buildChart,
         'task_item': buildTaskItem,
         'realtime_chart': buildRealtimeChart,
-        // --- MODIFIED: The builder now accepts and uses the 'child' parameter ---
         'root_container': (context, id, controller, manager, child) {
           final progress =
               controller.get<BorderAnimationProgress>(id)?.progress ?? 0.0;
@@ -105,7 +106,6 @@ class MyApp extends StatelessWidget {
               border: Border.all(color: color, width: 3),
               borderRadius: BorderRadius.circular(16),
             ),
-            // --- FIX: Display the pre-rendered children inside the container ---
             child: child,
           );
         },

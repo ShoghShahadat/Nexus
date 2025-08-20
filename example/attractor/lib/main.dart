@@ -1,75 +1,49 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus_example/counter_cubit.dart';
+import 'particle_painter.dart';
+import 'package:collection/collection.dart';
 
-/// تابع اصلی که NexusWorld را برای Isolate پس‌زمینه فراهم می‌کند.
-NexusWorld provideCounterWorld() {
+/// The entry point for the background isolate.
+NexusWorld provideAttractorWorld() {
   final world = NexusWorld();
 
-  // 1. ثبت سرویس‌ها: CounterCubit به عنوان یک Singleton ثبت می‌شود.
-  final cubit = CounterCubit();
-  world.services.registerSingleton(cubit);
+  world.addSystem(PointerSystem());
+  world.addSystem(ParticleSpawningSystem());
+  world.addSystem(ParticleLifecycleSystem());
+  world.addSystem(PhysicsSystem());
+  world.addSystem(AttractionSystem());
 
-  // 2. افزودن سیستم‌ها:
-  world.addSystem(CounterSystem());
-  world.addSystem(InputSystem());
-  world.addSystem(HistorySystem()); // NEW: Add the history system
+  final attractor = Entity();
+  attractor.add(PositionComponent(x: 200, y: 300, width: 20, height: 20));
+  attractor.add(AttractorComponent(strength: 1.0));
+  attractor.add(TagsComponent({'attractor'}));
+  world.addEntity(attractor);
 
-  // 3. ایجاد موجودیت‌ها (Entities):
+  final spawner = Entity();
+  // --- FIX: Removed PositionComponent from spawner ---
+  // --- NEW: Link the spawner to the attractor's position ---
+  spawner.add(SpawnerLinkComponent(targetTag: 'attractor'));
+  spawner.add(SpawnerComponent(spawnRate: 200));
+  world.addEntity(spawner);
 
-  // موجودیت برای نمایشگر شمارنده
-  final counterDisplay = Entity();
-  counterDisplay
-      .add(PositionComponent(x: 100, y: 200, width: 200, height: 100));
-  counterDisplay.add(BlocComponent<CounterCubit, int>(cubit));
-  counterDisplay.add(CounterStateComponent(cubit.state));
-  counterDisplay.add(TagsComponent({'counter_display'}));
-  // NEW: Add history tracking for the counter's state
-  counterDisplay.add(HistoryComponent(
-    trackedComponents: {'CounterStateComponent'},
-  ));
-  world.addEntity(counterDisplay);
-
-  // موجودیت برای دکمه افزایش
-  final incrementButton = Entity();
-  incrementButton.add(PositionComponent(x: 210, y: 320, width: 80, height: 50));
-  incrementButton.add(ClickableComponent((_) => cubit.increment()));
-  incrementButton.add(TagsComponent({'increment_button'}));
-  world.addEntity(incrementButton);
-
-  // موجودیت برای دکمه کاهش
-  final decrementButton = Entity();
-  decrementButton.add(PositionComponent(x: 110, y: 320, width: 80, height: 50));
-  decrementButton.add(ClickableComponent((_) => cubit.decrement()));
-  decrementButton.add(TagsComponent({'decrement_button'}));
-  world.addEntity(decrementButton);
-
-  // --- NEW: Undo and Redo Buttons ---
-  final undoButton = Entity();
-  undoButton.add(PositionComponent(x: 110, y: 380, width: 80, height: 50));
-  undoButton.add(ClickableComponent(
-      (_) => world.eventBus.fire(UndoEvent(counterDisplay.id))));
-  undoButton.add(TagsComponent({'undo_button'}));
-  world.addEntity(undoButton);
-
-  final redoButton = Entity();
-  redoButton.add(PositionComponent(x: 210, y: 380, width: 80, height: 50));
-  redoButton.add(ClickableComponent(
-      (_) => world.eventBus.fire(RedoEvent(counterDisplay.id))));
-  redoButton.add(TagsComponent({'redo_button'}));
-  world.addEntity(redoButton);
-  // --- END NEW ---
+  final root = Entity();
+  root.add(CustomWidgetComponent(widgetType: 'particle_canvas'));
+  root.add(TagsComponent({'root'}));
+  world.addEntity(root);
 
   return world;
 }
 
-/// نقطه شروع برنامه Flutter.
+/// Main entry point for the Flutter app.
 void main() {
   registerCoreComponents();
+  // We need to register our new component for serialization
+  ComponentFactoryRegistry.I.register(
+      'SpawnerLinkComponent', (json) => SpawnerLinkComponent.fromJson(json));
   runApp(const MyApp());
 }
 
-/// ویجت اصلی برنامه.
+/// The root widget of the application.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -77,85 +51,43 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final renderingSystem = FlutterRenderingSystem(
       builders: {
-        'counter_display': (context, id, controller, manager) {
-          final state = controller.get<CounterStateComponent>(id);
-          if (state == null) return const SizedBox.shrink();
+        'particle_canvas': (context, id, controller, manager, child) {
+          final particleIds = controller.getAllIdsWithTag('particle');
+          final attractorId =
+              controller.getAllIdsWithTag('attractor').firstOrNull;
 
-          return Material(
-            color: Colors.transparent,
-            child: Center(
-              child: Text(
-                '${state.value}',
-                style:
-                    const TextStyle(fontSize: 50, fontWeight: FontWeight.bold),
+          if (attractorId == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          return RepaintBoundary(
+            child: CustomPaint(
+              painter: ParticlePainter(
+                particleIds: particleIds,
+                attractorId: attractorId,
+                controller: controller,
               ),
+              child: const SizedBox.expand(),
             ),
           );
         },
-        'increment_button': (context, id, controller, manager) {
-          return ElevatedButton(
-            onPressed: () => manager.send(EntityTapEvent(id)),
-            child: const Icon(Icons.add),
-          );
-        },
-        'decrement_button': (context, id, controller, manager) {
-          return ElevatedButton(
-            onPressed: () => manager.send(EntityTapEvent(id)),
-            child: const Icon(Icons.remove),
-          );
-        },
-        // --- NEW: Builders for Undo/Redo buttons ---
-        'undo_button': (context, id, controller, manager) {
-          // We can get the history state to enable/disable the button
-          final counterId =
-              controller.getAllIdsWithTag('counter_display').first;
-          final history = controller.get<HistoryComponent>(counterId);
-          final canUndo = history?.canUndo ?? false;
-
-          return ElevatedButton(
-            onPressed: canUndo ? () => manager.send(EntityTapEvent(id)) : null,
-            child: const Icon(Icons.undo),
-          );
-        },
-        'redo_button': (context, id, controller, manager) {
-          final counterId =
-              controller.getAllIdsWithTag('counter_display').first;
-          final history = controller.get<HistoryComponent>(counterId);
-          final canRedo = history?.canRedo ?? false;
-
-          return ElevatedButton(
-            onPressed: canRedo ? () => manager.send(EntityTapEvent(id)) : null,
-            child: const Icon(Icons.redo),
-          );
-        },
-        // --- END NEW ---
       },
     );
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
+        backgroundColor: const Color(0xFF1a1a1a),
         appBar: AppBar(
-          title: const Text('Nexus Counter Example'),
+          title: const Text('Nexus Attractor Example'),
+          backgroundColor: Colors.grey.shade900,
+          foregroundColor: Colors.white,
         ),
         body: NexusWidget(
-          worldProvider: provideCounterWorld,
+          worldProvider: provideAttractorWorld,
           renderingSystem: renderingSystem,
         ),
       ),
     );
-  }
-}
-
-/// سیستمی که به تغییرات وضعیت در CounterCubit گوش می‌دهد و
-/// CounterStateComponent متناظر را به‌روزرسانی می‌کند.
-class CounterSystem extends BlocSystem<CounterCubit, int> {
-  @override
-  void onStateChange(Entity entity, int state) {
-    // Check if the state has actually changed before adding the component.
-    final currentState = entity.get<CounterStateComponent>();
-    if (currentState == null || currentState.value != state) {
-      entity.add(CounterStateComponent(state));
-    }
   }
 }

@@ -14,7 +14,7 @@ export 'src/core/providers/system_provider.dart';
 export 'src/core/assemblers/entity_assembler.dart';
 export 'src/core/logic/logic_function.dart';
 export 'src/core/utils/equatable_mixin.dart';
-export 'src/core/storage/storage_adapter.dart'; // NEW
+export 'src/core/storage/storage_adapter.dart';
 
 // --- Serialization ---
 export 'src/core/serialization/serializable_component.dart';
@@ -33,7 +33,7 @@ export 'src/components/animation_component.dart';
 export 'src/components/animation_progress_component.dart';
 export 'src/components/archetype_component.dart';
 export 'src/components/attractor_component.dart';
-export 'src/components/blackboard_component.dart'; // NEW
+export 'src/components/blackboard_component.dart';
 export 'src/components/bloc_component.dart';
 export 'src/components/children_component.dart';
 export 'src/components/clickable_component.dart';
@@ -42,12 +42,13 @@ export 'src/components/custom_widget_component.dart';
 export 'src/components/lifecycle_component.dart';
 export 'src/components/morphing_component.dart';
 export 'src/components/particle_component.dart';
-export 'src/components/persistence_component.dart'; // NEW
+export 'src/components/persistence_component.dart';
 export 'src/components/position_component.dart';
 export 'src/components/render_strategy_component.dart';
 export 'src/components/rule_component.dart';
 export 'src/components/shape_path_component.dart';
 export 'src/components/spawner_component.dart';
+export 'src/components/spawner_link_component.dart'; // NEW EXPORT
 export 'src/components/tags_component.dart';
 export 'src/components/velocity_component.dart';
 export 'src/components/widget_component.dart';
@@ -64,7 +65,7 @@ export 'src/systems/lifecycle_system.dart';
 export 'src/systems/morphing_system.dart';
 export 'src/systems/particle_lifecycle_system.dart';
 export 'src/systems/particle_spawning_system.dart';
-export 'src/systems/persistence_system.dart'; // NEW
+export 'src/systems/persistence_system.dart';
 export 'src/systems/physics_system.dart';
 export 'src/systems/pointer_system.dart';
 export 'src/systems/pulsing_warning_system.dart';

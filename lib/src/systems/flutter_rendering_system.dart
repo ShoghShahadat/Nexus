@@ -29,6 +29,20 @@ class FlutterRenderingSystem extends ChangeNotifier {
     return _componentCache[id]?[T] as T?;
   }
 
+  // --- NEW: Restored this useful helper method ---
+  /// Finds all entity IDs that have a specific tag.
+  List<EntityId> getAllIdsWithTag(String tag) {
+    final ids = <EntityId>[];
+    for (final entry in _componentCache.entries) {
+      final tagsComponent = entry.value[TagsComponent];
+      if (tagsComponent is TagsComponent && tagsComponent.hasTag(tag)) {
+        ids.add(entry.key);
+      }
+    }
+    return ids;
+  }
+  // --- END NEW ---
+
   ChangeNotifier _getNotifier(EntityId id) {
     return _entityNotifiers.putIfAbsent(id, () => ChangeNotifier());
   }
@@ -88,7 +102,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
 
     EntityId? rootId;
     try {
-      // --- FIX: Replaced unnecessary_cast with a safe type check ---
       rootId = _componentCache.entries.firstWhere((entry) {
         final component = entry.value[TagsComponent];
         if (component is TagsComponent) {
@@ -139,16 +152,12 @@ class FlutterRenderingSystem extends ChangeNotifier {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: children);
-        }
-        // --- NEW: Added a handler for 'row' widget type ---
-        else if (customWidgetComp.widgetType == 'row') {
+        } else if (customWidgetComp.widgetType == 'row') {
           childrenWidget = Row(
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: children);
-        }
-        // --- END NEW ---
-        else if (children.isNotEmpty) {
+        } else if (children.isNotEmpty) {
           childrenWidget = children.first;
         } else {
           childrenWidget = const SizedBox.shrink();

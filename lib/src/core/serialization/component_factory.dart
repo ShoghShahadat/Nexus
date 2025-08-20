@@ -53,13 +53,15 @@ void registerCoreComponents() {
       'VelocityComponent', (json) => VelocityComponent.fromJson(json));
   ComponentFactoryRegistry.I
       .register('SpawnerComponent', (json) => SpawnerComponent.fromJson(json));
+  // --- NEW: Register the new SpawnerLinkComponent ---
+  ComponentFactoryRegistry.I.register(
+      'SpawnerLinkComponent', (json) => SpawnerLinkComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
       'ChildrenComponent', (json) => ChildrenComponent.fromJson(json));
   ComponentFactoryRegistry.I
       .register('HistoryComponent', (json) => HistoryComponent.fromJson(json));
   ComponentFactoryRegistry.I.register('RenderStrategyComponent',
       (json) => RenderStrategyComponent.fromJson(json));
-  // *** NEW: Register new components ***
   ComponentFactoryRegistry.I.register(
       'BlackboardComponent', (json) => BlackboardComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
