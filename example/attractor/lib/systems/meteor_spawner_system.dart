@@ -23,7 +23,6 @@ class MeteorSpawnerSystem extends System {
       _timeSinceLastSpawn = 0;
       _spawnInterval = _random.nextDouble() * 3 + 2; // Next wave in 2-5 secs
 
-      // --- NEW: Spawn a random number of meteors ---
       final meteorCount = _random.nextInt(3) + 1; // 1 to 3 meteors
       for (int i = 0; i < meteorCount; i++) {
         _createMeteor();
@@ -61,16 +60,15 @@ class MeteorSpawnerSystem extends System {
     meteor.add(MeteorComponent());
     meteor.add(TagsComponent({'meteor'}));
 
-    // --- NEW: Randomly decide the meteor's behavior ---
-    if (_random.nextDouble() < 0.3) {
-      // 30% chance to be a homing meteor
-      final attractor = world.entities.values
-          .firstWhereOrNull((e) => e.has<AttractorComponent>());
-      if (attractor != null) {
-        meteor.add(MeteorTargetComponent(targetId: attractor.id));
-      }
+    // --- MODIFIED: All meteors now target the attractor ---
+    // --- اصلاح شده: تمام شهاب‌سنگ‌ها اکنون جاذب را هدف قرار می‌دهند ---
+    final attractor = world.entities.values
+        .firstWhereOrNull((e) => e.has<AttractorComponent>());
+    if (attractor != null) {
+      meteor.add(MeteorTargetComponent(targetId: attractor.id));
     } else {
-      // 70% chance to have a random trajectory
+      // Fallback in case the attractor is destroyed, give it a random target.
+      // حالت جایگزین در صورتی که جاذب نابود شده باشد، یک هدف تصادفی به آن می‌دهد.
       meteor.add(MeteorTargetComponent(targetId: null));
     }
 
