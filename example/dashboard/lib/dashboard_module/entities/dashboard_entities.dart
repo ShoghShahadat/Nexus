@@ -7,6 +7,8 @@ class DashboardEntityProvider extends EntityProvider {
   @override
   void createEntities(NexusWorld world) {
     final assembler = DashboardEntityAssembler(world);
+    // The assembler now configures the world's root entity directly.
+    // It returns the other entities that need to be explicitly added.
     for (final entity in assembler.assemble()) {
       world.addEntity(entity);
     }
@@ -48,17 +50,17 @@ class DashboardEntityAssembler extends EntityAssembler<void> {
       ],
     );
 
+    // --- FIX: Configure the world's root entity instead of creating a new one. ---
+    // --- اصلاح: پیکربندی موجودیت root دنیا به جای ساختن یک موجودیت جدید. ---
     // The root entity is the animated container. Its child is the main content column.
-    final rootEntity = Entity();
-    rootEntity.add(CustomWidgetComponent(widgetType: 'root_container'));
-    rootEntity.add(TagsComponent({'root'}));
-    rootEntity.add(ChildrenComponent([rootContent.id]));
+    world.rootEntity.add(CustomWidgetComponent(widgetType: 'root_container'));
+    world.rootEntity.add(ChildrenComponent([rootContent.id]));
     // This is the key instruction: only rebuild the shell, not the children.
-    rootEntity.add(RenderStrategyComponent(RenderBehavior.staticShell));
-    // --- END MODIFICATION ---
+    world.rootEntity.add(RenderStrategyComponent(RenderBehavior.staticShell));
 
+    // Do not return the root entity from the assembler, as it's already part of the world.
+    // موجودیت root را از اسمبلر برنگردانید، چون از قبل بخشی از دنیا است.
     return [
-      rootEntity,
       rootContent,
       summaryGrid,
       chart,

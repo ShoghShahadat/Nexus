@@ -182,14 +182,41 @@ class FlutterRenderingSystem extends ChangeNotifier {
 
     EntityId? rootId;
     try {
-      rootId = _componentCache.entries.firstWhere((entry) {
+      final rootEntry = _componentCache.entries.firstWhere((entry) {
         final component = entry.value[TagsComponent];
         if (component is TagsComponent) {
           return component.hasTag('root');
         }
         return false;
-      }).key;
+      });
+      rootId = rootEntry.key;
+
+      // --- DEBUG LOGGING START ---
+      if (kDebugMode) {
+        print('[RenderingSystem] Found root entity with ID: $rootId');
+        final rootComponents = _componentCache[rootId];
+        if (rootComponents != null) {
+          print(
+              '    Components: ${rootComponents.keys.map((t) => t.toString()).join(', ')}');
+          if (!rootComponents.containsKey(CustomWidgetComponent)) {
+            print(
+                '    !!! WARNING: Root entity is missing CustomWidgetComponent!');
+          }
+        } else {
+          print(
+              '    !!! ERROR: Could not find components for root ID $rootId in cache.');
+        }
+      }
+      // --- DEBUG LOGGING END ---
     } catch (e) {
+      if (kDebugMode) {
+        print('[RenderingSystem] Error finding root entity: $e');
+        print('Available entities in cache:');
+        _componentCache.forEach((id, components) {
+          print(
+              '  - ID: $id, Components: ${components.keys.map((t) => t.toString()).join(', ')}');
+        });
+      }
       return const Center(child: Text("Error: 'root' entity not found."));
     }
 

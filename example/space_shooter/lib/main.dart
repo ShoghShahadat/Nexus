@@ -187,12 +187,9 @@ NexusWorld provideSpaceShooterWorld() {
   // این spawner خارج از صفحه است و نیازی به موقعیت ندارد.
   world.addEntity(enemySpawner);
 
-  // The root entity for rendering.
-  // موجودیت ریشه برای رندرینگ.
-  final root = Entity();
-  root.add(CustomWidgetComponent(widgetType: 'game_canvas'));
-  root.add(TagsComponent({'root'}));
-  world.addEntity(root);
+  // --- FIX: Configure the world's root entity instead of creating a new one. ---
+  // --- اصلاح: پیکربندی موجودیت root دنیا به جای ساختن یک موجودیت جدید. ---
+  world.rootEntity.add(CustomWidgetComponent(widgetType: 'game_canvas'));
 
   return world;
 }

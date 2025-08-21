@@ -41,13 +41,34 @@ class Entity extends ChangeNotifier {
     notifyListeners();
   }
 
-  // *** NEW: Added a convenience method to add multiple components at once. ***
-  // *** جدید: یک متد کمکی برای اضافه کردن چندین کامپوننت به صورت یکجا اضافه شد. ***
+  // *** FIX: Correctly add multiple components using their runtimeType. ***
+  // *** اصلاح: افزودن صحیح چندین کامپوننت با استفاده از runtimeType آن‌ها. ***
   void addComponents(List<Component> components) {
+    bool hasChanged = false;
     for (final component in components) {
-      // Use the generic add method to ensure type safety and correct registration.
-      // از متد add ژنریک استفاده می‌کنیم تا از صحت نوع و ثبت صحیح اطمینان حاصل شود.
-      add(component);
+      final type = component.runtimeType; // Use runtimeType here!
+      final existingComponent = _components[type];
+
+      // If the exact same instance is being re-added, just mark it dirty.
+      if (identical(existingComponent, component)) {
+        _dirtyComponents.add(type);
+        hasChanged = true;
+        continue;
+      }
+
+      // If an equivalent component is already there, do nothing.
+      if (existingComponent != null && existingComponent == component) {
+        continue;
+      }
+
+      // Otherwise, add the new component.
+      _components[type] = component;
+      _dirtyComponents.add(type);
+      hasChanged = true;
+    }
+    // Notify listeners only once if any changes were made.
+    if (hasChanged) {
+      notifyListeners();
     }
   }
 

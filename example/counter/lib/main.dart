@@ -155,17 +155,18 @@ NexusWorld provideCounterWorld() {
     buttonRow.id,
   ]));
 
-  final rootEntity = Entity();
-  rootEntity.add(TagsComponent({'root'}));
-  rootEntity.add(CustomWidgetComponent(widgetType: 'center_layout'));
-  rootEntity.add(ChildrenComponent([contentColumn.id]));
+  // --- FIX: Configure the world's root entity instead of creating a new one. ---
+  // --- اصلاح: پیکربندی موجودیت root دنیا به جای ساختن یک موجودیت جدید. ---
+  world.rootEntity.add(CustomWidgetComponent(widgetType: 'center_layout'));
+  world.rootEntity.add(ChildrenComponent([contentColumn.id]));
 
   world.addEntity(counterDisplay);
   world.addEntity(incrementButton);
   world.addEntity(decrementButton);
   world.addEntity(buttonRow);
   world.addEntity(contentColumn);
-  world.addEntity(rootEntity);
+  // No longer need to add a separate root entity.
+  // دیگر نیازی به افزودن یک موجودیت root جداگانه نیست.
 
   return world;
 }
