@@ -16,7 +16,7 @@ export 'src/core/logic/logic_function.dart';
 export 'src/core/utils/equatable_mixin.dart';
 export 'src/core/storage/storage_adapter.dart';
 
-// --- NEW: GPU Compute API ---
+// --- GPU Compute API ---
 export 'src/compute/gpu_buffer.dart';
 export 'src/compute/gpu_system.dart';
 
@@ -66,6 +66,7 @@ export 'src/components/keyboard_input_component.dart';
 export 'src/components/link_component.dart';
 export 'src/components/list_components.dart';
 export 'src/components/lifecycle_component.dart';
+export 'src/components/lifecycle_policy_component.dart'; // New export
 export 'src/components/morphing_component.dart';
 export 'src/components/parent_component.dart';
 export 'src/components/particle_component.dart';
@@ -100,6 +101,7 @@ export 'src/systems/damage_system.dart';
 export 'src/systems/decoration_animation_system.dart';
 export 'src/systems/effect_system.dart';
 export 'src/systems/flutter_rendering_system.dart';
+export 'src/systems/garbage_collector_system.dart'; // New export
 export 'src/systems/hardware_input_system.dart';
 export 'src/systems/history_system.dart';
 export 'src/systems/input_system.dart';

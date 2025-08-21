@@ -1,24 +1,19 @@
-import 'dart:async';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/components/gameplay_components.dart';
 import 'package:nexus/src/events/gameplay_events.dart';
 
 /// A system that processes `CollisionEvent`s to apply damage to entities
 /// with a `HealthComponent`.
+/// This version uses the new `listen` helper for automatic subscription management.
 class DamageSystem extends System {
-  StreamSubscription? _collisionSubscription;
-
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    _collisionSubscription = world.eventBus.on<CollisionEvent>(_onCollision);
+    // Use the new, safer `listen` method. No need to manage the subscription manually.
+    listen<CollisionEvent>(_onCollision);
   }
 
-  @override
-  void onRemovedFromWorld() {
-    _collisionSubscription?.cancel();
-    super.onRemovedFromWorld();
-  }
+  // No need for onRemovedFromWorld anymore, the base class handles it!
 
   void _onCollision(CollisionEvent event) {
     final entityA = world.entities[event.entityA];

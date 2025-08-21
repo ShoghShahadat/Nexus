@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 
 import 'components/complex_movement_component.dart';
+import 'components/debug_info_component.dart';
 import 'components/explosion_component.dart';
 import 'components/health_orb_component.dart';
 import 'components/meteor_component.dart';
 import 'events.dart';
 import 'particle_painter.dart';
 import 'world/world_provider.dart';
-import 'components/gpu_particle_render_component.dart'; // Import the new component
+import 'components/gpu_particle_render_component.dart';
 
 /// A dedicated function to register all custom components for this example.
 void registerAttractorComponents() {
@@ -25,19 +26,17 @@ void registerAttractorComponents() {
     'CollisionComponent': (json) => CollisionComponent.fromJson(json),
     'DamageComponent': (json) => DamageComponent.fromJson(json),
     'TargetingComponent': (json) => TargetingComponent.fromJson(json),
-    // Register the new GPU render component
     'GpuParticleRenderComponent': (json) =>
         GpuParticleRenderComponent.fromJson(json),
+    // Register the new debug component
+    'DebugInfoComponent': (json) => DebugInfoComponent.fromJson(json),
   };
   ComponentFactoryRegistry.I.registerAll(customComponents);
 }
 
 void main() {
-  // Register core library components
   registerCoreComponents();
-  // Register components specific to this example
   registerAttractorComponents();
-
   runApp(const MyApp());
 }
 
@@ -67,9 +66,10 @@ class _MyAppState extends State<MyApp> {
 
           final blackboard = controller.get<BlackboardComponent>(rootId);
           final health = controller.get<HealthComponent>(attractorId);
-          // Get the particle data directly from the new component on the root entity
           final gpuRenderData =
               controller.get<GpuParticleRenderComponent>(rootId);
+          // Get the new debug info
+          final debugInfo = controller.get<DebugInfoComponent>(rootId);
 
           final score = blackboard?.get<num>('score') ?? 0;
           final currentHealth = health?.currentHealth ?? 0;
@@ -93,7 +93,6 @@ class _MyAppState extends State<MyApp> {
                     RepaintBoundary(
                       child: CustomPaint(
                         painter: ParticlePainter(
-                          // Pass the raw GPU data to the painter
                           gpuParticleData: gpuRenderData?.particleData,
                           meteorIds: controller.getAllIdsWithTag('meteor'),
                           attractorId: attractorId,
@@ -139,6 +138,34 @@ class _MyAppState extends State<MyApp> {
                   ],
                 ),
               ),
+              // --- NEW: Debug Info Border ---
+              if (debugInfo != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  color: Colors.black.withOpacity(0.5),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _DebugStat(
+                          label: 'FPS',
+                          value: debugInfo.fps.toStringAsFixed(1)),
+                      _DebugStat(
+                          label: 'Frame',
+                          value:
+                              '${debugInfo.frameTime.toStringAsFixed(2)} ms'),
+                      _DebugStat(
+                          label: 'Entities',
+                          value: debugInfo.entityCount.toString()),
+                      _DebugStat(
+                          label: 'Mode',
+                          value: debugInfo.gpuMode,
+                          valueColor: debugInfo.gpuMode == 'GPU'
+                              ? Colors.greenAccent
+                              : Colors.orangeAccent),
+                    ],
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: LinearProgressIndicator(
@@ -172,6 +199,40 @@ class _MyAppState extends State<MyApp> {
           renderingSystem: renderingSystem,
         ),
       ),
+    );
+  }
+}
+
+/// A small helper widget for displaying a single debug statistic.
+class _DebugStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  const _DebugStat({
+    required this.label,
+    required this.value,
+    this.valueColor = Colors.white,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 10,
+              fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+              color: valueColor, fontSize: 13, fontWeight: FontWeight.bold),
+        ),
+      ],
     );
   }
 }

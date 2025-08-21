@@ -120,27 +120,17 @@ class GameOverSystem extends System {
 
 /// A system to handle the game restart logic.
 class RestartSystem extends System {
-  StreamSubscription? _restartSubscription;
-
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    _restartSubscription = world.eventBus.on<RestartGameEvent>(_onRestart);
-  }
-
-  @override
-  void onRemovedFromWorld() {
-    _restartSubscription?.cancel();
-    super.onRemovedFromWorld();
+    listen<RestartGameEvent>(_onRestart);
   }
 
   void _onRestart(RestartGameEvent event) {
-    // --- FIX: Clean up all old game entities before restarting ---
     final entitiesToRemove = world.entities.values
         .where((e) {
           final tags = e.get<TagsComponent>();
           if (tags == null) return false;
-          // Check if the entity has any of the game-specific tags.
           return tags.hasTag('meteor') ||
               tags.hasTag('health_orb') ||
               tags.hasTag('particle');
@@ -148,11 +138,11 @@ class RestartSystem extends System {
         .map((e) => e.id)
         .toList();
 
-    // Remove them from the world to prevent accumulation.
     for (final id in entitiesToRemove) {
       world.removeEntity(id);
     }
-    // --- END FIX ---
+
+    world.eventBus.fire(ResetSimulationEvent());
 
     final attractor = world.entities.values.firstWhereOrNull(
         (e) => e.get<TagsComponent>()?.hasTag('attractor') ?? false);
@@ -162,6 +152,21 @@ class RestartSystem extends System {
         (e) => e.get<TagsComponent>()?.hasTag('meteor_spawner') ?? false);
 
     if (attractor != null) {
+      // --- CRITICAL FIX: Reset the attractor's position to the start ---
+      final screenInfo = root?.get<ScreenInfoComponent>();
+      if (screenInfo != null) {
+        final startX = screenInfo.width / 2;
+        final startY = screenInfo.height * 0.8;
+        // Re-add the position component with starting coordinates.
+        attractor.add(PositionComponent(
+          x: startX,
+          y: startY,
+          width: 20, // Keep original size
+          height: 20,
+        ));
+      }
+      // --- END FIX ---
+
       attractor.add(HealthComponent(maxHealth: 100));
       attractor.add(InputFocusComponent());
       attractor.add(KeyboardInputComponent());
@@ -208,7 +213,6 @@ class GameProgressionSystem extends System {
     if (meteorSpawner != null) {
       final spawner = meteorSpawner.get<SpawnerComponent>();
       if (spawner != null) {
-        // Starts at 0.8 and increases to a max of 4 per second over 60 seconds
         final newEventsPerSecond =
             (0.8 + (gameTime / 60.0) * 3.2).clamp(0.8, 4.0);
         spawner.frequency = Frequency.perSecond(newEventsPerSecond);

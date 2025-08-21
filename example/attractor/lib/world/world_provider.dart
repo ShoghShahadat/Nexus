@@ -3,8 +3,10 @@ import 'dart:typed_data';
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
 import 'package:nexus/src/core/utils/frequency.dart';
+import '../components/debug_info_component.dart';
 import '../components/health_orb_component.dart';
 import '../components/meteor_component.dart';
+import '../systems/debug_system.dart';
 import '../systems/game_systems.dart';
 import '../systems/health_orb_system.dart';
 import '../systems/healing_system.dart';
@@ -31,7 +33,10 @@ Entity createHealthOrbPrefab(NexusWorld world) {
     TagsComponent({'health_orb'}),
     HealthComponent(maxHealth: 100),
     CollisionComponent(
-        tag: 'health_orb', radius: 6, collidesWith: {'attractor'})
+        tag: 'health_orb', radius: 6, collidesWith: {'attractor'}),
+    LifecyclePolicyComponent(
+      destructionCondition: (e) => e.get<HealthComponent>()!.currentHealth <= 0,
+    ),
   ]);
 
   return orb;
@@ -46,15 +51,17 @@ Entity createMeteorPrefab(NexusWorld world) {
   final gameTime =
       root.get<BlackboardComponent>()?.get<double>('game_time') ?? 0.0;
 
-  final screenInfo = root.get<ScreenInfoComponent>();
-  final screenWidth = screenInfo?.width ?? 400.0;
-  final screenHeight = screenInfo?.height ?? 800.0;
-
   final size = (25 + (gameTime / 60.0) * 25).clamp(25.0, 50.0);
   final speed = ((150 + (gameTime / 60.0) * 250).clamp(150.0, 400.0)) * 5;
 
   final startEdge = random.nextInt(4);
   double startX, startY;
+
+  // Use current screen info for spawning position
+  final screenInfo = root.get<ScreenInfoComponent>();
+  final screenWidth = screenInfo?.width ?? 400.0;
+  final screenHeight = screenInfo?.height ?? 800.0;
+
   switch (startEdge) {
     case 0:
       startX = random.nextDouble() * screenWidth;
@@ -82,7 +89,24 @@ Entity createMeteorPrefab(NexusWorld world) {
     TagsComponent({'meteor'}),
     HealthComponent(maxHealth: 20),
     VelocityComponent(y: speed * 0.5),
-    DamageComponent(25)
+    DamageComponent(25),
+    // --- FIX: Destruction condition now reads LIVE screen data ---
+    LifecyclePolicyComponent(
+      destructionCondition: (e) {
+        final pos = e.get<PositionComponent>()!;
+        final health = e.get<HealthComponent>()?.currentHealth ?? 1;
+        // Get the most up-to-date screen info from the root entity.
+        final currentScreenInfo = world.rootEntity.get<ScreenInfoComponent>()!;
+        final currentWidth = currentScreenInfo.width;
+        final currentHeight = currentScreenInfo.height;
+
+        return health <= 0 ||
+            pos.y > currentHeight + 50 ||
+            pos.y < -50 ||
+            pos.x > currentWidth + 50 ||
+            pos.x < -50;
+      },
+    ),
   ]);
 
   final attractor = world.entities.values
@@ -98,17 +122,17 @@ NexusWorld provideAttractorWorld() {
   final world = NexusWorld();
 
   world.addSystems([
-    // --- NEW: GPU Systems ---
-    AttractorGpuSystem(), // The new powerhouse for particle simulation
-    GpuBridgeSystem(), // Manages communication between CPU and GPU
-
-    // --- Core Systems (Still running on CPU) ---
+    GarbageCollectorSystem(),
+    DebugSystem(),
     AnimationSystem(),
     AdvancedInputSystem(),
-    PhysicsSystem(), // Still needed for meteors and the attractor
+    PhysicsSystem(),
     ResponsivenessSystem(),
+    ParticleLifecycleSystem(), // This system now handles particle removal.
 
-    // --- Gameplay Systems (Still running on CPU) ---
+    AttractorGpuSystem(),
+    GpuBridgeSystem(),
+
     SpawnerSystem(),
     TargetingSystem(),
     CollisionSystem(),
@@ -122,7 +146,6 @@ NexusWorld provideAttractorWorld() {
     HealingSystem(),
   ]);
 
-  // --- Entities ---
   final attractor = Entity();
   attractor.addComponents([
     PersistenceComponent('attractor_state'),
@@ -135,19 +158,19 @@ NexusWorld provideAttractorWorld() {
     InputFocusComponent(),
     KeyboardInputComponent(),
     CollisionComponent(
-        tag: 'attractor', radius: 20, collidesWith: {'meteor', 'health_orb'})
+        tag: 'attractor', radius: 20, collidesWith: {'meteor', 'health_orb'}),
+    LifecyclePolicyComponent(isPersistent: true),
   ]);
   world.addEntity(attractor);
 
-  // The particle spawner is no longer needed, as the GpuSystem initializes all particles at once.
-
-  world.createSpawner(
+  final meteorSpawner = world.createSpawner(
     tag: 'meteor_spawner',
     prefab: () => createMeteorPrefab(world),
     frequency: const Frequency.perSecond(0.8),
   );
+  meteorSpawner.add(LifecyclePolicyComponent(isPersistent: true));
 
-  world.createSpawner(
+  final healthOrbSpawner = world.createSpawner(
     tag: 'health_orb_spawner',
     prefab: () => createHealthOrbPrefab(world),
     frequency: Frequency.every(const Duration(seconds: 1)),
@@ -159,14 +182,14 @@ NexusWorld provideAttractorWorld() {
       return !isGameOver;
     },
   );
+  healthOrbSpawner.add(LifecyclePolicyComponent(isPersistent: true));
 
   world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),
     BlackboardComponent({'score': 0, 'is_game_over': false, 'game_time': 0.0}),
-    // Add the render component to the root entity to hold the GPU results
     GpuParticleRenderComponent(Float32List(0)),
-    // Add the uniforms component for the GPU system
     GpuUniformsComponent(),
+    DebugInfoComponent(),
   ]);
 
   return world;

@@ -33,13 +33,23 @@ abstract class GpuSystem<T> extends System {
   /// The current execution mode of the system (GPU or CPU).
   GpuMode get mode => _mode;
 
-  late final List<T> _cpuData;
-  late final GpuBuffer<dynamic> _gpuDataBuffer;
+  // Switched from 'late final' to 'late' to allow re-initialization.
+  late List<T> _cpuData;
+  late GpuBuffer<dynamic> _gpuDataBuffer;
 
   List<T> initializeData();
 
   @protected
   void gpuLogic(T element, GpuKernelContext ctx);
+
+  /// Forces the system to re-run its `initializeData` method, effectively
+  /// resetting the simulation state. This is crucial for CPU fallback mode.
+  void reinitializeData() {
+    if (_mode == GpuMode.cpuFallback) {
+      _cpuData = initializeData();
+    }
+    // In a full GPU implementation, this would also re-upload the data buffer.
+  }
 
   int compute(double deltaTime) {
     if (_mode == GpuMode.gpu) {
@@ -70,8 +80,6 @@ abstract class GpuSystem<T> extends System {
 
     try {
       _gpuDataBuffer = Float32GpuBuffer.fromList(flatData);
-      // Pass the entire buffer to the context. The context itself will handle
-      // extracting the platform-specific pointer.
       _gpu.initialize(_gpuDataBuffer as Float32GpuBuffer);
       _mode = GpuMode.gpu;
       debugPrint(

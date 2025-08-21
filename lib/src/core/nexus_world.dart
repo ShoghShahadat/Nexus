@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/components/lifecycle_policy_component.dart';
 import 'package:nexus/src/core/utils/frequency.dart';
+import 'package:nexus/src/systems/garbage_collector_system.dart';
 
 /// Manages all the entities, systems, and modules in the Nexus world.
 class NexusWorld {
@@ -11,6 +14,7 @@ class NexusWorld {
   late final EventBus eventBus;
 
   late final Entity rootEntity;
+  GarbageCollectorSystem? _gc;
 
   final Set<EntityId> _removedEntityIdsThisFrame = {};
 
@@ -32,11 +36,12 @@ class NexusWorld {
       TagsComponent({'root'}),
       ScreenInfoComponent(
           width: 0, height: 0, orientation: ScreenOrientation.portrait),
+      // The root entity is always persistent.
+      LifecyclePolicyComponent(isPersistent: true),
     ]);
     addEntity(rootEntity);
   }
 
-  /// Initializes the world, running any async setup required by its systems.
   Future<void> init() async {
     for (final system in _systems) {
       await system.init();
@@ -57,6 +62,12 @@ class NexusWorld {
   }
 
   void addEntity(Entity entity) {
+    if (kDebugMode &&
+        !entity.has<LifecyclePolicyComponent>() &&
+        entity.id != rootEntity.id) {
+      debugPrint(
+          '[NexusWorld] WARNING: Entity ID ${entity.id} was added without a LifecyclePolicyComponent. This is highly discouraged.');
+    }
     _entities[entity.id] = entity;
     for (final system in _systems) {
       if (system.matches(entity)) {
@@ -84,6 +95,9 @@ class NexusWorld {
   }
 
   void addSystem(System system) {
+    if (system is GarbageCollectorSystem) {
+      _gc = system;
+    }
     _systems.add(system);
     system.onAddedToWorld(this);
   }
@@ -95,6 +109,9 @@ class NexusWorld {
   }
 
   void removeSystem(System system) {
+    if (system is GarbageCollectorSystem) {
+      _gc = null;
+    }
     if (_systems.remove(system)) {
       system.onRemovedFromWorld();
     }
@@ -106,8 +123,6 @@ class NexusWorld {
     }
   }
 
-  // *** NEW: A helper method to easily create and add a spawner entity. ***
-  // *** جدید: یک متد کمکی برای ساخت و افزودن آسان یک موجودیت سازنده. ***
   Entity createSpawner({
     required Entity Function() prefab,
     Frequency frequency = Frequency.never,
@@ -137,6 +152,9 @@ class NexusWorld {
   }
 
   void update(double dt) {
+    // Run the garbage collector first.
+    _gc?.runGc(dt);
+
     final entitiesList = List<Entity>.from(_entities.values);
     for (final system in _systems) {
       for (final entity in entitiesList) {

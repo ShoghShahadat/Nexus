@@ -33,7 +33,13 @@ class GpuBridgeSystem extends System {
   void update(Entity entity, double dt) {
     if (_gpuSystem == null) return;
 
+    // --- CRITICAL FIX: Pause simulation on Game Over ---
+    // Read the game over state from the blackboard.
+    final blackboard = entity.get<BlackboardComponent>();
+    final isGameOver = blackboard?.get<bool>('is_game_over') ?? false;
+
     // 1. Update Uniforms (CPU -> GPU/CPU-Sim)
+    // Always update uniforms so the simulation knows the attractor's position on restart.
     final attractor = world.entities.values
         .firstWhereOrNull((e) => e.has<AttractorComponent>());
     final screenInfo = entity.get<ScreenInfoComponent>();
@@ -50,12 +56,16 @@ class GpuBridgeSystem extends System {
       ));
     }
 
+    // If the game is over, do not run the simulation or update particle visuals.
+    // This effectively freezes the particle system.
+    if (isGameOver) {
+      return;
+    }
+
     // 2. Run GPU/CPU Simulation for physics.
-    // The GpuSystem base class handles the decision.
     _gpuSystem!.compute(dt);
 
     // 3. Retrieve physics data and apply visual logic on CPU.
-    // This logic remains the same regardless of where the physics was computed.
     final particleObjects = _gpuSystem!.particleObjects;
     final renderData = Float32List(particleObjects.length * 4);
 
@@ -73,7 +83,6 @@ class GpuBridgeSystem extends System {
         renderData[destIndex + 2] = p.initialSize * (1.0 - progress);
 
         final opacity = 1.0 - progress;
-        // Store a positive value (opacity) for normal particles.
         renderData[destIndex + 3] = opacity.clamp(0.0, 1.0);
 
         if (_random.nextDouble() < 0.0005) {
@@ -87,7 +96,6 @@ class GpuBridgeSystem extends System {
 
         final colorValue =
             Colors.redAccent.withOpacity(1.0 - progress).value.toDouble();
-        // Store a negative value (the color) for exploding particles.
         renderData[destIndex + 3] = -colorValue;
 
         if (_explosionStates[i] >= 1.0) {
