@@ -36,6 +36,7 @@ export 'src/events/shape_events.dart';
 export 'src/events/input_events.dart';
 export 'src/events/pointer_events.dart';
 export 'src/events/history_events.dart';
+export 'src/events/theme_events.dart'; // افزوده شد
 
 // --- Components ---
 export 'src/components/animation_component.dart';
@@ -72,6 +73,8 @@ export 'src/components/velocity_component.dart';
 export 'src/components/web_socket_components.dart';
 export 'src/components/widget_component.dart';
 export 'src/components/history_component.dart';
+export 'src/components/theme_component.dart'; // افزوده شد
+export 'src/components/styleable_component.dart'; // افزوده شد
 
 // --- Systems ---
 export 'src/systems/advanced_input_system.dart';
@@ -105,6 +108,7 @@ export 'src/systems/targeting_system.dart';
 export 'src/systems/timer_system.dart';
 export 'src/systems/web_socket_system.dart';
 export 'src/systems/history_system.dart';
+export 'src/systems/theming_system.dart'; // افزوده شد
 
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';
