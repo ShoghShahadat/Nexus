@@ -1,13 +1,13 @@
 import 'package:flutter/services.dart';
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
+import 'package:nexus/src/core/utils/frequency.dart';
 import '../events.dart';
 import '../world/world_provider.dart'; // For the prefab function
 
 /// A system to control the attractor's movement via keyboard.
 class AttractorControlSystem extends System {
   final double moveSpeed = 250.0;
-  // --- FIX: This flag ensures we set the initial position only once ---
   bool _initialPositionSet = false;
 
   @override
@@ -17,21 +17,17 @@ class AttractorControlSystem extends System {
 
   @override
   void update(Entity entity, double dt) {
-    // --- FIX: Get live screen dimensions from the root entity's ScreenInfoComponent ---
     final root = world.entities.values.firstWhereOrNull(
         (e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
     final screenInfo = root?.get<ScreenInfoComponent>();
-    final screenWidth =
-        screenInfo?.width ?? 400.0; // Use live data with a fallback
-    final screenHeight =
-        screenInfo?.height ?? 800.0; // Use live data with a fallback
+    final screenWidth = screenInfo?.width ?? 400.0;
+    final screenHeight = screenInfo?.height ?? 800.0;
 
     final pos = entity.get<PositionComponent>()!;
 
-    // --- FIX: Set initial position dynamically on the first valid frame ---
     if (!_initialPositionSet && screenInfo != null) {
       pos.x = screenWidth / 2;
-      pos.y = screenHeight * 0.8; // Position at 80% down the screen
+      pos.y = screenHeight * 0.8;
       entity.add(pos);
       _initialPositionSet = true;
     }
@@ -64,7 +60,6 @@ class AttractorControlSystem extends System {
     final nextX = pos.x + vel.x * dt;
     final nextY = pos.y + vel.y * dt;
 
-    // Use a small padding for the boundary check against dynamic screen dimensions
     const padding = 10.0;
     if ((nextX < padding && vel.x < 0) ||
         (nextX > screenWidth - padding && vel.x > 0)) {
@@ -152,7 +147,7 @@ class RestartSystem extends System {
     if (meteorSpawner != null && !meteorSpawner.has<SpawnerComponent>()) {
       meteorSpawner.add(SpawnerComponent(
         prefab: () => createMeteorPrefab(world),
-        fireRate: 0.8,
+        frequency: const Frequency.perSecond(0.8),
         wantsToFire: true,
       ));
     }
@@ -176,20 +171,20 @@ class GameProgressionSystem extends System {
     final blackboard = entity.get<BlackboardComponent>()!;
     if (blackboard.get<bool>('is_game_over') ?? false) return;
 
-    // Increment game time
     final gameTime = (blackboard.get<double>('game_time') ?? 0.0) + dt;
     blackboard.set('game_time', gameTime);
     entity.add(blackboard);
 
-    // Increase meteor spawn rate over time
     final meteorSpawner = world.entities.values.firstWhereOrNull(
         (e) => e.get<TagsComponent>()?.hasTag('meteor_spawner') ?? false);
     if (meteorSpawner != null) {
       final spawner = meteorSpawner.get<SpawnerComponent>();
       if (spawner != null) {
         // Starts at 0.8 and increases to a max of 4 per second over 60 seconds
-        final newFireRate = (0.8 + (gameTime / 60.0) * 3.2).clamp(1.0, 25.0);
-        spawner.fireRate = newFireRate;
+        final newEventsPerSecond =
+            (0.8 + (gameTime / 60.0) * 3.2).clamp(0.8, 4.0);
+        // --- FIX: Update the Frequency object instead of the old fireRate ---
+        spawner.frequency = Frequency.perSecond(newEventsPerSecond);
         meteorSpawner.add(spawner);
       }
     }

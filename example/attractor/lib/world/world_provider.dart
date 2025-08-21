@@ -1,7 +1,7 @@
 import 'dart:math';
-
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
+import 'package:nexus/src/core/utils/frequency.dart';
 import '../components/health_orb_component.dart';
 import '../components/meteor_component.dart';
 import '../systems/complex_movement_system.dart';
@@ -22,14 +22,13 @@ Entity createHealthOrbPrefab(NexusWorld world) {
   final screenWidth = screenInfo?.width ?? 400.0;
   final screenHeight = screenInfo?.height ?? 800.0;
 
-  // Spawn at a random position within the screen bounds.
   final x = random.nextDouble() * (screenWidth - 40) + 20;
   final y = random.nextDouble() * (screenHeight - 40) + 20;
 
   orb.add(PositionComponent(x: x, y: y, width: 12, height: 12));
   orb.add(HealthOrbComponent());
   orb.add(TagsComponent({'health_orb'}));
-  orb.add(HealthComponent(maxHealth: 100)); // Health depletes over time
+  orb.add(HealthComponent(maxHealth: 100));
   orb.add(CollisionComponent(
       tag: 'health_orb', radius: 6, collidesWith: {'attractor'}));
 
@@ -118,7 +117,6 @@ NexusWorld provideAttractorWorld() {
   world.addSystem(GameOverSystem());
   world.addSystem(RestartSystem());
   world.addSystem(GameProgressionSystem());
-  // --- NEW: Add the new gameplay systems ---
   world.addSystem(HealthOrbSystem());
   world.addSystem(HealingSystem());
 
@@ -147,17 +145,17 @@ NexusWorld provideAttractorWorld() {
   meteorSpawner.add(PositionComponent(x: 0, y: 0));
   meteorSpawner.add(SpawnerComponent(
     prefab: () => createMeteorPrefab(world),
-    fireRate: 0.8,
+    frequency: const Frequency.perSecond(0.8),
     wantsToFire: true,
   ));
   world.addEntity(meteorSpawner);
 
-  // --- NEW: Add the health orb spawner entity ---
   final healthOrbSpawner = Entity();
   healthOrbSpawner.add(TagsComponent({'health_orb_spawner'}));
   healthOrbSpawner.add(SpawnerComponent(
     prefab: () => createHealthOrbPrefab(world),
-    fireRate: 0.2, // Spawns one orb every 5 seconds
+    // --- FIX: Changed the frequency to spawn one orb every 1 second ---
+    frequency: Frequency.every(const Duration(seconds: 1)),
     wantsToFire: true,
   ));
   world.addEntity(healthOrbSpawner);

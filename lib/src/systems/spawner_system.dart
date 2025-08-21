@@ -1,9 +1,9 @@
 import 'package:nexus/nexus.dart' hide SpawnerComponent;
 import 'package:nexus/src/components/gameplay_components.dart';
+import 'package:nexus/src/core/utils/frequency.dart';
 import 'package:nexus/src/events/gameplay_events.dart';
 
 /// A system that handles the spawning of new entities based on a `SpawnerComponent`.
-/// سیستمی که تولید موجودیت‌های جدید را بر اساس `SpawnerComponent` مدیریت می‌کند.
 class SpawnerSystem extends System {
   @override
   void onAddedToWorld(NexusWorld world) {
@@ -44,8 +44,6 @@ class SpawnerSystem extends System {
     final newEntity = spawner.prefab();
     final spawnerPos = spawnerEntity.get<PositionComponent>()!;
 
-    // If the new entity already has a position, update it. Otherwise, add one.
-    // اگر موجودیت جدید از قبل کامپوننت موقعیت دارد، آن را به‌روز کن. در غیر این صورت، یکی اضافه کن.
     final newEntityPos =
         newEntity.get<PositionComponent>() ?? PositionComponent(x: 0, y: 0);
     newEntityPos.x = spawnerPos.x;
@@ -53,6 +51,12 @@ class SpawnerSystem extends System {
     newEntity.add(newEntityPos);
 
     world.addEntity(newEntity);
-    spawner.cooldown = 1.0 / spawner.fireRate;
+    // --- FIX: Calculate cooldown based on the Frequency object ---
+    if (spawner.frequency.eventsPerSecond > 0) {
+      spawner.cooldown = 1.0 / spawner.frequency.eventsPerSecond;
+    } else {
+      // If frequency is zero, set a very large cooldown to prevent spawning.
+      spawner.cooldown = double.maxFinite;
+    }
   }
 }
