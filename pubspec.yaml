@@ -17,6 +17,7 @@ dependencies:
   meta: ^1.11.0 
   collection: ^1.18.0
   go_router: ^16.2.0
+  analyzer: ^6.4.1
   # --- NEW: Added for persistence example ---
   shared_preferences: ^2.2.3
 

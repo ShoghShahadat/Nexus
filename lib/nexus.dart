@@ -16,6 +16,10 @@ export 'src/core/logic/logic_function.dart';
 export 'src/core/utils/equatable_mixin.dart';
 export 'src/core/storage/storage_adapter.dart';
 
+// --- NEW: GPU Compute API ---
+export 'src/compute/gpu_buffer.dart';
+export 'src/compute/gpu_system.dart';
+
 // --- Services ---
 export 'src/services/network/http_method.dart';
 export 'src/services/network/i_network_service.dart';
@@ -49,7 +53,7 @@ export 'src/components/archetype_component.dart';
 export 'src/components/attractor_component.dart';
 export 'src/components/blackboard_component.dart';
 export 'src/components/bloc_component.dart';
-export 'src/components/category_component.dart'; // افزوده شد
+export 'src/components/category_component.dart';
 export 'src/components/children_component.dart';
 export 'src/components/clickable_component.dart';
 export 'src/components/counter_state_component.dart';
@@ -59,11 +63,11 @@ export 'src/components/effect_component.dart';
 export 'src/components/gameplay_components.dart';
 export 'src/components/input_focus_component.dart';
 export 'src/components/keyboard_input_component.dart';
-export 'src/components/link_component.dart'; // افزوده شد
+export 'src/components/link_component.dart';
 export 'src/components/list_components.dart';
 export 'src/components/lifecycle_component.dart';
 export 'src/components/morphing_component.dart';
-export 'src/components/parent_component.dart'; // افزوده شد
+export 'src/components/parent_component.dart';
 export 'src/components/particle_component.dart';
 export 'src/components/particle_spawner_component.dart';
 export 'src/components/persistence_component.dart';
@@ -117,7 +121,7 @@ export 'src/systems/targeting_system.dart';
 export 'src/systems/particle_spawning_system.dart';
 export 'src/systems/theming_system.dart';
 export 'src/systems/timer_system.dart';
-export 'src/systems/transform_system.dart'; // افزوده شد
+export 'src/systems/transform_system.dart';
 export 'src/systems/web_socket_system.dart';
 
 // --- Flutter Bridge ---
