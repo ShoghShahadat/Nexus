@@ -1,19 +1,16 @@
 import 'dart:math';
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
-import '../components/complex_movement_component.dart';
 import '../components/meteor_component.dart';
-import '../components/meteor_target_component.dart';
 import '../systems/complex_movement_system.dart';
 import '../systems/explosion_system.dart';
 import '../systems/game_systems.dart';
 import '../systems/meteor_burn_system.dart';
-import '../systems/meteor_collision_system.dart';
-import '../systems/meteor_spawner_system.dart';
-import '../systems/meteor_targeting_system.dart';
+// --- FIX: Removed all obsolete system imports ---
+// --- اصلاح: حذف تمام ایمپورت‌های سیستم‌های منسوخ شده ---
 
-/// Creates a prefab for a meteor entity with dynamic size.
-/// یک prefab برای موجودیت شهاب‌سنگ با اندازه پویا ایجاد می‌کند.
+/// Creates a prefab for a meteor entity using ONLY core framework components.
+/// یک prefab برای موجودیت شهاب‌سنگ فقط با استفاده از کامپوننت‌های هسته فریم‌ورک ایجاد می‌کند.
 Entity createMeteorPrefab(NexusWorld world) {
   final meteor = Entity();
   final random = Random();
@@ -23,11 +20,8 @@ Entity createMeteorPrefab(NexusWorld world) {
   final gameTime =
       root?.get<BlackboardComponent>()?.get<double>('game_time') ?? 0.0;
 
-  // --- NEW: Calculate size based on game time ---
-  // --- جدید: محاسبه اندازه بر اساس زمان بازی ---
-  // Size starts at 25 and increases to a max of 50 over 60 seconds
-  // اندازه از ۲۵ شروع شده و در طول ۶۰ ثانیه به حداکثر ۵۰ می‌رسد
   final size = (25 + (gameTime / 60.0) * 25).clamp(25.0, 50.0);
+  final speed = (150 + (gameTime / 60.0) * 250).clamp(150.0, 400.0);
 
   // Note: These screen dimensions are now only for initial placement.
   const screenWidth = 400.0;
@@ -58,10 +52,13 @@ Entity createMeteorPrefab(NexusWorld world) {
       tag: 'meteor', radius: size / 2, collidesWith: {'attractor'}));
   meteor.add(MeteorComponent());
   meteor.add(TagsComponent({'meteor'}));
+  meteor.add(VelocityComponent(y: speed * 0.5)); // Initial gentle push
+  meteor.add(DamageComponent(25));
+
   final attractor = world.entities.values
       .firstWhereOrNull((e) => e.has<AttractorComponent>());
   if (attractor != null) {
-    meteor.add(TargetingComponent(targetId: attractor.id));
+    meteor.add(TargetingComponent(targetId: attractor.id, turnSpeed: 2.0));
   }
   return meteor;
 }
@@ -72,7 +69,9 @@ NexusWorld provideAttractorWorld() {
 
   // Core Systems
   world.addSystem(AnimationSystem());
-  world.addSystem(PersistenceSystem());
+  // *** FIX: Removed unused PersistenceSystem that was causing the crash. ***
+  // *** اصلاح: سیستم PersistenceSystem که استفاده نمی‌شد و باعث کرش می‌شد، حذف گردید. ***
+  // world.addSystem(PersistenceSystem());
   world.addSystem(AdvancedInputSystem());
   world.addSystem(PhysicsSystem());
   world.addSystem(AttractionSystem());
@@ -84,15 +83,16 @@ NexusWorld provideAttractorWorld() {
   world.addSystem(ExplosionSystem());
 
   // Gameplay Systems
-  world.addSystem(MeteorSpawnerSystem());
-  world.addSystem(MeteorTargetingSystem());
+  // --- FIX: Removed the obsolete, empty MeteorSpawnerSystem ---
+  // --- اصلاح: حذف MeteorSpawnerSystem منسوخ و خالی ---
+  world.addSystem(SpawnerSystem()); // The one and only spawner system
+  world.addSystem(TargetingSystem());
+  world.addSystem(CollisionSystem());
+  world.addSystem(DamageSystem());
   world.addSystem(MeteorBurnSystem());
-  world.addSystem(MeteorCollisionSystem());
   world.addSystem(AttractorControlSystem());
   world.addSystem(GameOverSystem());
   world.addSystem(RestartSystem());
-  // --- NEW: Add the progression system ---
-  // --- جدید: افزودن سیستم پیشرفت بازی ---
   world.addSystem(GameProgressionSystem());
 
   // --- Entities ---
@@ -105,6 +105,8 @@ NexusWorld provideAttractorWorld() {
   attractor.add(VelocityComponent());
   attractor.add(InputFocusComponent());
   attractor.add(KeyboardInputComponent());
+  attractor.add(CollisionComponent(
+      tag: 'attractor', radius: 20, collidesWith: {'meteor'}));
   world.addEntity(attractor);
 
   final particleSpawner = Entity();
@@ -114,6 +116,7 @@ NexusWorld provideAttractorWorld() {
 
   final meteorSpawner = Entity();
   meteorSpawner.add(TagsComponent({'meteor_spawner'}));
+  meteorSpawner.add(PositionComponent(x: 0, y: 0));
   meteorSpawner.add(SpawnerComponent(
     prefab: () => createMeteorPrefab(world),
     fireRate: 0.8,
@@ -124,8 +127,6 @@ NexusWorld provideAttractorWorld() {
   final root = Entity();
   root.add(CustomWidgetComponent(widgetType: 'particle_canvas'));
   root.add(TagsComponent({'root'}));
-  // --- NEW: Add game_time to the blackboard ---
-  // --- جدید: افزودن game_time به تخته سیاه ---
   root.add(BlackboardComponent(
       {'score': 0, 'is_game_over': false, 'game_time': 0.0}));
   world.addEntity(root);

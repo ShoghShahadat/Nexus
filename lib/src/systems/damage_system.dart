@@ -31,18 +31,18 @@ class DamageSystem extends System {
 
     final newHealth = health.currentHealth - damage.damage;
 
-    if (newHealth <= 0) {
-      // The entity is destroyed.
-      // موجودیت نابود شد.
-      world.removeEntity(target.id);
-    } else {
-      // Update the health component.
-      // کامپوننت سلامتی را به‌روز می‌کند.
-      target.add(HealthComponent(
-        maxHealth: health.maxHealth,
-        currentHealth: newHealth,
-      ));
-    }
+    // *** FIX: The sole responsibility of this system is to update health. ***
+    // It should NOT remove entities. Other systems (like MeteorBurnSystem or GameOverSystem)
+    // are responsible for reacting to the health change. This separation of concerns
+    // allows the explosion effect in MeteorBurnSystem to trigger correctly.
+    // *** اصلاح: تنها مسئولیت این سیستم به‌روزرسانی جان است. ***
+    // این سیستم نباید موجودیت‌ها را حذف کند. سیستم‌های دیگر (مانند MeteorBurnSystem)
+    // مسئول واکنش نشان دادن به تغییر جان هستند. این تفکیک مسئولیت‌ها اجازه می‌دهد
+    // افکت انفجار به درستی اجرا شود.
+    target.add(HealthComponent(
+      maxHealth: health.maxHealth,
+      currentHealth: newHealth,
+    ));
   }
 
   @override

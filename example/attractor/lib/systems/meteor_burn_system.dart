@@ -4,51 +4,71 @@ import 'package:nexus/nexus.dart';
 import '../components/meteor_component.dart';
 
 /// A system that handles the burning, shrinking, and particle shedding of meteors.
+/// It now uses the standard HealthComponent to manage the meteor's lifespan and destruction.
+/// سیستمی که سوختن، کوچک شدن و پخش ذرات شهاب‌سنگ‌ها را مدیریت می‌کند.
+/// اکنون از HealthComponent استاندارد برای مدیریت طول عمر و نابودی شهاب‌سنگ استفاده می‌کند.
 class MeteorBurnSystem extends System {
   final Random _random = Random();
 
   @override
   bool matches(Entity entity) {
-    return entity.has<MeteorComponent>();
+    // This system now operates on meteors that have health.
+    // این سیستم اکنون روی شهاب‌سنگ‌هایی که جان دارند عمل می‌کند.
+    return entity.has<MeteorComponent>() && entity.has<HealthComponent>();
   }
 
   @override
   void update(Entity entity, double dt) {
-    final meteor = entity.get<MeteorComponent>()!;
+    final health = entity.get<HealthComponent>()!;
     final pos = entity.get<PositionComponent>()!;
 
-    meteor.health -= dt * 0.3;
-
-    if (meteor.health <= 0) {
-      final rootEntity = world.entities.values.firstWhereOrNull(
-          (e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
-
-      // --- FIX: Only award points if the game is not over ---
-      // --- اصلاح: امتیاز فقط در صورتی داده می‌شود که بازی تمام نشده باشد ---
-      if (rootEntity != null) {
-        final blackboard = rootEntity.get<BlackboardComponent>()!;
-        if (!(blackboard.get<bool>('is_game_over') ?? false)) {
-          blackboard.increment('score', 5);
-          rootEntity.add(blackboard);
-        }
-      }
-
-      for (int i = 0; i < 20; i++) {
-        _createDebrisParticle(pos);
-      }
-      world.removeEntity(entity.id);
+    // Check for death first (e.g., from a collision).
+    // ابتدا مرگ را بررسی می‌کنیم (مثلاً در اثر برخورد).
+    if (health.currentHealth <= 0) {
+      _explodeAndDie(entity, pos);
       return;
     }
 
-    pos.width = 25 * meteor.health;
-    pos.height = 25 * meteor.health;
+    // If not dead, burn over time. 5 second lifespan means losing 20% health per second.
+    // اگر نمرده است، به مرور زمان می‌سوزد. عمر ۵ ثانیه‌ای یعنی از دست دادن ۲۰٪ جان در هر ثانیه.
+    final damagePerSecond = health.maxHealth / 5.0;
+    final newHealth = health.currentHealth - (damagePerSecond * dt);
 
-    if (_random.nextDouble() < 0.5) {
-      _createDebrisParticle(pos);
+    if (newHealth <= 0) {
+      _explodeAndDie(entity, pos);
+    } else {
+      // Update health and shrink the meteor visually.
+      // جان را به‌روز کرده و شهاب‌سنگ را از نظر بصری کوچک می‌کنیم.
+      entity.add(HealthComponent(
+          maxHealth: health.maxHealth, currentHealth: newHealth));
+
+      final healthRatio = newHealth / health.maxHealth;
+      pos.width = 25 * healthRatio;
+      pos.height = 25 * healthRatio;
+      entity.add(pos);
+
+      if (_random.nextDouble() < 0.5) {
+        _createDebrisParticle(pos);
+      }
+    }
+  }
+
+  void _explodeAndDie(Entity entity, PositionComponent pos) {
+    final rootEntity = world.entities.values.firstWhereOrNull(
+        (e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
+
+    if (rootEntity != null) {
+      final blackboard = rootEntity.get<BlackboardComponent>()!;
+      if (!(blackboard.get<bool>('is_game_over') ?? false)) {
+        blackboard.increment('score', 5);
+        rootEntity.add(blackboard);
+      }
     }
 
-    entity.add(meteor);
-    entity.add(pos);
+    for (int i = 0; i < 20; i++) {
+      _createDebrisParticle(pos);
+    }
+    world.removeEntity(entity.id);
   }
 
   void _createDebrisParticle(PositionComponent meteorPos) {

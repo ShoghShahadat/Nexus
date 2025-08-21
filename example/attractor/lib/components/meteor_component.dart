@@ -1,22 +1,19 @@
 import 'package:nexus/nexus.dart';
 
-/// A component that marks an entity as a meteor and tracks its burn-up state.
-/// Defined locally in the example to showcase extensibility.
+/// A component that marks an entity as a meteor.
+/// Health is now managed by the standard HealthComponent.
+/// کامپوننتی که یک موجودیت را به عنوان شهاب‌سنگ علامت‌گذاری می‌کند.
+/// "جان" اکنون توسط HealthComponent استاندارد مدیریت می‌شود.
 class MeteorComponent extends Component with SerializableComponent {
-  /// The remaining "health" of the meteor. It burns away over time.
-  double health;
-
-  MeteorComponent({this.health = 1.0}); // Starts with full health
+  MeteorComponent(); // No longer needs health
 
   factory MeteorComponent.fromJson(Map<String, dynamic> json) {
-    return MeteorComponent(
-      health: (json['health'] as num).toDouble(),
-    );
+    return MeteorComponent();
   }
 
   @override
-  Map<String, dynamic> toJson() => {'health': health};
+  Map<String, dynamic> toJson() => {};
 
   @override
-  List<Object?> get props => [health];
+  List<Object?> get props => [];
 }

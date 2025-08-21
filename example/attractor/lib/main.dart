@@ -1,22 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:nexus/nexus.dart';
-import 'package:collection/collection.dart';
-import 'package:get_it/get_it.dart';
 
 import 'components/complex_movement_component.dart';
 import 'components/explosion_component.dart';
 import 'components/meteor_component.dart';
-import 'components/meteor_target_component.dart';
 import 'events.dart';
-// --- FIX: Import the correct, enhanced painter ---
-// --- اصلاح: ایمپورت کردن نقاش صحیح و بهبود یافته ---
 import 'particle_painter.dart';
-
 import 'world/world_provider.dart';
 
 void main() {
   registerCoreComponents();
+  // Register all serializable components used in this example.
+  // تمام کامپوننت‌های سریالایزبل استفاده شده در این مثال را ثبت می‌کند.
   ComponentFactoryRegistry.I
       .register('HealthComponent', (json) => HealthComponent.fromJson(json));
   ComponentFactoryRegistry.I.register('ExplodingParticleComponent',
@@ -26,11 +21,15 @@ void main() {
   ComponentFactoryRegistry.I
       .register('MeteorComponent', (json) => MeteorComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
-      'MeteorTargetComponent', (json) => MeteorTargetComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register(
       'InputFocusComponent', (json) => InputFocusComponent.fromJson(json));
   ComponentFactoryRegistry.I.register('KeyboardInputComponent',
       (json) => KeyboardInputComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'CollisionComponent', (json) => CollisionComponent.fromJson(json));
+  ComponentFactoryRegistry.I
+      .register('DamageComponent', (json) => DamageComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'TargetingComponent', (json) => TargetingComponent.fromJson(json));
 
   runApp(const MyApp());
 }
@@ -43,8 +42,6 @@ class MyApp extends StatelessWidget {
     final renderingSystem = FlutterRenderingSystem(
       builders: {
         'particle_canvas': (context, id, controller, manager, child) {
-          final particleIds = controller.getAllIdsWithTag('particle');
-          final meteorIds = controller.getAllIdsWithTag('meteor');
           final attractorId =
               controller.getAllIdsWithTag('attractor').firstOrNull;
           final rootId = controller.getAllIdsWithTag('root').firstOrNull;
@@ -77,11 +74,9 @@ class MyApp extends StatelessWidget {
                   children: [
                     RepaintBoundary(
                       child: CustomPaint(
-                        // --- FIX: Use the correct painter ---
-                        // --- اصلاح: استفاده از نقاش صحیح ---
                         painter: ParticlePainter(
-                          particleIds: particleIds,
-                          meteorIds: meteorIds,
+                          particleIds: controller.getAllIdsWithTag('particle'),
+                          meteorIds: controller.getAllIdsWithTag('meteor'),
                           attractorId: attractorId,
                           controller: controller,
                         ),

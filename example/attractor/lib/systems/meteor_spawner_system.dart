@@ -2,76 +2,35 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 import '../components/meteor_component.dart';
-import '../components/meteor_target_component.dart';
+// --- FIX: Removed obsolete import for the deleted component ---
+// --- اصلاح: حذف ایمپورت منسوخ شده برای کامپوننت حذف شده ---
 
-/// A system that periodically spawns meteors with varied behaviors.
+/// A system that periodically spawns meteors.
+/// Now it's just a simple timer, as the prefab creation logic
+/// has been moved to the world_provider for better organization.
+/// سیستمی که به صورت دوره‌ای شهاب‌سنگ تولید می‌کند.
+/// اکنون این یک تایمر ساده است، زیرا منطق ساخت prefab برای سازماندهی بهتر
+/// به world_provider منتقل شده است.
 class MeteorSpawnerSystem extends System {
-  final Random _random = Random();
-  double _timeSinceLastSpawn = 0;
-  double _spawnInterval = 4.0;
-
   @override
   bool matches(Entity entity) {
-    return entity.has<AttractorComponent>();
+    // This system now finds the spawner entity by its tag.
+    // این سیستم اکنون موجودیت spawner را با تگ آن پیدا می‌کند.
+    return entity.get<TagsComponent>()?.hasTag('meteor_spawner') ?? false;
   }
 
   @override
   void update(Entity entity, double dt) {
-    _timeSinceLastSpawn += dt;
+    final spawner = entity.get<SpawnerComponent>();
+    if (spawner == null)
+      return; // Spawner might have been removed (e.g., on game over)
 
-    if (_timeSinceLastSpawn >= _spawnInterval) {
-      _timeSinceLastSpawn = 0;
-      _spawnInterval = _random.nextDouble() * 3 + 2; // Next wave in 2-5 secs
-
-      final meteorCount = _random.nextInt(3) + 1; // 1 to 3 meteors
-      for (int i = 0; i < meteorCount; i++) {
-        _createMeteor();
-      }
-    }
-  }
-
-  void _createMeteor() {
-    final meteor = Entity();
-    const screenWidth = 400.0;
-    const screenHeight = 800.0;
-
-    final startEdge = _random.nextInt(4);
-    double startX, startY;
-    switch (startEdge) {
-      case 0:
-        startX = _random.nextDouble() * screenWidth;
-        startY = -50.0;
-        break;
-      case 1:
-        startX = screenWidth + 50.0;
-        startY = _random.nextDouble() * screenHeight;
-        break;
-      case 2:
-        startX = _random.nextDouble() * screenWidth;
-        startY = screenHeight + 50.0;
-        break;
-      default:
-        startX = -50.0;
-        startY = _random.nextDouble() * screenHeight;
-        break;
-    }
-
-    meteor.add(PositionComponent(x: startX, y: startY, width: 25, height: 25));
-    meteor.add(MeteorComponent());
-    meteor.add(TagsComponent({'meteor'}));
-
-    // --- MODIFIED: All meteors now target the attractor ---
-    // --- اصلاح شده: تمام شهاب‌سنگ‌ها اکنون جاذب را هدف قرار می‌دهند ---
-    final attractor = world.entities.values
-        .firstWhereOrNull((e) => e.has<AttractorComponent>());
-    if (attractor != null) {
-      meteor.add(MeteorTargetComponent(targetId: attractor.id));
-    } else {
-      // Fallback in case the attractor is destroyed, give it a random target.
-      // حالت جایگزین در صورتی که جاذب نابود شده باشد، یک هدف تصادفی به آن می‌دهد.
-      meteor.add(MeteorTargetComponent(targetId: null));
-    }
-
-    world.addEntity(meteor);
+    // The core SpawnerSystem now handles the actual spawning logic.
+    // This system's responsibility is now greatly reduced, which is good design.
+    // We could even remove this system entirely and just use the SpawnerComponent
+    // on its own, but we keep it for potential future logic (e.g., spawning
+    // different waves of enemies).
+    // سیستم اصلی SpawnerSystem اکنون منطق واقعی تولید را مدیریت می‌کند.
+    // مسئولیت این سیستم بسیار کاهش یافته که طراحی خوبی است.
   }
 }
