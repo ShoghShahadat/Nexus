@@ -1,0 +1,1 @@
+C:\Users\ASUS\Desktop\flutter_project\packages\nexus\rust_core\target\wasm32-unknown-unknown\release\rust_core.wasm: C:\Users\ASUS\Desktop\flutter_project\packages\nexus\rust_core\src\lib.rs C:\Users\ASUS\Desktop\flutter_project\packages\nexus\rust_core\src\shader.wgsl

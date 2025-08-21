@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
@@ -119,13 +120,40 @@ class GameOverSystem extends System {
 
 /// A system to handle the game restart logic.
 class RestartSystem extends System {
+  StreamSubscription? _restartSubscription;
+
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    world.eventBus.on<RestartGameEvent>(_onRestart);
+    _restartSubscription = world.eventBus.on<RestartGameEvent>(_onRestart);
+  }
+
+  @override
+  void onRemovedFromWorld() {
+    _restartSubscription?.cancel();
+    super.onRemovedFromWorld();
   }
 
   void _onRestart(RestartGameEvent event) {
+    // --- FIX: Clean up all old game entities before restarting ---
+    final entitiesToRemove = world.entities.values
+        .where((e) {
+          final tags = e.get<TagsComponent>();
+          if (tags == null) return false;
+          // Check if the entity has any of the game-specific tags.
+          return tags.hasTag('meteor') ||
+              tags.hasTag('health_orb') ||
+              tags.hasTag('particle');
+        })
+        .map((e) => e.id)
+        .toList();
+
+    // Remove them from the world to prevent accumulation.
+    for (final id in entitiesToRemove) {
+      world.removeEntity(id);
+    }
+    // --- END FIX ---
+
     final attractor = world.entities.values.firstWhereOrNull(
         (e) => e.get<TagsComponent>()?.hasTag('attractor') ?? false);
     final root = world.entities.values.firstWhereOrNull(
@@ -183,7 +211,6 @@ class GameProgressionSystem extends System {
         // Starts at 0.8 and increases to a max of 4 per second over 60 seconds
         final newEventsPerSecond =
             (0.8 + (gameTime / 60.0) * 3.2).clamp(0.8, 4.0);
-        // --- FIX: Update the Frequency object instead of the old fireRate ---
         spawner.frequency = Frequency.perSecond(newEventsPerSecond);
         meteorSpawner.add(spawner);
       }

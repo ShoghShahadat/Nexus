@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart'; // Import for Color
 import 'package:nexus/nexus.dart';
 
 // A simple 2D vector class for our particle data structure.
@@ -134,12 +133,12 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
 
   // This method is required by the base class to structure the data for the GPU.
   @override
-  Float32List flattenComponentData(List<ParticleData> components) {
-    if (components.isEmpty) return Float32List(0);
+  Float32List flattenData(List<ParticleData> data) {
+    if (data.isEmpty) return Float32List(0);
     // Stride is now 7 (px, py, vx, vy, age, maxAge, initialSize)
-    final list = Float32List(components.length * 7);
-    for (int i = 0; i < components.length; i++) {
-      final p = components[i];
+    final list = Float32List(data.length * 7);
+    for (int i = 0; i < data.length; i++) {
+      final p = data[i];
       final baseIndex = i * 7;
       list[baseIndex + 0] = p.position.x;
       list[baseIndex + 1] = p.position.y;

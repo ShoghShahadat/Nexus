@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:nexus/nexus.dart';
 import '../components/health_orb_component.dart';
@@ -6,11 +7,18 @@ import '../components/health_orb_component.dart';
 /// collides with a health orb.
 class HealingSystem extends System {
   final Random _random = Random();
+  StreamSubscription? _collisionSubscription;
 
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    world.eventBus.on<CollisionEvent>(_onCollision);
+    _collisionSubscription = world.eventBus.on<CollisionEvent>(_onCollision);
+  }
+
+  @override
+  void onRemovedFromWorld() {
+    _collisionSubscription?.cancel();
+    super.onRemovedFromWorld();
   }
 
   void _onCollision(CollisionEvent event) {

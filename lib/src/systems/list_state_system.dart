@@ -1,24 +1,32 @@
+import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 
 /// The primary system for managing the state of lists.
-/// سیستم اصلی برای مدیریت وضعیت لیست‌ها.
-///
-/// This system is event-driven and responds to filter, sort, and search events.
-/// It processes the `allItems` list from a `ListComponent` and updates the
-/// `visibleItems` list accordingly. It assumes item data is stored in a
-/// `BlackboardComponent` on each item entity.
-/// این سیستم رویداد-محور است و به رویدادهای فیلتر، مرتب‌سازی و جستجو پاسخ می‌دهد.
-/// لیست `allItems` را پردازش کرده و `visibleItems` را به‌روز می‌کند. فرض بر این است که
-/// داده‌های هر آیتم در یک `BlackboardComponent` ذخیره شده است.
 class ListStateSystem extends System {
+  StreamSubscription? _filterSubscription;
+  StreamSubscription? _sortSubscription;
+  StreamSubscription? _searchSubscription;
+  StreamSubscription? _purgeSubscription;
+
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    world.eventBus.on<UpdateListFilterEvent>(_onUpdateFilter);
-    world.eventBus.on<UpdateListSortEvent>(_onUpdateSort);
-    world.eventBus.on<UpdateListSearchEvent>(_onUpdateSearch);
-    world.eventBus.on<PurgeListItemEvent>(_onPurgeItem);
+    _filterSubscription =
+        world.eventBus.on<UpdateListFilterEvent>(_onUpdateFilter);
+    _sortSubscription = world.eventBus.on<UpdateListSortEvent>(_onUpdateSort);
+    _searchSubscription =
+        world.eventBus.on<UpdateListSearchEvent>(_onUpdateSearch);
+    _purgeSubscription = world.eventBus.on<PurgeListItemEvent>(_onPurgeItem);
+  }
+
+  @override
+  void onRemovedFromWorld() {
+    _filterSubscription?.cancel();
+    _sortSubscription?.cancel();
+    _searchSubscription?.cancel();
+    _purgeSubscription?.cancel();
+    super.onRemovedFromWorld();
   }
 
   // --- Event Handlers ---
@@ -63,8 +71,6 @@ class ListStateSystem extends System {
   }
 
   void _onPurgeItem(PurgeListItemEvent event) {
-    // Find all list managers and remove the purged item from their lists.
-    // تمام مدیران لیست را پیدا کرده و آیتم پاک‌شده را از لیست‌هایشان حذف می‌کند.
     final allManagers =
         world.entities.values.where((e) => e.has<ListComponent>()).toList();
 
@@ -90,7 +96,6 @@ class ListStateSystem extends System {
     final state = manager.get<ListStateComponent>()!;
     var items = List<EntityId>.from(listComp.allItems);
 
-    // 1. Filtering
     if (state.filterCriteria.isNotEmpty) {
       items = items.where((itemId) {
         final itemEntity = world.entities[itemId];
@@ -102,20 +107,16 @@ class ListStateSystem extends System {
       }).toList();
     }
 
-    // 2. Searching
     if (state.searchQuery.isNotEmpty) {
       items = items.where((itemId) {
         final itemEntity = world.entities[itemId];
         final data = itemEntity?.get<BlackboardComponent>();
         if (data == null) return false;
-        // Simple search: checks if any string value contains the query.
-        // جستجوی ساده: بررسی می‌کند آیا هیچ مقدار رشته‌ای شامل عبارت جستجو هست یا خیر.
         return data.toJson()['data'].values.any((value) =>
             value is String && value.toLowerCase().contains(state.searchQuery));
       }).toList();
     }
 
-    // 3. Sorting
     if (state.sortByField != null) {
       items.sort((aId, bId) {
         final aEntity = world.entities[aId];
@@ -132,8 +133,6 @@ class ListStateSystem extends System {
       });
     }
 
-    // Update the manager with the new list of visible items.
-    // مدیر لیست را با لیست جدید آیتم‌های قابل مشاهده به‌روز می‌کند.
     manager.add(ListComponent(
       listId: listComp.listId,
       allItems: listComp.allItems,
