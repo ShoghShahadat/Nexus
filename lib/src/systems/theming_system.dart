@@ -1,11 +1,12 @@
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/components/decoration_components.dart';
 import 'package:nexus/src/events/theme_events.dart';
 import 'package:nexus/src/components/styleable_component.dart';
 import 'package:nexus/src/components/theme_component.dart';
 
-// فرض می‌کنیم یک سرویس برای فراهم کردن داده‌های تم داریم.
-// در یک اپلیکیشن واقعی، این داده‌ها می‌توانند از یک فایل JSON یا یک API خوانده شوند.
+// A mock service for providing theme data.
+// In a real application, this data could be loaded from a JSON file or an API.
 class ThemeProviderService {
   final Map<String, Map<String, dynamic>> _themes = {
     'light': {
@@ -27,17 +28,17 @@ class ThemeProviderService {
   }
 }
 
-/// سیستمی که مسئولیت مدیریت و اعمال تم‌ها در سراسر برنامه را بر عهده دارد.
+/// A system responsible for managing and applying themes across the application.
 ///
-/// این سیستم به رویداد ThemeChangedEvent گوش می‌دهد و بر اساس آن، ظاهر
-/// تمام موجودیت‌های دارای StyleableComponent را به‌روزرسانی می‌کند.
+/// This system listens for `ThemeChangedEvent` and, in response, updates the
+/// appearance of all entities that have a `StyleableComponent`.
 class ThemingSystem extends System {
   late final ThemeProviderService _themeProvider;
 
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    // ثبت و دریافت سرویس فراهم‌کننده تم
+    // Register and retrieve the theme provider service.
     if (!services.isRegistered<ThemeProviderService>()) {
       services.registerSingleton(ThemeProviderService());
     }
@@ -52,13 +53,13 @@ class ThemingSystem extends System {
 
     if (rootEntity == null) return;
 
-    // ۱. به‌روزرسانی ThemeComponent مرکزی
+    // 1. Update the central ThemeComponent.
     final newThemeProperties =
         _themeProvider.getThemeProperties(event.newThemeId);
     rootEntity.add(
         ThemeComponent(id: event.newThemeId, properties: newThemeProperties));
 
-    // ۲. پیدا کردن و به‌روزرسانی تمام موجودیت‌های استایل‌پذیر
+    // 2. Find and update all styleable entities.
     final styleableEntities =
         world.entities.values.where((e) => e.has<StyleableComponent>());
 
@@ -67,24 +68,24 @@ class ThemingSystem extends System {
       final currentDecoration =
           entity.get<DecorationComponent>() ?? DecorationComponent();
 
-      // یک دکوراسیشن جدید بر اساس اتصالات و تم جدید می‌سازیم
-      // در اینجا برای سادگی فقط رنگ پس‌زمینه را در نظر می‌گیریم
+      // Create a new decoration based on the bindings and the new theme.
+      // For simplicity, we're only handling backgroundColor here.
       final boundColorKey = styleable.styleBindings['backgroundColor'];
       if (boundColorKey != null) {
         final newColorValue = newThemeProperties[boundColorKey] as int?;
         if (newColorValue != null) {
           entity.add(DecorationComponent(
             color: SolidColor(newColorValue),
-            boxShadow: currentDecoration.boxShadow, // حفظ سایر ویژگی‌ها
+            boxShadow: currentDecoration.boxShadow, // Preserve other properties
           ));
         }
       }
-      // منطق مشابهی برای سایر ویژگی‌ها مانند shadowColor, borderColor و ... می‌تواند اضافه شود
+      // Similar logic can be added for other properties like shadowColor, borderColor, etc.
     }
   }
 
   @override
-  bool matches(Entity entity) => false; // سیستم کاملاً رویداد-محور است
+  bool matches(Entity entity) => false; // This system is purely event-driven.
 
   @override
   void update(Entity entity, double dt) {}

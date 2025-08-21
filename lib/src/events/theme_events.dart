@@ -1,8 +1,9 @@
-/// رویدادی که برای تغییر تم فعال برنامه ارسال می‌شود.
+/// An event fired to change the active theme of the application.
 ///
-/// ThemingSystem به این رویداد گوش می‌دهد تا ظاهر تمام موجودیت‌های استایل‌پذیر را به‌روز کند.
+/// The `ThemingSystem` listens for this event to update the appearance
+/// of all styleable entities.
 class ThemeChangedEvent {
-  /// شناسه تم جدیدی که باید فعال شود.
+  /// The ID of the new theme to be activated.
   final String newThemeId;
 
   ThemeChangedEvent(this.newThemeId);

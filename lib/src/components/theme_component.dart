@@ -1,20 +1,20 @@
 import 'package:nexus/nexus.dart';
 
-/// یک کامپوننت داده-محور که وضعیت و مقادیر تم فعلی برنامه را نگهداری می‌کند.
+/// A data-driven component that holds the state and values of the current application theme.
 ///
-/// این کامپوننت معمولاً روی یک موجودیت مرکزی (مانند 'root') قرار می‌گیرد
-/// و توسط ThemingSystem برای اعمال استایل‌ها به موجودیت‌های دیگر استفاده می‌شود.
+/// This component is typically placed on a central entity (e.g., 'root')
+/// and is used by the ThemingSystem to apply styles to other entities.
 class ThemeComponent extends Component with SerializableComponent {
-  /// شناسه یکتای تم فعلی (مثلاً 'dark_mode', 'glassmorphism_light').
+  /// The unique identifier for the current theme (e.g., 'dark_mode', 'glassmorphism_light').
   final String id;
 
-  /// نقشه مقادیر استایل برای تم فعلی.
-  /// کلیدها نام ویژگی (مانند 'primaryColor') و مقادیر، داده‌های آن هستند.
+  /// A map of style values for the current theme.
+  /// Keys are property names (like 'primaryColor'), and values are the corresponding data.
   final Map<String, dynamic> properties;
 
   ThemeComponent({required this.id, this.properties = const {}});
 
-  /// یک کامپوننت را از داده‌های JSON بازسازی می‌کند.
+  /// Deserializes a component from JSON data.
   factory ThemeComponent.fromJson(Map<String, dynamic> json) {
     return ThemeComponent(
       id: json['id'] as String,
@@ -22,7 +22,7 @@ class ThemeComponent extends Component with SerializableComponent {
     );
   }
 
-  /// این کامپوننت را به یک نقشه JSON تبدیل می‌کند.
+  /// Serializes this component to a JSON map.
   @override
   Map<String, dynamic> toJson() => {
         'id': id,

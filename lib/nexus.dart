@@ -36,7 +36,7 @@ export 'src/events/shape_events.dart';
 export 'src/events/input_events.dart';
 export 'src/events/pointer_events.dart';
 export 'src/events/history_events.dart';
-export 'src/events/theme_events.dart'; // افزوده شد
+export 'src/events/theme_events.dart';
 
 // --- Components ---
 export 'src/components/animation_component.dart';
@@ -53,6 +53,7 @@ export 'src/components/clickable_component.dart';
 export 'src/components/counter_state_component.dart';
 export 'src/components/custom_widget_component.dart';
 export 'src/components/decoration_components.dart';
+export 'src/components/effect_component.dart'; // افزوده شد
 export 'src/components/gameplay_components.dart';
 export 'src/components/input_focus_component.dart';
 export 'src/components/keyboard_input_component.dart';
@@ -67,14 +68,14 @@ export 'src/components/render_strategy_component.dart';
 export 'src/components/rule_component.dart';
 export 'src/components/shape_path_component.dart';
 export 'src/components/spawner_link_component.dart';
+export 'src/components/styleable_component.dart';
 export 'src/components/tags_component.dart';
+export 'src/components/theme_component.dart';
 export 'src/components/timer_component.dart';
 export 'src/components/velocity_component.dart';
 export 'src/components/web_socket_components.dart';
 export 'src/components/widget_component.dart';
 export 'src/components/history_component.dart';
-export 'src/components/theme_component.dart'; // افزوده شد
-export 'src/components/styleable_component.dart'; // افزوده شد
 
 // --- Systems ---
 export 'src/systems/advanced_input_system.dart';
@@ -87,8 +88,10 @@ export 'src/systems/bloc_system.dart';
 export 'src/systems/collision_system.dart';
 export 'src/systems/damage_system.dart';
 export 'src/systems/decoration_animation_system.dart';
+export 'src/systems/effect_system.dart'; // افزوده شد
 export 'src/systems/flutter_rendering_system.dart';
 export 'src/systems/hardware_input_system.dart';
+export 'src/systems/history_system.dart';
 export 'src/systems/input_system.dart';
 export 'src/systems/list_item_animation_system.dart';
 export 'src/systems/list_item_interaction_system.dart';
@@ -105,10 +108,9 @@ export 'src/systems/rule_system.dart';
 export 'src/systems/shape_selection_system.dart';
 export 'src/systems/spawner_system.dart';
 export 'src/systems/targeting_system.dart';
+export 'src/systems/theming_system.dart';
 export 'src/systems/timer_system.dart';
 export 'src/systems/web_socket_system.dart';
-export 'src/systems/history_system.dart';
-export 'src/systems/theming_system.dart'; // افزوده شد
 
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';
