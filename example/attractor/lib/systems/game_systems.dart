@@ -7,17 +7,8 @@ import '../world/world_provider.dart'; // For the prefab function
 /// A system to control the attractor's movement via keyboard.
 class AttractorControlSystem extends System {
   final double moveSpeed = 250.0;
-  double screenWidth = 400.0;
-  double screenHeight = 800.0;
-
-  @override
-  void onAddedToWorld(NexusWorld world) {
-    super.onAddedToWorld(world);
-    world.eventBus.on<ScreenResizeEvent>((event) {
-      screenWidth = event.width;
-      screenHeight = event.height;
-    });
-  }
+  // --- FIX: This flag ensures we set the initial position only once ---
+  bool _initialPositionSet = false;
 
   @override
   bool matches(Entity entity) {
@@ -26,9 +17,27 @@ class AttractorControlSystem extends System {
 
   @override
   void update(Entity entity, double dt) {
+    // --- FIX: Get live screen dimensions from the root entity's ScreenInfoComponent ---
+    final root = world.entities.values.firstWhereOrNull(
+        (e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
+    final screenInfo = root?.get<ScreenInfoComponent>();
+    final screenWidth =
+        screenInfo?.width ?? 400.0; // Use live data with a fallback
+    final screenHeight =
+        screenInfo?.height ?? 800.0; // Use live data with a fallback
+
+    final pos = entity.get<PositionComponent>()!;
+
+    // --- FIX: Set initial position dynamically on the first valid frame ---
+    if (!_initialPositionSet && screenInfo != null) {
+      pos.x = screenWidth / 2;
+      pos.y = screenHeight * 0.8; // Position at 80% down the screen
+      entity.add(pos);
+      _initialPositionSet = true;
+    }
+
     final keyboard = entity.get<KeyboardInputComponent>();
     final vel = entity.get<VelocityComponent>()!;
-    final pos = entity.get<PositionComponent>()!;
 
     vel.x = 0;
     vel.y = 0;
@@ -55,10 +64,14 @@ class AttractorControlSystem extends System {
     final nextX = pos.x + vel.x * dt;
     final nextY = pos.y + vel.y * dt;
 
-    if ((nextX < 10 && vel.x < 0) || (nextX > screenWidth - 10 && vel.x > 0)) {
+    // Use a small padding for the boundary check against dynamic screen dimensions
+    const padding = 10.0;
+    if ((nextX < padding && vel.x < 0) ||
+        (nextX > screenWidth - padding && vel.x > 0)) {
       vel.x = 0;
     }
-    if ((nextY < 10 && vel.y < 0) || (nextY > screenHeight - 10 && vel.y > 0)) {
+    if ((nextY < padding && vel.y < 0) ||
+        (nextY > screenHeight - padding && vel.y > 0)) {
       vel.y = 0;
     }
 

@@ -31,6 +31,7 @@ class ComponentFactoryRegistry {
 
 /// A helper function to register all default serializable components from the core library.
 void registerCoreComponents() {
+  // --- Existing Core Components ---
   ComponentFactoryRegistry.I.register(
       'PositionComponent', (json) => PositionComponent.fromJson(json));
   ComponentFactoryRegistry.I
@@ -51,8 +52,6 @@ void registerCoreComponents() {
       'AttractorComponent', (json) => AttractorComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
       'VelocityComponent', (json) => VelocityComponent.fromJson(json));
-  // --- FIX: Register the correct, serializable spawner component ---
-  // --- اصلاح: ثبت کامپوننت اسپاونر صحیح و سریالایزبل ---
   ComponentFactoryRegistry.I.register('ParticleSpawnerComponent',
       (json) => ParticleSpawnerComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
@@ -67,4 +66,46 @@ void registerCoreComponents() {
       'BlackboardComponent', (json) => BlackboardComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
       'PersistenceComponent', (json) => PersistenceComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'ApiStatusComponent', (json) => ApiStatusComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'AppLifecycleComponent', (json) => AppLifecycleComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register('WebSocketStateComponent',
+      (json) => WebSocketStateComponent.fromJson(json));
+
+  // --- Gameplay Components ---
+  ComponentFactoryRegistry.I.register(
+      'TargetingComponent', (json) => TargetingComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'CollisionComponent', (json) => CollisionComponent.fromJson(json));
+  ComponentFactoryRegistry.I
+      .register('HealthComponent', (json) => HealthComponent.fromJson(json));
+  ComponentFactoryRegistry.I
+      .register('DamageComponent', (json) => DamageComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'InputFocusComponent', (json) => InputFocusComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register('KeyboardInputComponent',
+      (json) => KeyboardInputComponent.fromJson(json));
+
+  // --- List Components ---
+  ComponentFactoryRegistry.I
+      .register('ListComponent', (json) => ListComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'ListStateComponent', (json) => ListStateComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'AnimateOutComponent', (json) => AnimateOutComponent.fromJson(json));
+
+  // --- FIX: Register all newly added serializable components ---
+  ComponentFactoryRegistry.I
+      .register('ThemeComponent', (json) => ThemeComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'StyleableComponent', (json) => StyleableComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'ScreenInfoComponent', (json) => ScreenInfoComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
+      'CategoryComponent', (json) => CategoryComponent.fromJson(json));
+  ComponentFactoryRegistry.I
+      .register('ParentComponent', (json) => ParentComponent.fromJson(json));
+  ComponentFactoryRegistry.I
+      .register('LinkComponent', (json) => LinkComponent.fromJson(json));
 }

@@ -1,56 +1,60 @@
-import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/input_focus_component.dart';
-import 'package:nexus/src/components/keyboard_input_component.dart';
-import 'package:nexus/src/events/input_events.dart';
 
 /// A system that processes keyboard events and updates the state of the
 /// focused entity.
-/// سیستمی که رویدادهای کیبورد را پردازش کرده و وضعیت موجودیت متمرکز را به‌روز می‌کند.
+///
+/// --- FIX v1.4.3 ---
+/// This system now processes events in sync with the main game loop (`update`)
+/// instead of asynchronously. It queues incoming key events and processes them
+/// once per frame. This ensures a consistent input state for other systems
+/// and prevents stuttering caused by OS-level key repeat delays.
 class AdvancedInputSystem extends System {
+  // A queue to hold key events received from the UI thread since the last frame.
+  final List<NexusKeyEvent> _keyEventsQueue = [];
+
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    world.eventBus.on<NexusKeyEvent>(_onKeyEvent);
-  }
-
-  void _onKeyEvent(NexusKeyEvent event) {
-    // Find the entity that currently has input focus.
-    // موجودیتی که در حال حاضر فوکوس ورودی را دارد، پیدا می‌کند.
-    final focusedEntity = world.entities.values
-        .firstWhereOrNull((e) => e.has<InputFocusComponent>());
-
-    if (focusedEntity == null) return;
-
-    // Get the current keyboard state or create a new one.
-    // وضعیت فعلی کیبورد را دریافت کرده یا یک وضعیت جدید ایجاد می‌کند.
-    final currentKeyboardState =
-        focusedEntity.get<KeyboardInputComponent>() ?? KeyboardInputComponent();
-
-    final newKeysDown = Set<int>.from(currentKeyboardState.keysDown);
-    String? newCharacter;
-
-    if (event.isKeyDown) {
-      newKeysDown.add(event.logicalKeyId);
-      newCharacter = event.character;
-    } else {
-      newKeysDown.remove(event.logicalKeyId);
-      newCharacter = null;
-    }
-
-    // Add the updated component to the entity.
-    // کامپوننت به‌روز شده را به موجودیت اضافه می‌کند.
-    focusedEntity.add(KeyboardInputComponent(
-      keysDown: newKeysDown,
-      lastCharacter: newCharacter,
-    ));
+    // Listen for events and add them to the queue.
+    world.eventBus.on<NexusKeyEvent>((event) {
+      _keyEventsQueue.add(event);
+    });
   }
 
   @override
-  bool matches(Entity entity) => false; // Purely event-driven.
+  bool matches(Entity entity) {
+    // This system runs on the focused entity every frame to process the queue.
+    return entity.has<InputFocusComponent>();
+  }
 
   @override
   void update(Entity entity, double dt) {
-    // Logic is in the event listener.
+    final currentKeyboardState =
+        entity.get<KeyboardInputComponent>() ?? KeyboardInputComponent();
+    final newKeysDown = Set<int>.from(currentKeyboardState.keysDown);
+    String? lastChar;
+
+    // Process all events that have arrived since the last frame.
+    if (_keyEventsQueue.isNotEmpty) {
+      for (final event in _keyEventsQueue) {
+        if (event.isKeyDown) {
+          newKeysDown.add(event.logicalKeyId);
+          lastChar = event.character;
+        } else {
+          newKeysDown.remove(event.logicalKeyId);
+        }
+      }
+      _keyEventsQueue.clear();
+    } else {
+      // If no new events, clear the character from the last frame.
+      lastChar = null;
+    }
+
+    // Always add/update the component to ensure the state is consistent every frame.
+    // This solves the movement stuttering issue.
+    entity.add(KeyboardInputComponent(
+      keysDown: newKeysDown,
+      lastCharacter: lastChar,
+    ));
   }
 }

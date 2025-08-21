@@ -7,6 +7,7 @@ import '../systems/complex_movement_system.dart';
 import '../systems/explosion_system.dart';
 import '../systems/game_systems.dart';
 import '../systems/meteor_burn_system.dart';
+import 'package:nexus/src/systems/particle_spawning_system.dart';
 
 /// Creates a prefab for a meteor entity using ONLY core framework components.
 Entity createMeteorPrefab(NexusWorld world) {
@@ -18,29 +19,29 @@ Entity createMeteorPrefab(NexusWorld world) {
   final gameTime =
       root?.get<BlackboardComponent>()?.get<double>('game_time') ?? 0.0;
 
+  final screenInfo = root?.get<ScreenInfoComponent>();
+  final screenWidth = screenInfo?.width ?? 400.0;
+  final screenHeight = screenInfo?.height ?? 800.0;
+
   final size = (25 + (gameTime / 60.0) * 25).clamp(25.0, 50.0);
-  // --- FIX: Increased meteor speed by 5x ---
   final speed = ((150 + (gameTime / 60.0) * 250).clamp(150.0, 400.0)) * 5;
 
-  // Note: These screen dimensions are now only for initial placement.
-  const screenWidth = 400.0;
-  const screenHeight = 800.0;
   final startEdge = random.nextInt(4);
   double startX, startY;
   switch (startEdge) {
-    case 0:
+    case 0: // Top
       startX = random.nextDouble() * screenWidth;
       startY = -50.0;
       break;
-    case 1:
+    case 1: // Right
       startX = screenWidth + 50.0;
       startY = random.nextDouble() * screenHeight;
       break;
-    case 2:
+    case 2: // Bottom
       startX = random.nextDouble() * screenWidth;
       startY = screenHeight + 50.0;
       break;
-    default:
+    default: // Left
       startX = -50.0;
       startY = random.nextDouble() * screenHeight;
       break;
@@ -51,7 +52,6 @@ Entity createMeteorPrefab(NexusWorld world) {
       tag: 'meteor', radius: size / 2, collidesWith: {'attractor'}));
   meteor.add(MeteorComponent());
   meteor.add(TagsComponent({'meteor'}));
-  // --- FIX: Meteors now have health from the start ---
   meteor.add(HealthComponent(maxHealth: 20));
   meteor.add(VelocityComponent(y: speed * 0.5)); // Initial gentle push
   meteor.add(DamageComponent(25));
@@ -73,6 +73,10 @@ NexusWorld provideAttractorWorld() {
   world.addSystem(AdvancedInputSystem());
   world.addSystem(PhysicsSystem());
   world.addSystem(AttractionSystem());
+  // --- FIX: Add the ResponsivenessSystem to the world ---
+  // This system listens for ScreenResizedEvent and updates the ScreenInfoComponent,
+  // making the correct screen dimensions available to all other systems.
+  world.addSystem(ResponsivenessSystem());
 
   // Particle Systems
   world.addSystem(ParticleSpawningSystem());
@@ -81,7 +85,7 @@ NexusWorld provideAttractorWorld() {
   world.addSystem(ExplosionSystem());
 
   // Gameplay Systems
-  world.addSystem(SpawnerSystem()); // The one and only spawner system
+  world.addSystem(SpawnerSystem());
   world.addSystem(TargetingSystem());
   world.addSystem(CollisionSystem());
   world.addSystem(DamageSystem());
@@ -94,13 +98,11 @@ NexusWorld provideAttractorWorld() {
   // --- Entities ---
   final attractor = Entity();
   attractor.add(PersistenceComponent('attractor_state'));
-  attractor.add(PositionComponent(x: 200, y: 200, width: 20, height: 20));
+  attractor.add(PositionComponent(width: 20, height: 20));
   attractor.add(AttractorComponent(strength: 1.0));
   attractor.add(TagsComponent({'attractor'}));
   attractor.add(HealthComponent(maxHealth: 100));
-  // --- FIX: Added DamageComponent to the attractor ---
-  // This will cause meteors to be destroyed on contact.
-  attractor.add(DamageComponent(1000)); // High damage to ensure destruction
+  attractor.add(DamageComponent(1000));
   attractor.add(VelocityComponent());
   attractor.add(InputFocusComponent());
   attractor.add(KeyboardInputComponent());
@@ -126,6 +128,8 @@ NexusWorld provideAttractorWorld() {
   final root = Entity();
   root.add(CustomWidgetComponent(widgetType: 'particle_canvas'));
   root.add(TagsComponent({'root'}));
+  root.add(ScreenInfoComponent(
+      width: 400, height: 800, orientation: ScreenOrientation.portrait));
   root.add(BlackboardComponent(
       {'score': 0, 'is_game_over': false, 'game_time': 0.0}));
   world.addEntity(root);
