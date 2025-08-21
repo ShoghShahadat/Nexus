@@ -1,15 +1,17 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
 import 'package:nexus/src/core/utils/frequency.dart';
 import '../components/health_orb_component.dart';
 import '../components/meteor_component.dart';
-import '../systems/complex_movement_system.dart';
-import '../systems/explosion_system.dart';
 import '../systems/game_systems.dart';
 import '../systems/health_orb_system.dart';
 import '../systems/healing_system.dart';
 import '../systems/meteor_burn_system.dart';
+import '../systems/attractor_gpu_system.dart';
+import '../systems/gpu_bridge_system.dart';
+import '../components/gpu_particle_render_component.dart';
 
 // --- Prefab for Health Orbs ---
 Entity createHealthOrbPrefab(NexusWorld world) {
@@ -96,20 +98,17 @@ NexusWorld provideAttractorWorld() {
   final world = NexusWorld();
 
   world.addSystems([
-    // Core Systems
+    // --- NEW: GPU Systems ---
+    AttractorGpuSystem(), // The new powerhouse for particle simulation
+    GpuBridgeSystem(), // Manages communication between CPU and GPU
+
+    // --- Core Systems (Still running on CPU) ---
     AnimationSystem(),
     AdvancedInputSystem(),
-    PhysicsSystem(),
-    AttractionSystem(),
+    PhysicsSystem(), // Still needed for meteors and the attractor
     ResponsivenessSystem(),
 
-    // Particle Systems
-    ParticleSpawningSystem(),
-    ParticleLifecycleSystem(),
-    ComplexMovementSystem(),
-    ExplosionSystem(),
-
-    // Gameplay Systems
+    // --- Gameplay Systems (Still running on CPU) ---
     SpawnerSystem(),
     TargetingSystem(),
     CollisionSystem(),
@@ -140,15 +139,8 @@ NexusWorld provideAttractorWorld() {
   ]);
   world.addEntity(attractor);
 
-  final particleSpawner = Entity();
-  particleSpawner.addComponents([
-    SpawnerLinkComponent(targetTag: 'attractor'),
-    ParticleSpawnerComponent(spawnRate: 200)
-  ]);
-  world.addEntity(particleSpawner);
+  // The particle spawner is no longer needed, as the GpuSystem initializes all particles at once.
 
-  // *** REFACTOR: Use the new world.createSpawner helper for cleaner code. ***
-  // *** بازنویسی: استفاده از متد کمکی world.createSpawner برای کد تمیزتر. ***
   world.createSpawner(
     tag: 'meteor_spawner',
     prefab: () => createMeteorPrefab(world),
@@ -159,8 +151,6 @@ NexusWorld provideAttractorWorld() {
     tag: 'health_orb_spawner',
     prefab: () => createHealthOrbPrefab(world),
     frequency: Frequency.every(const Duration(seconds: 1)),
-    // Example of a powerful condition: only spawn if the game is not over.
-    // نمونه‌ای از یک شرط قدرتمند: فقط در صورتی بساز که بازی تمام نشده باشد.
     condition: () {
       final isGameOver = world.rootEntity
               .get<BlackboardComponent>()
@@ -172,7 +162,11 @@ NexusWorld provideAttractorWorld() {
 
   world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),
-    BlackboardComponent({'score': 0, 'is_game_over': false, 'game_time': 0.0})
+    BlackboardComponent({'score': 0, 'is_game_over': false, 'game_time': 0.0}),
+    // Add the render component to the root entity to hold the GPU results
+    GpuParticleRenderComponent(Float32List(0)),
+    // Add the uniforms component for the GPU system
+    GpuUniformsComponent(),
   ]);
 
   return world;

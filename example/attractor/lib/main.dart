@@ -8,9 +8,9 @@ import 'components/meteor_component.dart';
 import 'events.dart';
 import 'particle_painter.dart';
 import 'world/world_provider.dart';
+import 'components/gpu_particle_render_component.dart'; // Import the new component
 
 /// A dedicated function to register all custom components for this example.
-/// This keeps the main function clean and organized.
 void registerAttractorComponents() {
   final customComponents = <String, ComponentFactory>{
     'HealthComponent': (json) => HealthComponent.fromJson(json),
@@ -25,6 +25,9 @@ void registerAttractorComponents() {
     'CollisionComponent': (json) => CollisionComponent.fromJson(json),
     'DamageComponent': (json) => DamageComponent.fromJson(json),
     'TargetingComponent': (json) => TargetingComponent.fromJson(json),
+    // Register the new GPU render component
+    'GpuParticleRenderComponent': (json) =>
+        GpuParticleRenderComponent.fromJson(json),
   };
   ComponentFactoryRegistry.I.registerAll(customComponents);
 }
@@ -38,10 +41,6 @@ void main() {
   runApp(const MyApp());
 }
 
-// *** FINAL FIX: Convert back to StatefulWidget to preserve the Rendering System. ***
-// The FlutterRenderingSystem holds the UI-side cache of component data.
-// It must be created once and preserved across hot reloads, just like the NexusManager.
-// Creating it inside a StatefulWidget's State object achieves this.
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -50,7 +49,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // Create the rendering system once and hold it in the state.
   late final FlutterRenderingSystem renderingSystem;
 
   @override
@@ -69,6 +67,9 @@ class _MyAppState extends State<MyApp> {
 
           final blackboard = controller.get<BlackboardComponent>(rootId);
           final health = controller.get<HealthComponent>(attractorId);
+          // Get the particle data directly from the new component on the root entity
+          final gpuRenderData =
+              controller.get<GpuParticleRenderComponent>(rootId);
 
           final score = blackboard?.get<num>('score') ?? 0;
           final currentHealth = health?.currentHealth ?? 0;
@@ -92,7 +93,8 @@ class _MyAppState extends State<MyApp> {
                     RepaintBoundary(
                       child: CustomPaint(
                         painter: ParticlePainter(
-                          particleIds: controller.getAllIdsWithTag('particle'),
+                          // Pass the raw GPU data to the painter
+                          gpuParticleData: gpuRenderData?.particleData,
                           meteorIds: controller.getAllIdsWithTag('meteor'),
                           attractorId: attractorId,
                           healthOrbIds:
@@ -161,13 +163,13 @@ class _MyAppState extends State<MyApp> {
       home: Scaffold(
         backgroundColor: const Color(0xFF1a1a1a),
         appBar: AppBar(
-          title: const Text('Nexus Attractor: Survival'),
+          title: const Text('Nexus Attractor: GPU Edition'),
           backgroundColor: Colors.grey.shade900,
           foregroundColor: Colors.white,
         ),
         body: NexusWidget(
           worldProvider: provideAttractorWorld,
-          renderingSystem: renderingSystem, // Use the preserved instance.
+          renderingSystem: renderingSystem,
         ),
       ),
     );

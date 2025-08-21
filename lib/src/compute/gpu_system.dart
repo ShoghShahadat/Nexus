@@ -51,7 +51,7 @@ abstract class GpuSystem<T extends Component> extends System {
     if (!_isGpuInitialized) {
       final initialComponents = initializeData();
 
-      final flatData = _flattenComponentData(initialComponents);
+      final flatData = flattenComponentData(initialComponents);
       dataBuffer = Float32GpuBuffer.fromList(flatData);
 
       // In the future, the transpiler would be invoked here.
@@ -71,19 +71,7 @@ abstract class GpuSystem<T extends Component> extends System {
   }
 
   // This is a placeholder for a more sophisticated reflection/serialization system.
-  Float32List _flattenComponentData(List<T> components) {
-    // This assumes T is a known type like ParticleComponent for the PoC.
-    if (components.isEmpty) return Float32List(0);
-    final list = Float32List(components.length * 4);
-    for (int i = 0; i < components.length; i++) {
-      final component = components[i] as dynamic; // Unsafe, for PoC only
-      list[i * 4 + 0] = component.position.x;
-      list[i * 4 + 1] = component.position.y;
-      list[i * 4 + 2] = component.velocity.x;
-      list[i * 4 + 3] = component.velocity.y;
-    }
-    return list;
-  }
+  Float32List flattenComponentData(List<T> components);
 
   @override
   bool matches(Entity entity) => false;
@@ -98,5 +86,8 @@ abstract class GpuSystem<T extends Component> extends System {
 /// A context object providing access to global variables inside `gpuLogic`.
 class GpuKernelContext {
   /// The time elapsed since the last frame, in seconds.
-  final double deltaTime = 0.0; // This would be populated by the transpiler
+  final double deltaTime;
+
+  // FIX: Added a constructor to accept deltaTime.
+  GpuKernelContext({required this.deltaTime});
 }
