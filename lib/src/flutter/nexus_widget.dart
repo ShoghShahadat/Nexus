@@ -23,6 +23,11 @@ class NexusWidget extends StatefulWidget {
 }
 
 class _NexusWidgetState extends State<NexusWidget> {
+  // *** FIX: Use a static manager in debug mode to preserve state across Hot Reloads. ***
+  // Static variables are not re-initialized on hot reload, allowing the NexusWorld
+  // and all its state to survive the process seamlessly.
+  static NexusManager? _staticDebugManager;
+
   late NexusManager _manager;
   late final AppLifecycleListener _lifecycleListener;
   final FocusNode _focusNode = FocusNode();
@@ -74,26 +79,32 @@ class _NexusWidgetState extends State<NexusWidget> {
     _manager.send(nexusEvent);
   }
 
-  // --- FIX: didUpdateWidget is no longer needed for Hot Reload management ---
-  // The Key mechanism handles this reliably.
-  /*
-  @override
-  void didUpdateWidget(NexusWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (kDebugMode) {
-      _resetManager();
-    }
-  }
-  */
-
   void _initializeManager() {
-    if (!kIsWeb && !kDebugMode) {
-      _manager = NexusIsolateManager();
+    // --- MODIFIED: Hot Reload aware initialization ---
+    if (kDebugMode) {
+      // In debug mode, we reuse the static manager if it exists.
+      if (_staticDebugManager == null) {
+        _staticDebugManager = NexusSingleThreadManager();
+        _manager = _staticDebugManager!;
+        widget.renderingSystem.setManager(_manager);
+        _spawnWorld(); // Spawn only when the manager is first created.
+      } else {
+        _manager = _staticDebugManager!;
+        widget.renderingSystem.setManager(_manager);
+        // The world already exists, just re-establish the stream listener.
+        _manager.renderPacketStream
+            .listen(widget.renderingSystem.updateFromPackets);
+      }
     } else {
-      _manager = NexusSingleThreadManager();
+      // Release mode behavior is unchanged (uses isolates on non-web).
+      if (!kIsWeb) {
+        _manager = NexusIsolateManager();
+      } else {
+        _manager = NexusSingleThreadManager();
+      }
+      widget.renderingSystem.setManager(_manager);
+      _spawnWorld();
     }
-    widget.renderingSystem.setManager(_manager);
-    _spawnWorld();
   }
 
   void _spawnWorld() {
@@ -106,18 +117,15 @@ class _NexusWidgetState extends State<NexusWidget> {
         .listen(widget.renderingSystem.updateFromPackets);
   }
 
-  // --- FIX: The complex and error-prone reset logic is completely removed. ---
-  /*
-  void _resetManager() async {
-    // ... (removed)
-  }
-  */
-
   @override
   void dispose() {
     _lifecycleListener.dispose();
     _focusNode.dispose();
-    _manager.dispose();
+    // --- MODIFIED: In debug mode, we DO NOT dispose the static manager. ---
+    // It lives for the entire application run to preserve state.
+    if (!kDebugMode) {
+      _manager.dispose();
+    }
     super.dispose();
   }
 

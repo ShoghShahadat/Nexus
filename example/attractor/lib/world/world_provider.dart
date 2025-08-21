@@ -152,10 +152,13 @@ NexusWorld provideAttractorWorld() {
 
   final healthOrbSpawner = Entity();
   healthOrbSpawner.add(TagsComponent({'health_orb_spawner'}));
+  // *** FIX: Added the missing PositionComponent to the spawner entity. ***
+  // *** اصلاح: کامپوننت PositionComponent که جا افتاده بود به موجودیت spawner اضافه شد. ***
+  healthOrbSpawner.add(PositionComponent(x: 0, y: 0));
   healthOrbSpawner.add(SpawnerComponent(
     prefab: () => createHealthOrbPrefab(world),
-    // --- FIX: Changed the frequency to spawn one orb every 1 second ---
-    frequency: Frequency.every(const Duration(seconds: 1)),
+    frequency: Frequency.every(const Duration(
+        seconds: 10)), // Changed to 10 seconds for better gameplay balance
     wantsToFire: true,
   ));
   world.addEntity(healthOrbSpawner);

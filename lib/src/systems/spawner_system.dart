@@ -22,6 +22,8 @@ class SpawnerSystem extends System {
 
   @override
   bool matches(Entity entity) {
+    // The spawner itself needs a position to be a valid spawn point.
+    // خودِ spawner برای اینکه یک نقطه ساخت معتبر باشد، به موقعیت نیاز دارد.
     return entity.has<SpawnerComponent>() && entity.has<PositionComponent>();
   }
 
@@ -42,20 +44,23 @@ class SpawnerSystem extends System {
 
   void _spawn(Entity spawnerEntity, SpawnerComponent spawner) {
     final newEntity = spawner.prefab();
-    final spawnerPos = spawnerEntity.get<PositionComponent>()!;
 
-    final newEntityPos =
-        newEntity.get<PositionComponent>() ?? PositionComponent(x: 0, y: 0);
-    newEntityPos.x = spawnerPos.x;
-    newEntityPos.y = spawnerPos.y;
-    newEntity.add(newEntityPos);
+    // *** FIX: Only set the position if the prefab doesn't already have one. ***
+    // This allows prefabs like health orbs to define their own random starting positions,
+    // while prefabs like bullets will correctly inherit the spawner's position.
+    // *** اصلاح: موقعیت فقط در صورتی تنظیم می‌شود که prefab از قبل آن را نداشته باشد. ***
+    // این به prefabهایی مانند گوی‌های جان اجازه می‌دهد موقعیت تصادفی خود را تعیین کنند،
+    // در حالی که prefabهایی مانند گلوله‌ها موقعیت spawner را به درستی به ارث می‌برند.
+    if (!newEntity.has<PositionComponent>()) {
+      final spawnerPos = spawnerEntity.get<PositionComponent>()!;
+      newEntity.add(PositionComponent(x: spawnerPos.x, y: spawnerPos.y));
+    }
 
     world.addEntity(newEntity);
-    // --- FIX: Calculate cooldown based on the Frequency object ---
+
     if (spawner.frequency.eventsPerSecond > 0) {
       spawner.cooldown = 1.0 / spawner.frequency.eventsPerSecond;
     } else {
-      // If frequency is zero, set a very large cooldown to prevent spawning.
       spawner.cooldown = double.maxFinite;
     }
   }

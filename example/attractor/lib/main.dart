@@ -36,7 +36,10 @@ void main() {
   runApp(const MyApp());
 }
 
-// --- FIX: Convert back to StatefulWidget to manage the Key for Hot Reload ---
+// *** FINAL FIX: Convert back to StatefulWidget to preserve the Rendering System. ***
+// The FlutterRenderingSystem holds the UI-side cache of component data.
+// It must be created once and preserved across hot reloads, just like the NexusManager.
+// Creating it inside a StatefulWidget's State object achieves this.
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
@@ -45,13 +48,13 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // --- FIX: Use a Key to force NexusWidget to rebuild completely on Hot Reload ---
-  // This is the simplest and most reliable way to handle Hot Reload.
-  Key _nexusKey = UniqueKey();
+  // Create the rendering system once and hold it in the state.
+  late final FlutterRenderingSystem renderingSystem;
 
   @override
-  Widget build(BuildContext context) {
-    final renderingSystem = FlutterRenderingSystem(
+  void initState() {
+    super.initState();
+    renderingSystem = FlutterRenderingSystem(
       builders: {
         'particle_canvas': (context, id, controller, manager, child) {
           final attractorId =
@@ -147,7 +150,10 @@ class _MyAppState extends State<MyApp> {
         },
       },
     );
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
@@ -158,9 +164,8 @@ class _MyAppState extends State<MyApp> {
           foregroundColor: Colors.white,
         ),
         body: NexusWidget(
-          key: _nexusKey, // Pass the key here
           worldProvider: provideAttractorWorld,
-          renderingSystem: renderingSystem,
+          renderingSystem: renderingSystem, // Use the preserved instance.
         ),
       ),
     );
