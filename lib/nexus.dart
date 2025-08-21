@@ -37,7 +37,7 @@ export 'src/events/input_events.dart';
 export 'src/events/pointer_events.dart';
 export 'src/events/history_events.dart';
 export 'src/events/theme_events.dart';
-export 'src/events/responsive_events.dart'; // افزوده شد
+export 'src/events/responsive_events.dart';
 
 // --- Components ---
 export 'src/components/animation_component.dart';
@@ -49,6 +49,7 @@ export 'src/components/archetype_component.dart';
 export 'src/components/attractor_component.dart';
 export 'src/components/blackboard_component.dart';
 export 'src/components/bloc_component.dart';
+export 'src/components/category_component.dart'; // افزوده شد
 export 'src/components/children_component.dart';
 export 'src/components/clickable_component.dart';
 export 'src/components/counter_state_component.dart';
@@ -58,17 +59,19 @@ export 'src/components/effect_component.dart';
 export 'src/components/gameplay_components.dart';
 export 'src/components/input_focus_component.dart';
 export 'src/components/keyboard_input_component.dart';
+export 'src/components/link_component.dart'; // افزوده شد
 export 'src/components/list_components.dart';
 export 'src/components/lifecycle_component.dart';
 export 'src/components/morphing_component.dart';
+export 'src/components/parent_component.dart'; // افزوده شد
 export 'src/components/particle_component.dart';
 export 'src/components/particle_spawner_component.dart';
 export 'src/components/persistence_component.dart';
 export 'src/components/position_component.dart';
 export 'src/components/render_strategy_component.dart';
-export 'src/components/responsive_component.dart'; // افزوده شد
+export 'src/components/responsive_component.dart';
 export 'src/components/rule_component.dart';
-export 'src/components/screen_info_component.dart'; // افزوده شد
+export 'src/components/screen_info_component.dart';
 export 'src/components/shape_path_component.dart';
 export 'src/components/spawner_link_component.dart';
 export 'src/components/styleable_component.dart';
@@ -106,13 +109,14 @@ export 'src/systems/persistence_system.dart';
 export 'src/systems/physics_system.dart';
 export 'src/systems/pointer_system.dart';
 export 'src/systems/pulsing_warning_system.dart';
-export 'src/systems/responsiveness_system.dart'; // افزوده شد
+export 'src/systems/responsiveness_system.dart';
 export 'src/systems/rule_system.dart';
 export 'src/systems/shape_selection_system.dart';
 export 'src/systems/spawner_system.dart';
 export 'src/systems/targeting_system.dart';
 export 'src/systems/theming_system.dart';
 export 'src/systems/timer_system.dart';
+export 'src/systems/transform_system.dart'; // افزوده شد
 export 'src/systems/web_socket_system.dart';
 
 // --- Flutter Bridge ---
