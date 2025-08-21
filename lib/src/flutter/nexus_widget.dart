@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/events/responsive_events.dart';
+import 'package:nexus/src/components/screen_info_component.dart';
 
 class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
@@ -70,8 +72,6 @@ class _NexusWidgetState extends State<NexusWidget> {
     final nexusEvent = NexusKeyEvent(
       logicalKeyId: event.logicalKey.keyId,
       character: event.character,
-      // Use runtimeType check for modern Flutter keyboard events.
-      // از بررسی نوع در زمان اجرا برای رویدادهای کیبورد مدرن فلاتر استفاده می‌کنیم.
       isKeyDown: event is KeyDownEvent || event is KeyRepeatEvent,
     );
     _manager.send(nexusEvent);
@@ -133,27 +133,38 @@ class _NexusWidgetState extends State<NexusWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Use the modern KeyboardListener instead of the deprecated RawKeyboardListener.
-    // از KeyboardListener مدرن به جای RawKeyboardListener منسوخ شده استفاده می‌کنیم.
-    return KeyboardListener(
-      focusNode: _focusNode,
-      onKeyEvent: _handleKeyEvent,
-      child: Listener(
-        onPointerMove: (event) {
-          final pointerEvent = NexusPointerMoveEvent(
-              event.localPosition.dx, event.localPosition.dy);
-          _manager.send(pointerEvent);
-          if (kDebugMode) {
-            _manager.send(SaveDataEvent());
-          }
-        },
-        child: AnimatedBuilder(
-          animation: widget.renderingSystem,
-          builder: (context, child) {
-            return widget.renderingSystem.build(context);
-          },
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Send screen size information to the logic isolate whenever it changes.
+        _manager.send(ScreenResizedEvent(
+          newWidth: constraints.maxWidth,
+          newHeight: constraints.maxHeight,
+          newOrientation: constraints.maxWidth > constraints.maxHeight
+              ? ScreenOrientation.landscape
+              : ScreenOrientation.portrait,
+        ));
+
+        return KeyboardListener(
+          focusNode: _focusNode,
+          onKeyEvent: _handleKeyEvent,
+          child: Listener(
+            onPointerMove: (event) {
+              final pointerEvent = NexusPointerMoveEvent(
+                  event.localPosition.dx, event.localPosition.dy);
+              _manager.send(pointerEvent);
+              if (kDebugMode) {
+                _manager.send(SaveDataEvent());
+              }
+            },
+            child: AnimatedBuilder(
+              animation: widget.renderingSystem,
+              builder: (context, child) {
+                return widget.renderingSystem.build(context);
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
