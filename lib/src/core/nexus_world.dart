@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/core/utils/frequency.dart';
 
 /// Manages all the entities, systems, and modules in the Nexus world.
 class NexusWorld {
@@ -9,8 +10,6 @@ class NexusWorld {
   final GetIt services;
   late final EventBus eventBus;
 
-  /// A convenience getter to access the automatically created root entity.
-  /// یک getter راحت برای دسترسی به موجودیت root که به صورت خودکار ساخته شده است.
   late final Entity rootEntity;
 
   final Set<EntityId> _removedEntityIdsThisFrame = {};
@@ -24,17 +23,13 @@ class NexusWorld {
     if (!services.isRegistered<EventBus>()) {
       services.registerSingleton<EventBus>(this.eventBus);
     }
-    // Automatically create and add the root entity upon world creation.
-    // به صورت خودکار موجودیت root را هنگام ساخت دنیا ایجاد و اضافه می‌کند.
     _createRootEntity();
   }
 
-  /// Creates and adds the default root entity to the world.
   void _createRootEntity() {
     rootEntity = Entity();
     rootEntity.addComponents([
       TagsComponent({'root'}),
-      // Initialize with default values; ResponsivenessSystem will update it.
       ScreenInfoComponent(
           width: 0, height: 0, orientation: ScreenOrientation.portrait),
     ]);
@@ -50,15 +45,12 @@ class NexusWorld {
 
   void loadModule(NexusModule module) {
     _modules.add(module);
-
     for (final provider in module.systemProviders) {
       for (final system in provider.systems) {
         addSystem(system);
       }
     }
-
     module.onLoad(this);
-
     for (final provider in module.entityProviders) {
       provider.createEntities(this);
     }
@@ -112,6 +104,36 @@ class NexusWorld {
     for (final system in systems) {
       removeSystem(system);
     }
+  }
+
+  // *** NEW: A helper method to easily create and add a spawner entity. ***
+  // *** جدید: یک متد کمکی برای ساخت و افزودن آسان یک موجودیت سازنده. ***
+  Entity createSpawner({
+    required Entity Function() prefab,
+    Frequency frequency = Frequency.never,
+    bool wantsToFire = true,
+    bool Function()? condition,
+    PositionComponent? position,
+    String? tag,
+  }) {
+    final spawnerEntity = Entity();
+    final components = <Component>[];
+
+    if (tag != null) {
+      components.add(TagsComponent({tag}));
+    }
+
+    components.add(position ?? PositionComponent(x: 0, y: 0));
+    components.add(SpawnerComponent(
+      prefab: prefab,
+      frequency: frequency,
+      wantsToFire: wantsToFire,
+      condition: condition,
+    ));
+
+    spawnerEntity.addComponents(components);
+    addEntity(spawnerEntity);
+    return spawnerEntity;
   }
 
   void update(double dt) {

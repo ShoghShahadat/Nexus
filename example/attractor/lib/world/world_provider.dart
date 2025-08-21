@@ -16,9 +16,7 @@ Entity createHealthOrbPrefab(NexusWorld world) {
   final orb = Entity();
   final random = Random();
 
-  final root = world.entities.values
-      .firstWhereOrNull((e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
-  final screenInfo = root?.get<ScreenInfoComponent>();
+  final screenInfo = world.rootEntity.get<ScreenInfoComponent>();
   final screenWidth = screenInfo?.width ?? 400.0;
   final screenHeight = screenInfo?.height ?? 800.0;
 
@@ -42,12 +40,11 @@ Entity createMeteorPrefab(NexusWorld world) {
   final meteor = Entity();
   final random = Random();
 
-  final root = world.entities.values
-      .firstWhereOrNull((e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
+  final root = world.rootEntity;
   final gameTime =
-      root?.get<BlackboardComponent>()?.get<double>('game_time') ?? 0.0;
+      root.get<BlackboardComponent>()?.get<double>('game_time') ?? 0.0;
 
-  final screenInfo = root?.get<ScreenInfoComponent>();
+  final screenInfo = root.get<ScreenInfoComponent>();
   final screenWidth = screenInfo?.width ?? 400.0;
   final screenHeight = screenInfo?.height ?? 800.0;
 
@@ -128,8 +125,6 @@ NexusWorld provideAttractorWorld() {
 
   // --- Entities ---
   final attractor = Entity();
-  // *** REFACTOR: Use the new addComponents method for cleaner entity creation. ***
-  // *** بازنویسی: استفاده از متد جدید addComponents برای ساخت تمیزتر موجودیت. ***
   attractor.addComponents([
     PersistenceComponent('attractor_state'),
     PositionComponent(width: 20, height: 20),
@@ -152,39 +147,33 @@ NexusWorld provideAttractorWorld() {
   ]);
   world.addEntity(particleSpawner);
 
-  final meteorSpawner = Entity();
-  meteorSpawner.addComponents([
-    TagsComponent({'meteor_spawner'}),
-    PositionComponent(x: 0, y: 0),
-    SpawnerComponent(
-      prefab: () => createMeteorPrefab(world),
-      frequency: const Frequency.perSecond(0.8),
-      wantsToFire: true,
-    )
-  ]);
-  world.addEntity(meteorSpawner);
+  // *** REFACTOR: Use the new world.createSpawner helper for cleaner code. ***
+  // *** بازنویسی: استفاده از متد کمکی world.createSpawner برای کد تمیزتر. ***
+  world.createSpawner(
+    tag: 'meteor_spawner',
+    prefab: () => createMeteorPrefab(world),
+    frequency: const Frequency.perSecond(0.8),
+  );
 
-  final healthOrbSpawner = Entity();
-  healthOrbSpawner.addComponents([
-    TagsComponent({'health_orb_spawner'}),
-    PositionComponent(x: 0, y: 0),
-    SpawnerComponent(
-      prefab: () => createHealthOrbPrefab(world),
-      frequency: Frequency.every(const Duration(seconds: 10)),
-      wantsToFire: true,
-    )
-  ]);
-  world.addEntity(healthOrbSpawner);
+  world.createSpawner(
+    tag: 'health_orb_spawner',
+    prefab: () => createHealthOrbPrefab(world),
+    frequency: Frequency.every(const Duration(seconds: 1)),
+    // Example of a powerful condition: only spawn if the game is not over.
+    // نمونه‌ای از یک شرط قدرتمند: فقط در صورتی بساز که بازی تمام نشده باشد.
+    condition: () {
+      final isGameOver = world.rootEntity
+              .get<BlackboardComponent>()
+              ?.get<bool>('is_game_over') ??
+          false;
+      return !isGameOver;
+    },
+  );
 
-  final root = Entity();
-  root.addComponents([
+  world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),
-    TagsComponent({'root'}),
-    ScreenInfoComponent(
-        width: 400, height: 800, orientation: ScreenOrientation.portrait),
     BlackboardComponent({'score': 0, 'is_game_over': false, 'game_time': 0.0})
   ]);
-  world.addEntity(root);
 
   return world;
 }

@@ -4,25 +4,30 @@ import 'package:nexus/src/core/utils/frequency.dart';
 // --- Spawning ---
 
 /// A logic-only component for spawning new entities.
-/// This component is NOT serializable because it contains a function.
+/// This component is NOT serializable because it contains functions.
 class SpawnerComponent extends Component {
   /// A factory function that creates a new entity instance (a "prefab").
   final Entity Function() prefab;
 
-  // --- FIX: Changed fireRate from double to the more expressive Frequency class ---
   Frequency frequency;
   double cooldown;
   bool wantsToFire;
+
+  /// An optional condition that must return true for spawning to occur.
+  /// یک شرط اختیاری که برای رخ دادن ساخت، باید true برگرداند.
+  final bool Function()? condition;
 
   SpawnerComponent({
     required this.prefab,
     this.frequency = Frequency.never,
     this.cooldown = 0.0,
     this.wantsToFire = false,
+    this.condition,
   });
 
   @override
-  List<Object?> get props => [prefab, frequency, cooldown, wantsToFire];
+  List<Object?> get props =>
+      [prefab, frequency, cooldown, wantsToFire, condition];
 }
 
 // --- Targeting & Movement ---

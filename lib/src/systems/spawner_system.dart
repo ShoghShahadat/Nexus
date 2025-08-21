@@ -22,8 +22,6 @@ class SpawnerSystem extends System {
 
   @override
   bool matches(Entity entity) {
-    // The spawner itself needs a position to be a valid spawn point.
-    // خودِ spawner برای اینکه یک نقطه ساخت معتبر باشد، به موقعیت نیاز دارد.
     return entity.has<SpawnerComponent>() && entity.has<PositionComponent>();
   }
 
@@ -35,7 +33,11 @@ class SpawnerSystem extends System {
       spawner.cooldown -= dt;
     }
 
-    if (spawner.wantsToFire && spawner.cooldown <= 0) {
+    // *** MODIFIED: Check the optional condition before deciding to fire. ***
+    // *** اصلاح: شرط اختیاری را قبل از تصمیم به ساخت، بررسی می‌کند. ***
+    final bool conditionMet = spawner.condition?.call() ?? true;
+
+    if (spawner.wantsToFire && spawner.cooldown <= 0 && conditionMet) {
       _spawn(entity, spawner);
     }
 
@@ -45,12 +47,6 @@ class SpawnerSystem extends System {
   void _spawn(Entity spawnerEntity, SpawnerComponent spawner) {
     final newEntity = spawner.prefab();
 
-    // *** FIX: Only set the position if the prefab doesn't already have one. ***
-    // This allows prefabs like health orbs to define their own random starting positions,
-    // while prefabs like bullets will correctly inherit the spawner's position.
-    // *** اصلاح: موقعیت فقط در صورتی تنظیم می‌شود که prefab از قبل آن را نداشته باشد. ***
-    // این به prefabهایی مانند گوی‌های جان اجازه می‌دهد موقعیت تصادفی خود را تعیین کنند،
-    // در حالی که prefabهایی مانند گلوله‌ها موقعیت spawner را به درستی به ارث می‌برند.
     if (!newEntity.has<PositionComponent>()) {
       final spawnerPos = spawnerEntity.get<PositionComponent>()!;
       newEntity.add(PositionComponent(x: spawnerPos.x, y: spawnerPos.y));
