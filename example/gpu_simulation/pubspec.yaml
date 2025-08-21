@@ -1,0 +1,30 @@
+name: nexus_example
+description: A demonstration of the Nexus architecture.
+publish_to: 'none' # This is an example, so we prevent accidental publishing.
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  nexus:
+    # When you publish your package, this will be:
+    # nexus: ^1.0.0-dev.1
+    # For local development, we use a path dependency.
+    path: ../../
+  bloc: ^8.1.4
+  get_it: ^7.7.0
+  go_router: ^16.2.0
+  shared_preferences: ^2.2.3
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

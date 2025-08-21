@@ -1,0 +1,22 @@
+[package]
+name = "rust_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"] # Compile to a C-style dynamic library
+
+[dependencies]
+# The core WebGPU implementation
+wgpu = "0.19"
+# For running async code synchronously in the FFI function
+pollster = "0.3"
+# For logging wgpu errors and info
+env_logger = "0.11"
+# For safe type casting
+bytemuck = { version = "1.14", features = ["derive"] }
+# For async channels
+futures-intrusive = "0.5"
+# *** FIX: Added the missing dependency for logging macros ***
+# *** اصلاح: وابستگی فراموش شده برای ماکروهای لاگ اضافه شد ***
+log = "0.4"

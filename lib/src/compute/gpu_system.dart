@@ -1,19 +1,37 @@
+import 'dart:ffi';
+import 'dart:typed_data'; // --- FIX: Added missing import for Float32List ---
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/compute/gpu_buffer.dart';
 import 'package:nexus/src/compute/gpu_context.dart';
+import 'package:meta/meta.dart';
 
 /// Abstract base class for a System that performs computations on the GPU.
 ///
-/// This class handles the initialization and disposal of the [GpuContext]
-/// and provides a simple `compute` method for subclasses to use.
-abstract class GpuSystem extends System {
+/// To use it, extend this class and provide the Component type you want to
+/// operate on. Then, implement the `gpuLogic` method with your Dart code
+/// that will be transpiled to a GPU shader.
+abstract class GpuSystem<T extends Component> extends System {
   final GpuContext _gpu = GpuContext();
+
+  /// The buffer holding the component data on the CPU side.
+  late final GpuBuffer<dynamic>
+      dataBuffer; // Use dynamic for the generic buffer
 
   /// A flag to ensure initialization happens only once.
   bool _isGpuInitialized = false;
 
-  /// Subclasses must implement this method to provide the initial data
-  /// that will be sent to the GPU and reside there.
-  void initializeGpu();
+  /// Subclasses must implement this method to provide the initial list of
+  /// components that will be sent to the GPU and reside there.
+  List<T> initializeData();
+
+  /// The core of the GpuSystem. Write your per-element logic in this method
+  /// using Dart. The framework will transpile this method's body to a
+  /// WGSL compute shader and run it on the GPU.
+  ///
+  /// The parameter [element] is a proxy for one instance of your component
+  /// on the GPU. [ctx] provides access to global shader variables.
+  @protected
+  void gpuLogic(T element, GpuKernelContext ctx);
 
   /// Executes a single frame of computation on the GPU.
   ///
@@ -21,8 +39,7 @@ abstract class GpuSystem extends System {
   /// Returns the duration of the GPU computation in microseconds.
   int compute(double deltaTime) {
     if (!_isGpuInitialized) {
-      // This is a safeguard, initializeGpu() should be called in onAddedToWorld.
-      initializeGpu();
+      throw StateError('GpuSystem was not initialized correctly.');
     }
     return _gpu.runSimulation(deltaTime);
   }
@@ -32,15 +49,54 @@ abstract class GpuSystem extends System {
     super.onAddedToWorld(world);
     // Ensure GPU is initialized when the system is added to the world.
     if (!_isGpuInitialized) {
-      initializeGpu();
+      final initialComponents = initializeData();
+
+      final flatData = _flattenComponentData(initialComponents);
+      dataBuffer = Float32GpuBuffer.fromList(flatData);
+
+      // In the future, the transpiler would be invoked here.
+      // For now, we call the simplified init function.
+      _gpu.initialize(dataBuffer.pointer as Pointer<Float>, dataBuffer.length);
+
+      _isGpuInitialized = true;
     }
   }
 
   @override
   void onRemovedFromWorld() {
-    // Clean up GPU resources when the system is removed.
     _gpu.dispose();
+    dataBuffer.dispose();
     _isGpuInitialized = false;
     super.onRemovedFromWorld();
   }
+
+  // This is a placeholder for a more sophisticated reflection/serialization system.
+  Float32List _flattenComponentData(List<T> components) {
+    // This assumes T is a known type like ParticleComponent for the PoC.
+    if (components.isEmpty) return Float32List(0);
+    final list = Float32List(components.length * 4);
+    for (int i = 0; i < components.length; i++) {
+      final component = components[i] as dynamic; // Unsafe, for PoC only
+      list[i * 4 + 0] = component.position.x;
+      list[i * 4 + 1] = component.position.y;
+      list[i * 4 + 2] = component.velocity.x;
+      list[i * 4 + 3] = component.velocity.y;
+    }
+    return list;
+  }
+
+  @override
+  bool matches(Entity entity) => false;
+
+  @override
+  void update(Entity entity, double dt) {
+    // By default, GpuSystem runs its logic via the `compute` method,
+    // which is typically called once per frame from a central point.
+  }
+}
+
+/// A context object providing access to global variables inside `gpuLogic`.
+class GpuKernelContext {
+  /// The time elapsed since the last frame, in seconds.
+  final double deltaTime = 0.0; // This would be populated by the transpiler
 }

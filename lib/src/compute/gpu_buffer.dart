@@ -1,9 +1,11 @@
 import 'dart:ffi';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 
 /// Abstract base class for a buffer of data that can be sent to the GPU.
-abstract class GpuBuffer {
+/// --- FIX: Made the class generic to support different component types ---
+abstract class GpuBuffer<T> {
   /// A pointer to the underlying memory of the buffer.
   Pointer<NativeType> get pointer;
 
@@ -22,9 +24,9 @@ abstract class GpuBuffer {
 
 /// A concrete implementation of [GpuBuffer] for a list of 32-bit floats.
 /// This class encapsulates the complexity of memory management with FFI.
-class Float32GpuBuffer extends GpuBuffer {
+class Float32GpuBuffer extends GpuBuffer<Float> {
   final Pointer<Float> _pointer;
-  final int _length;
+  final int _length; // Length in floats, not in bytes
 
   @override
   Pointer<Float> get pointer => _pointer;
