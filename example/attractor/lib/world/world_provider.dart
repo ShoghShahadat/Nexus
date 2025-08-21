@@ -2,14 +2,41 @@ import 'dart:math';
 
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
+import '../components/health_orb_component.dart';
 import '../components/meteor_component.dart';
 import '../systems/complex_movement_system.dart';
 import '../systems/explosion_system.dart';
 import '../systems/game_systems.dart';
+import '../systems/health_orb_system.dart';
+import '../systems/healing_system.dart';
 import '../systems/meteor_burn_system.dart';
-import 'package:nexus/src/systems/particle_spawning_system.dart';
 
-/// Creates a prefab for a meteor entity using ONLY core framework components.
+// --- Prefab for Health Orbs ---
+Entity createHealthOrbPrefab(NexusWorld world) {
+  final orb = Entity();
+  final random = Random();
+
+  final root = world.entities.values
+      .firstWhereOrNull((e) => e.get<TagsComponent>()?.hasTag('root') ?? false);
+  final screenInfo = root?.get<ScreenInfoComponent>();
+  final screenWidth = screenInfo?.width ?? 400.0;
+  final screenHeight = screenInfo?.height ?? 800.0;
+
+  // Spawn at a random position within the screen bounds.
+  final x = random.nextDouble() * (screenWidth - 40) + 20;
+  final y = random.nextDouble() * (screenHeight - 40) + 20;
+
+  orb.add(PositionComponent(x: x, y: y, width: 12, height: 12));
+  orb.add(HealthOrbComponent());
+  orb.add(TagsComponent({'health_orb'}));
+  orb.add(HealthComponent(maxHealth: 100)); // Health depletes over time
+  orb.add(CollisionComponent(
+      tag: 'health_orb', radius: 6, collidesWith: {'attractor'}));
+
+  return orb;
+}
+
+/// Creates a prefab for a meteor entity.
 Entity createMeteorPrefab(NexusWorld world) {
   final meteor = Entity();
   final random = Random();
@@ -29,19 +56,19 @@ Entity createMeteorPrefab(NexusWorld world) {
   final startEdge = random.nextInt(4);
   double startX, startY;
   switch (startEdge) {
-    case 0: // Top
+    case 0:
       startX = random.nextDouble() * screenWidth;
       startY = -50.0;
       break;
-    case 1: // Right
+    case 1:
       startX = screenWidth + 50.0;
       startY = random.nextDouble() * screenHeight;
       break;
-    case 2: // Bottom
+    case 2:
       startX = random.nextDouble() * screenWidth;
       startY = screenHeight + 50.0;
       break;
-    default: // Left
+    default:
       startX = -50.0;
       startY = random.nextDouble() * screenHeight;
       break;
@@ -53,7 +80,7 @@ Entity createMeteorPrefab(NexusWorld world) {
   meteor.add(MeteorComponent());
   meteor.add(TagsComponent({'meteor'}));
   meteor.add(HealthComponent(maxHealth: 20));
-  meteor.add(VelocityComponent(y: speed * 0.5)); // Initial gentle push
+  meteor.add(VelocityComponent(y: speed * 0.5));
   meteor.add(DamageComponent(25));
 
   final attractor = world.entities.values
@@ -73,9 +100,6 @@ NexusWorld provideAttractorWorld() {
   world.addSystem(AdvancedInputSystem());
   world.addSystem(PhysicsSystem());
   world.addSystem(AttractionSystem());
-  // --- FIX: Add the ResponsivenessSystem to the world ---
-  // This system listens for ScreenResizedEvent and updates the ScreenInfoComponent,
-  // making the correct screen dimensions available to all other systems.
   world.addSystem(ResponsivenessSystem());
 
   // Particle Systems
@@ -94,6 +118,9 @@ NexusWorld provideAttractorWorld() {
   world.addSystem(GameOverSystem());
   world.addSystem(RestartSystem());
   world.addSystem(GameProgressionSystem());
+  // --- NEW: Add the new gameplay systems ---
+  world.addSystem(HealthOrbSystem());
+  world.addSystem(HealingSystem());
 
   // --- Entities ---
   final attractor = Entity();
@@ -107,7 +134,7 @@ NexusWorld provideAttractorWorld() {
   attractor.add(InputFocusComponent());
   attractor.add(KeyboardInputComponent());
   attractor.add(CollisionComponent(
-      tag: 'attractor', radius: 20, collidesWith: {'meteor'}));
+      tag: 'attractor', radius: 20, collidesWith: {'meteor', 'health_orb'}));
   world.addEntity(attractor);
 
   final particleSpawner = Entity();
@@ -124,6 +151,16 @@ NexusWorld provideAttractorWorld() {
     wantsToFire: true,
   ));
   world.addEntity(meteorSpawner);
+
+  // --- NEW: Add the health orb spawner entity ---
+  final healthOrbSpawner = Entity();
+  healthOrbSpawner.add(TagsComponent({'health_orb_spawner'}));
+  healthOrbSpawner.add(SpawnerComponent(
+    prefab: () => createHealthOrbPrefab(world),
+    fireRate: 0.2, // Spawns one orb every 5 seconds
+    wantsToFire: true,
+  ));
+  world.addEntity(healthOrbSpawner);
 
   final root = Entity();
   root.add(CustomWidgetComponent(widgetType: 'particle_canvas'));

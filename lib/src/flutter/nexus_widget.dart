@@ -2,17 +2,13 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/events/responsive_events.dart';
-import 'package:nexus/src/components/screen_info_component.dart';
 
 class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
   final FlutterRenderingSystem renderingSystem;
   final Future<void> Function()? isolateInitializer;
   final RootIsolateToken? rootIsolateToken;
-  final Widget? child;
 
   const NexusWidget({
     super.key,
@@ -20,7 +16,6 @@ class NexusWidget extends StatefulWidget {
     required this.renderingSystem,
     this.isolateInitializer,
     this.rootIsolateToken,
-    this.child,
   });
 
   @override
@@ -29,16 +24,12 @@ class NexusWidget extends StatefulWidget {
 
 class _NexusWidgetState extends State<NexusWidget> {
   late NexusManager _manager;
-  // --- FIX: The NexusWidget state now owns the NexusWorld instance ---
-  late NexusWorld _world;
   late final AppLifecycleListener _lifecycleListener;
   final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    // --- FIX: Create the world instance here, once, when the widget is created ---
-    _world = widget.worldProvider();
     _initializeManager();
 
     _lifecycleListener = AppLifecycleListener(
@@ -83,6 +74,9 @@ class _NexusWidgetState extends State<NexusWidget> {
     _manager.send(nexusEvent);
   }
 
+  // --- FIX: didUpdateWidget is no longer needed for Hot Reload management ---
+  // The Key mechanism handles this reliably.
+  /*
   @override
   void didUpdateWidget(NexusWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -90,6 +84,7 @@ class _NexusWidgetState extends State<NexusWidget> {
       _resetManager();
     }
   }
+  */
 
   void _initializeManager() {
     if (!kIsWeb && !kDebugMode) {
@@ -103,8 +98,7 @@ class _NexusWidgetState extends State<NexusWidget> {
 
   void _spawnWorld() {
     _manager.spawn(
-      // --- FIX: The provider now returns the instance held by this state ---
-      () => _world,
+      widget.worldProvider,
       isolateInitializer: widget.isolateInitializer,
       rootIsolateToken: widget.rootIsolateToken,
     );
@@ -112,25 +106,12 @@ class _NexusWidgetState extends State<NexusWidget> {
         .listen(widget.renderingSystem.updateFromPackets);
   }
 
+  // --- FIX: The complex and error-prone reset logic is completely removed. ---
+  /*
   void _resetManager() async {
-    print("--- Hot Reload Detected: Beginning stateful reset ---");
-
-    await _manager.dispose(isHotReload: true);
-
-    StorageAdapter? preservedStorage;
-    if (GetIt.I.isRegistered<StorageAdapter>()) {
-      preservedStorage = GetIt.I.get<StorageAdapter>();
-    }
-    GetIt.I.reset(dispose: false);
-    if (preservedStorage != null) {
-      GetIt.I.registerSingleton<StorageAdapter>(preservedStorage);
-    }
-
-    // --- FIX: Recreate the world instance from the original provider ---
-    _world = widget.worldProvider();
-    _initializeManager();
-    print("--- Stateful reset complete ---");
+    // ... (removed)
   }
+  */
 
   @override
   void dispose() {
@@ -144,7 +125,6 @@ class _NexusWidgetState extends State<NexusWidget> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Send screen size information to the logic world via the manager.
         _manager.send(ScreenResizedEvent(
           newWidth: constraints.maxWidth,
           newHeight: constraints.maxHeight,

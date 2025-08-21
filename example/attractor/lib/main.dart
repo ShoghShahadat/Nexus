@@ -3,6 +3,7 @@ import 'package:nexus/nexus.dart';
 
 import 'components/complex_movement_component.dart';
 import 'components/explosion_component.dart';
+import 'components/health_orb_component.dart';
 import 'components/meteor_component.dart';
 import 'events.dart';
 import 'particle_painter.dart';
@@ -20,6 +21,8 @@ void main() {
   ComponentFactoryRegistry.I
       .register('MeteorComponent', (json) => MeteorComponent.fromJson(json));
   ComponentFactoryRegistry.I.register(
+      'HealthOrbComponent', (json) => HealthOrbComponent.fromJson(json));
+  ComponentFactoryRegistry.I.register(
       'InputFocusComponent', (json) => InputFocusComponent.fromJson(json));
   ComponentFactoryRegistry.I.register('KeyboardInputComponent',
       (json) => KeyboardInputComponent.fromJson(json));
@@ -33,13 +36,21 @@ void main() {
   runApp(const MyApp());
 }
 
-// --- FIX: MyApp can now be a StatelessWidget again, as NexusWidget handles the state. ---
-class MyApp extends StatelessWidget {
+// --- FIX: Convert back to StatefulWidget to manage the Key for Hot Reload ---
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  // --- FIX: Use a Key to force NexusWidget to rebuild completely on Hot Reload ---
+  // This is the simplest and most reliable way to handle Hot Reload.
+  Key _nexusKey = UniqueKey();
+
+  @override
   Widget build(BuildContext context) {
-    // The rendering system is created once and passed to the NexusWidget.
     final renderingSystem = FlutterRenderingSystem(
       builders: {
         'particle_canvas': (context, id, controller, manager, child) {
@@ -79,6 +90,8 @@ class MyApp extends StatelessWidget {
                           particleIds: controller.getAllIdsWithTag('particle'),
                           meteorIds: controller.getAllIdsWithTag('meteor'),
                           attractorId: attractorId,
+                          healthOrbIds:
+                              controller.getAllIdsWithTag('health_orb'),
                           controller: controller,
                         ),
                         child: const SizedBox.expand(),
@@ -144,9 +157,8 @@ class MyApp extends StatelessWidget {
           backgroundColor: Colors.grey.shade900,
           foregroundColor: Colors.white,
         ),
-        // NexusWidget now manages the world's lifecycle internally.
-        // We just need to provide the factory function to create the world.
         body: NexusWidget(
+          key: _nexusKey, // Pass the key here
           worldProvider: provideAttractorWorld,
           renderingSystem: renderingSystem,
         ),
