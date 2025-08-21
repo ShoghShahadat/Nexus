@@ -14,9 +14,9 @@ class Vec2 with EquatableMixin {
 }
 
 // 1. Define the data structure for a single particle.
-// FIX: Simplified to only contain data needed for physics simulation.
-// Visual properties like state and explosion progress are now managed by the CPU.
-class ParticleData extends Component {
+// This is now a plain Dart object, not a Component, as it's managed
+// internally by the GpuSystem.
+class ParticleData {
   final Vec2 position;
   final Vec2 velocity;
   double age;
@@ -30,15 +30,6 @@ class ParticleData extends Component {
     required this.maxAge,
     required this.initialSize,
   });
-
-  @override
-  List<Object?> get props => [
-        position,
-        velocity,
-        age,
-        maxAge,
-        initialSize,
-      ];
 }
 
 // A component to hold global data (uniforms) for the GPU simulation.
@@ -63,14 +54,18 @@ class GpuUniformsComponent extends Component {
 }
 
 // 2. Create the GpuSystem by extending the base class.
+// The generic type is the Dart object we want to simulate.
 class AttractorGpuSystem extends GpuSystem<ParticleData> {
   final int particleCount;
   final Random _random = Random();
 
+  // This is now private and managed by the base GpuSystem.
+  // We can access it via a getter if needed.
   late final List<ParticleData> _particleObjects;
 
   AttractorGpuSystem({this.particleCount = 500});
 
+  // This method is called by the base class during initialization.
   @override
   List<ParticleData> initializeData() {
     _particleObjects = List.generate(particleCount, (i) {
@@ -92,7 +87,7 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
   }
 
   // 3. Write the logic for a SINGLE particle in Dart.
-  // FIX: This logic is now purely for physics and lifecycle. No visual state.
+  // This code will be executed on the CPU if the GPU is not available.
   @override
   void gpuLogic(ParticleData p, GpuKernelContext ctx) {
     final uniforms = world.rootEntity.get<GpuUniformsComponent>()!;
@@ -128,6 +123,8 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
     p.velocity.y = sin(angle) * speed;
   }
 
+  // This method is no longer needed here, as the base class handles it.
+  // We keep it for reference or potential custom CPU logic.
   void simulateCpuExecution(double dt) {
     final ctx = GpuKernelContext(deltaTime: dt);
     for (final p in _particleObjects) {
@@ -135,10 +132,11 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
     }
   }
 
+  // This method is required by the base class to structure the data for the GPU.
   @override
   Float32List flattenComponentData(List<ParticleData> components) {
     if (components.isEmpty) return Float32List(0);
-    // FIX: Stride is now 7 (px, py, vx, vy, age, maxAge, initialSize)
+    // Stride is now 7 (px, py, vx, vy, age, maxAge, initialSize)
     final list = Float32List(components.length * 7);
     for (int i = 0; i < components.length; i++) {
       final p = components[i];
@@ -154,5 +152,6 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
     return list;
   }
 
+  // A public getter to allow other systems to access the particle data for rendering.
   List<ParticleData> get particleObjects => _particleObjects;
 }

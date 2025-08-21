@@ -27,28 +27,51 @@ class GpuContext {
   late final GpuSimDart _runGpuSimulation;
 
   Pointer<Void>? _context;
+  bool _isInitialized = false;
 
-  GpuContext._internal() {
-    _lib = DynamicLibrary.open(_libPath);
-    _initGpu = _lib.lookup<NativeFunction<InitGpuC>>('init_gpu').asFunction();
-    _releaseGpu =
-        _lib.lookup<NativeFunction<ReleaseGpuC>>('release_gpu').asFunction();
-    _runGpuSimulation =
-        _lib.lookup<NativeFunction<GpuSimC>>('run_gpu_simulation').asFunction();
+  GpuContext._internal();
+
+  /// Attempts to load the native library and initialize function pointers.
+  /// Throws an exception if the library cannot be found or loaded.
+  void _loadLibrary() {
+    final libPath = _getLibraryPath();
+    if (libPath == null) {
+      throw Exception('GPU native library not found for this platform.');
+    }
+    try {
+      _lib = DynamicLibrary.open(libPath);
+      _initGpu = _lib.lookup<NativeFunction<InitGpuC>>('init_gpu').asFunction();
+      _releaseGpu =
+          _lib.lookup<NativeFunction<ReleaseGpuC>>('release_gpu').asFunction();
+      _runGpuSimulation = _lib
+          .lookup<NativeFunction<GpuSimC>>('run_gpu_simulation')
+          .asFunction();
+    } catch (e) {
+      throw Exception('Failed to load GPU native library or functions: $e');
+    }
   }
 
   /// Initializes the GPU context with the initial data from a buffer.
   /// This must be called once before any computation.
+  /// Throws an exception if initialization fails.
   void initialize(Pointer<Float> initialData, int length) {
-    if (_context == null) {
-      _context = _initGpu(initialData, length);
+    if (_isInitialized) return;
+
+    // Load the library just-in-time.
+    _loadLibrary();
+
+    _context = _initGpu(initialData, length);
+    if (_context == nullptr) {
+      throw Exception(
+          'Failed to initialize GPU context. The native code returned a null pointer. This might happen if a compatible GPU is not available.');
     }
+    _isInitialized = true;
   }
 
   /// Runs a single frame of the GPU simulation.
   /// Returns the duration of the computation in microseconds.
   int runSimulation(double deltaTime) {
-    if (_context == null) {
+    if (!_isInitialized || _context == null) {
       throw StateError(
           'GpuContext is not initialized. Call initialize() first.');
     }
@@ -56,20 +79,27 @@ class GpuContext {
   }
 
   /// Releases the GPU resources.
-  /// This should be called when the application is closing.
   void dispose() {
     if (_context != null) {
       _releaseGpu(_context!);
       _context = null;
     }
+    _isInitialized = false;
   }
 
-  String get _libPath {
-    // This path logic needs to be robust for different platforms.
+  String? _getLibraryPath() {
     if (Platform.isWindows) {
       return path.join(Directory.current.path, 'rust_lib', 'rust_core.dll');
     }
-    // Add paths for other platforms (Android, Linux, macOS) here.
-    throw Exception('Unsupported platform for GpuContext');
+    if (Platform.isLinux || Platform.isAndroid) {
+      return path.join(Directory.current.path, 'rust_lib', 'librust_core.so');
+    }
+    if (Platform.isMacOS || Platform.isIOS) {
+      return path.join(
+          Directory.current.path, 'rust_lib', 'librust_core.dylib');
+    }
+    // Web platform does not use dynamic libraries.
+    // Other platforms are not supported yet.
+    return null;
   }
 }

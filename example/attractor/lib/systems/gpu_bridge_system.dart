@@ -33,7 +33,7 @@ class GpuBridgeSystem extends System {
   void update(Entity entity, double dt) {
     if (_gpuSystem == null) return;
 
-    // 1. Update Uniforms (CPU -> GPU)
+    // 1. Update Uniforms (CPU -> GPU/CPU-Sim)
     final attractor = world.entities.values
         .firstWhereOrNull((e) => e.has<AttractorComponent>());
     final screenInfo = entity.get<ScreenInfoComponent>();
@@ -50,10 +50,12 @@ class GpuBridgeSystem extends System {
       ));
     }
 
-    // 2. Run GPU Simulation for physics.
-    _gpuSystem!.simulateCpuExecution(dt);
+    // 2. Run GPU/CPU Simulation for physics.
+    // The GpuSystem base class handles the decision.
+    _gpuSystem!.compute(dt);
 
     // 3. Retrieve physics data and apply visual logic on CPU.
+    // This logic remains the same regardless of where the physics was computed.
     final particleObjects = _gpuSystem!.particleObjects;
     final renderData = Float32List(particleObjects.length * 4);
 
@@ -85,8 +87,7 @@ class GpuBridgeSystem extends System {
 
         final colorValue =
             Colors.redAccent.withOpacity(1.0 - progress).value.toDouble();
-        // FIX: Store a negative value (the color) for exploding particles.
-        // This provides an unambiguous way to differentiate states in the painter.
+        // Store a negative value (the color) for exploding particles.
         renderData[destIndex + 3] = -colorValue;
 
         if (_explosionStates[i] >= 1.0) {
