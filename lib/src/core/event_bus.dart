@@ -11,6 +11,9 @@ class EventBus {
   /// If true, the stream controller broadcasts its events to multiple listeners.
   bool isBroadcast;
 
+  // --- FIX: Added a flag to prevent events from being added to a closed controller ---
+  bool _isClosed = false;
+
   /// Creates an event bus.
   ///
   /// If [sync] is true, events are passed directly to listeners.
@@ -24,7 +27,6 @@ class EventBus {
   /// Note: Listening for `dynamic` is an advanced use-case, typically for
   /// dispatcher systems like RuleSystem that need to react to any event.
   StreamSubscription<T> on<T>(void Function(T event) onData) {
-    // --- FIX: Removed the check that prevented listening to dynamic events ---
     return _streamController.stream
         .where((event) => event is T)
         .cast<T>()
@@ -35,11 +37,17 @@ class EventBus {
   ///
   /// All listeners for the type of the [event] object will be notified.
   void fire(dynamic event) {
+    // --- FIX: Guard against firing events on a closed bus ---
+    if (_isClosed) {
+      return;
+    }
     _streamController.add(event);
   }
 
   /// Destroys the event bus and releases all resources.
   void destroy() {
+    // --- FIX: Mark the bus as closed before actually closing the stream ---
+    _isClosed = true;
     _streamController.close();
   }
 }

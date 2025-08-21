@@ -11,7 +11,6 @@ import 'world/world_provider.dart';
 void main() {
   registerCoreComponents();
   // Register all serializable components used in this example.
-  // تمام کامپوننت‌های سریالایزبل استفاده شده در این مثال را ثبت می‌کند.
   ComponentFactoryRegistry.I
       .register('HealthComponent', (json) => HealthComponent.fromJson(json));
   ComponentFactoryRegistry.I.register('ExplodingParticleComponent',
@@ -34,11 +33,13 @@ void main() {
   runApp(const MyApp());
 }
 
+// --- FIX: MyApp can now be a StatelessWidget again, as NexusWidget handles the state. ---
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // The rendering system is created once and passed to the NexusWidget.
     final renderingSystem = FlutterRenderingSystem(
       builders: {
         'particle_canvas': (context, id, controller, manager, child) {
@@ -143,20 +144,11 @@ class MyApp extends StatelessWidget {
           backgroundColor: Colors.grey.shade900,
           foregroundColor: Colors.white,
         ),
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            return NexusWidget(
-              worldProvider: () {
-                final world = provideAttractorWorld();
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  world.eventBus.fire(ScreenResizeEvent(
-                      constraints.maxWidth, constraints.maxHeight));
-                });
-                return world;
-              },
-              renderingSystem: renderingSystem,
-            );
-          },
+        // NexusWidget now manages the world's lifecycle internally.
+        // We just need to provide the factory function to create the world.
+        body: NexusWidget(
+          worldProvider: provideAttractorWorld,
+          renderingSystem: renderingSystem,
         ),
       ),
     );

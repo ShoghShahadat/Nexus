@@ -1,4 +1,5 @@
 import 'dart:math';
+
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
 import '../components/meteor_component.dart';
@@ -6,11 +7,8 @@ import '../systems/complex_movement_system.dart';
 import '../systems/explosion_system.dart';
 import '../systems/game_systems.dart';
 import '../systems/meteor_burn_system.dart';
-// --- FIX: Removed all obsolete system imports ---
-// --- اصلاح: حذف تمام ایمپورت‌های سیستم‌های منسوخ شده ---
 
 /// Creates a prefab for a meteor entity using ONLY core framework components.
-/// یک prefab برای موجودیت شهاب‌سنگ فقط با استفاده از کامپوننت‌های هسته فریم‌ورک ایجاد می‌کند.
 Entity createMeteorPrefab(NexusWorld world) {
   final meteor = Entity();
   final random = Random();
@@ -21,7 +19,8 @@ Entity createMeteorPrefab(NexusWorld world) {
       root?.get<BlackboardComponent>()?.get<double>('game_time') ?? 0.0;
 
   final size = (25 + (gameTime / 60.0) * 25).clamp(25.0, 50.0);
-  final speed = (150 + (gameTime / 60.0) * 250).clamp(150.0, 400.0);
+  // --- FIX: Increased meteor speed by 5x ---
+  final speed = ((150 + (gameTime / 60.0) * 250).clamp(150.0, 400.0)) * 5;
 
   // Note: These screen dimensions are now only for initial placement.
   const screenWidth = 400.0;
@@ -52,6 +51,8 @@ Entity createMeteorPrefab(NexusWorld world) {
       tag: 'meteor', radius: size / 2, collidesWith: {'attractor'}));
   meteor.add(MeteorComponent());
   meteor.add(TagsComponent({'meteor'}));
+  // --- FIX: Meteors now have health from the start ---
+  meteor.add(HealthComponent(maxHealth: 20));
   meteor.add(VelocityComponent(y: speed * 0.5)); // Initial gentle push
   meteor.add(DamageComponent(25));
 
@@ -69,9 +70,6 @@ NexusWorld provideAttractorWorld() {
 
   // Core Systems
   world.addSystem(AnimationSystem());
-  // *** FIX: Removed unused PersistenceSystem that was causing the crash. ***
-  // *** اصلاح: سیستم PersistenceSystem که استفاده نمی‌شد و باعث کرش می‌شد، حذف گردید. ***
-  // world.addSystem(PersistenceSystem());
   world.addSystem(AdvancedInputSystem());
   world.addSystem(PhysicsSystem());
   world.addSystem(AttractionSystem());
@@ -83,8 +81,6 @@ NexusWorld provideAttractorWorld() {
   world.addSystem(ExplosionSystem());
 
   // Gameplay Systems
-  // --- FIX: Removed the obsolete, empty MeteorSpawnerSystem ---
-  // --- اصلاح: حذف MeteorSpawnerSystem منسوخ و خالی ---
   world.addSystem(SpawnerSystem()); // The one and only spawner system
   world.addSystem(TargetingSystem());
   world.addSystem(CollisionSystem());
@@ -98,10 +94,13 @@ NexusWorld provideAttractorWorld() {
   // --- Entities ---
   final attractor = Entity();
   attractor.add(PersistenceComponent('attractor_state'));
-  attractor.add(PositionComponent(x: 200, y: 600, width: 20, height: 20));
+  attractor.add(PositionComponent(x: 200, y: 200, width: 20, height: 20));
   attractor.add(AttractorComponent(strength: 1.0));
   attractor.add(TagsComponent({'attractor'}));
   attractor.add(HealthComponent(maxHealth: 100));
+  // --- FIX: Added DamageComponent to the attractor ---
+  // This will cause meteors to be destroyed on contact.
+  attractor.add(DamageComponent(1000)); // High damage to ensure destruction
   attractor.add(VelocityComponent());
   attractor.add(InputFocusComponent());
   attractor.add(KeyboardInputComponent());

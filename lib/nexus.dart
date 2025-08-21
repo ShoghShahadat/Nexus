@@ -114,6 +114,7 @@ export 'src/systems/rule_system.dart';
 export 'src/systems/shape_selection_system.dart';
 export 'src/systems/spawner_system.dart';
 export 'src/systems/targeting_system.dart';
+export 'src/systems/particle_spawning_system.dart';
 export 'src/systems/theming_system.dart';
 export 'src/systems/timer_system.dart';
 export 'src/systems/transform_system.dart'; // افزوده شد

@@ -29,12 +29,16 @@ class NexusWidget extends StatefulWidget {
 
 class _NexusWidgetState extends State<NexusWidget> {
   late NexusManager _manager;
+  // --- FIX: The NexusWidget state now owns the NexusWorld instance ---
+  late NexusWorld _world;
   late final AppLifecycleListener _lifecycleListener;
   final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    // --- FIX: Create the world instance here, once, when the widget is created ---
+    _world = widget.worldProvider();
     _initializeManager();
 
     _lifecycleListener = AppLifecycleListener(
@@ -42,7 +46,9 @@ class _NexusWidgetState extends State<NexusWidget> {
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      FocusScope.of(context).requestFocus(_focusNode);
+      if (mounted) {
+        FocusScope.of(context).requestFocus(_focusNode);
+      }
     });
   }
 
@@ -97,7 +103,8 @@ class _NexusWidgetState extends State<NexusWidget> {
 
   void _spawnWorld() {
     _manager.spawn(
-      widget.worldProvider,
+      // --- FIX: The provider now returns the instance held by this state ---
+      () => _world,
       isolateInitializer: widget.isolateInitializer,
       rootIsolateToken: widget.rootIsolateToken,
     );
@@ -119,6 +126,8 @@ class _NexusWidgetState extends State<NexusWidget> {
       GetIt.I.registerSingleton<StorageAdapter>(preservedStorage);
     }
 
+    // --- FIX: Recreate the world instance from the original provider ---
+    _world = widget.worldProvider();
     _initializeManager();
     print("--- Stateful reset complete ---");
   }
@@ -135,7 +144,7 @@ class _NexusWidgetState extends State<NexusWidget> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Send screen size information to the logic isolate whenever it changes.
+        // Send screen size information to the logic world via the manager.
         _manager.send(ScreenResizedEvent(
           newWidth: constraints.maxWidth,
           newHeight: constraints.maxHeight,

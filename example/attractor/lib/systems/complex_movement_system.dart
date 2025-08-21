@@ -39,7 +39,7 @@ class ComplexMovementSystem extends System {
         break;
       case MovementType.Spiral:
         // Create a gentle spiraling motion by rotating the velocity vector.
-        final rotationSpeed = movement.frequency * 0.5;
+        final rotationSpeed = movement.frequency * 0.75;
         vel.x += -vel.y * rotationSpeed * dt;
         vel.y += vel.x * rotationSpeed * dt;
         break;

@@ -74,7 +74,7 @@ class MeteorBurnSystem extends System {
   void _createDebrisParticle(PositionComponent meteorPos) {
     final debris = Entity();
     final angle = _random.nextDouble() * 2 * pi;
-    final speed = _random.nextDouble() * 40 + 10;
+    final speed = _random.nextDouble() * 70 + 10;
 
     debris.add(PositionComponent(
       x: meteorPos.x + (_random.nextDouble() - 0.5) * meteorPos.width,

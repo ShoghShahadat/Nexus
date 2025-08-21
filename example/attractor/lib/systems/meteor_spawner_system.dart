@@ -1,7 +1,4 @@
-import 'dart:math';
-import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
-import '../components/meteor_component.dart';
 // --- FIX: Removed obsolete import for the deleted component ---
 // --- اصلاح: حذف ایمپورت منسوخ شده برای کامپوننت حذف شده ---
 
