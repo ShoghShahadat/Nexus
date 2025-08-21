@@ -9,29 +9,31 @@ import 'events.dart';
 import 'particle_painter.dart';
 import 'world/world_provider.dart';
 
+/// A dedicated function to register all custom components for this example.
+/// This keeps the main function clean and organized.
+void registerAttractorComponents() {
+  final customComponents = <String, ComponentFactory>{
+    'HealthComponent': (json) => HealthComponent.fromJson(json),
+    'ExplodingParticleComponent': (json) =>
+        ExplodingParticleComponent.fromJson(json),
+    'ComplexMovementComponent': (json) =>
+        ComplexMovementComponent.fromJson(json),
+    'MeteorComponent': (json) => MeteorComponent.fromJson(json),
+    'HealthOrbComponent': (json) => HealthOrbComponent.fromJson(json),
+    'InputFocusComponent': (json) => InputFocusComponent.fromJson(json),
+    'KeyboardInputComponent': (json) => KeyboardInputComponent.fromJson(json),
+    'CollisionComponent': (json) => CollisionComponent.fromJson(json),
+    'DamageComponent': (json) => DamageComponent.fromJson(json),
+    'TargetingComponent': (json) => TargetingComponent.fromJson(json),
+  };
+  ComponentFactoryRegistry.I.registerAll(customComponents);
+}
+
 void main() {
+  // Register core library components
   registerCoreComponents();
-  // Register all serializable components used in this example.
-  ComponentFactoryRegistry.I
-      .register('HealthComponent', (json) => HealthComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register('ExplodingParticleComponent',
-      (json) => ExplodingParticleComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register('ComplexMovementComponent',
-      (json) => ComplexMovementComponent.fromJson(json));
-  ComponentFactoryRegistry.I
-      .register('MeteorComponent', (json) => MeteorComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register(
-      'HealthOrbComponent', (json) => HealthOrbComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register(
-      'InputFocusComponent', (json) => InputFocusComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register('KeyboardInputComponent',
-      (json) => KeyboardInputComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register(
-      'CollisionComponent', (json) => CollisionComponent.fromJson(json));
-  ComponentFactoryRegistry.I
-      .register('DamageComponent', (json) => DamageComponent.fromJson(json));
-  ComponentFactoryRegistry.I.register(
-      'TargetingComponent', (json) => TargetingComponent.fromJson(json));
+  // Register components specific to this example
+  registerAttractorComponents();
 
   runApp(const MyApp());
 }
