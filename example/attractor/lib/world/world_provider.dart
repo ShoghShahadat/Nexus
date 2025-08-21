@@ -25,12 +25,14 @@ Entity createHealthOrbPrefab(NexusWorld world) {
   final x = random.nextDouble() * (screenWidth - 40) + 20;
   final y = random.nextDouble() * (screenHeight - 40) + 20;
 
-  orb.add(PositionComponent(x: x, y: y, width: 12, height: 12));
-  orb.add(HealthOrbComponent());
-  orb.add(TagsComponent({'health_orb'}));
-  orb.add(HealthComponent(maxHealth: 100));
-  orb.add(CollisionComponent(
-      tag: 'health_orb', radius: 6, collidesWith: {'attractor'}));
+  orb.addComponents([
+    PositionComponent(x: x, y: y, width: 12, height: 12),
+    HealthOrbComponent(),
+    TagsComponent({'health_orb'}),
+    HealthComponent(maxHealth: 100),
+    CollisionComponent(
+        tag: 'health_orb', radius: 6, collidesWith: {'attractor'})
+  ]);
 
   return orb;
 }
@@ -72,15 +74,17 @@ Entity createMeteorPrefab(NexusWorld world) {
       startY = random.nextDouble() * screenHeight;
       break;
   }
-  meteor
-      .add(PositionComponent(x: startX, y: startY, width: size, height: size));
-  meteor.add(CollisionComponent(
-      tag: 'meteor', radius: size / 2, collidesWith: {'attractor'}));
-  meteor.add(MeteorComponent());
-  meteor.add(TagsComponent({'meteor'}));
-  meteor.add(HealthComponent(maxHealth: 20));
-  meteor.add(VelocityComponent(y: speed * 0.5));
-  meteor.add(DamageComponent(25));
+
+  meteor.addComponents([
+    PositionComponent(x: startX, y: startY, width: size, height: size),
+    CollisionComponent(
+        tag: 'meteor', radius: size / 2, collidesWith: {'attractor'}),
+    MeteorComponent(),
+    TagsComponent({'meteor'}),
+    HealthComponent(maxHealth: 20),
+    VelocityComponent(y: speed * 0.5),
+    DamageComponent(25)
+  ]);
 
   final attractor = world.entities.values
       .firstWhereOrNull((e) => e.has<AttractorComponent>());
@@ -94,82 +98,92 @@ Entity createMeteorPrefab(NexusWorld world) {
 NexusWorld provideAttractorWorld() {
   final world = NexusWorld();
 
-  // Core Systems
-  world.addSystem(AnimationSystem());
-  world.addSystem(AdvancedInputSystem());
-  world.addSystem(PhysicsSystem());
-  world.addSystem(AttractionSystem());
-  world.addSystem(ResponsivenessSystem());
+  world.addSystems([
+    // Core Systems
+    AnimationSystem(),
+    AdvancedInputSystem(),
+    PhysicsSystem(),
+    AttractionSystem(),
+    ResponsivenessSystem(),
 
-  // Particle Systems
-  world.addSystem(ParticleSpawningSystem());
-  world.addSystem(ParticleLifecycleSystem());
-  world.addSystem(ComplexMovementSystem());
-  world.addSystem(ExplosionSystem());
+    // Particle Systems
+    ParticleSpawningSystem(),
+    ParticleLifecycleSystem(),
+    ComplexMovementSystem(),
+    ExplosionSystem(),
 
-  // Gameplay Systems
-  world.addSystem(SpawnerSystem());
-  world.addSystem(TargetingSystem());
-  world.addSystem(CollisionSystem());
-  world.addSystem(DamageSystem());
-  world.addSystem(MeteorBurnSystem());
-  world.addSystem(AttractorControlSystem());
-  world.addSystem(GameOverSystem());
-  world.addSystem(RestartSystem());
-  world.addSystem(GameProgressionSystem());
-  world.addSystem(HealthOrbSystem());
-  world.addSystem(HealingSystem());
+    // Gameplay Systems
+    SpawnerSystem(),
+    TargetingSystem(),
+    CollisionSystem(),
+    DamageSystem(),
+    MeteorBurnSystem(),
+    AttractorControlSystem(),
+    GameOverSystem(),
+    RestartSystem(),
+    GameProgressionSystem(),
+    HealthOrbSystem(),
+    HealingSystem(),
+  ]);
 
   // --- Entities ---
   final attractor = Entity();
-  attractor.add(PersistenceComponent('attractor_state'));
-  attractor.add(PositionComponent(width: 20, height: 20));
-  attractor.add(AttractorComponent(strength: 1.0));
-  attractor.add(TagsComponent({'attractor'}));
-  attractor.add(HealthComponent(maxHealth: 100));
-  attractor.add(DamageComponent(1000));
-  attractor.add(VelocityComponent());
-  attractor.add(InputFocusComponent());
-  attractor.add(KeyboardInputComponent());
-  attractor.add(CollisionComponent(
-      tag: 'attractor', radius: 20, collidesWith: {'meteor', 'health_orb'}));
+  // *** REFACTOR: Use the new addComponents method for cleaner entity creation. ***
+  // *** بازنویسی: استفاده از متد جدید addComponents برای ساخت تمیزتر موجودیت. ***
+  attractor.addComponents([
+    PersistenceComponent('attractor_state'),
+    PositionComponent(width: 20, height: 20),
+    AttractorComponent(strength: 1.0),
+    TagsComponent({'attractor'}),
+    HealthComponent(maxHealth: 100),
+    DamageComponent(1000),
+    VelocityComponent(),
+    InputFocusComponent(),
+    KeyboardInputComponent(),
+    CollisionComponent(
+        tag: 'attractor', radius: 20, collidesWith: {'meteor', 'health_orb'})
+  ]);
   world.addEntity(attractor);
 
   final particleSpawner = Entity();
-  particleSpawner.add(SpawnerLinkComponent(targetTag: 'attractor'));
-  particleSpawner.add(ParticleSpawnerComponent(spawnRate: 200));
+  particleSpawner.addComponents([
+    SpawnerLinkComponent(targetTag: 'attractor'),
+    ParticleSpawnerComponent(spawnRate: 200)
+  ]);
   world.addEntity(particleSpawner);
 
   final meteorSpawner = Entity();
-  meteorSpawner.add(TagsComponent({'meteor_spawner'}));
-  meteorSpawner.add(PositionComponent(x: 0, y: 0));
-  meteorSpawner.add(SpawnerComponent(
-    prefab: () => createMeteorPrefab(world),
-    frequency: const Frequency.perSecond(0.8),
-    wantsToFire: true,
-  ));
+  meteorSpawner.addComponents([
+    TagsComponent({'meteor_spawner'}),
+    PositionComponent(x: 0, y: 0),
+    SpawnerComponent(
+      prefab: () => createMeteorPrefab(world),
+      frequency: const Frequency.perSecond(0.8),
+      wantsToFire: true,
+    )
+  ]);
   world.addEntity(meteorSpawner);
 
   final healthOrbSpawner = Entity();
-  healthOrbSpawner.add(TagsComponent({'health_orb_spawner'}));
-  // *** FIX: Added the missing PositionComponent to the spawner entity. ***
-  // *** اصلاح: کامپوننت PositionComponent که جا افتاده بود به موجودیت spawner اضافه شد. ***
-  healthOrbSpawner.add(PositionComponent(x: 0, y: 0));
-  healthOrbSpawner.add(SpawnerComponent(
-    prefab: () => createHealthOrbPrefab(world),
-    frequency: Frequency.every(const Duration(
-        seconds: 10)), // Changed to 10 seconds for better gameplay balance
-    wantsToFire: true,
-  ));
+  healthOrbSpawner.addComponents([
+    TagsComponent({'health_orb_spawner'}),
+    PositionComponent(x: 0, y: 0),
+    SpawnerComponent(
+      prefab: () => createHealthOrbPrefab(world),
+      frequency: Frequency.every(const Duration(seconds: 10)),
+      wantsToFire: true,
+    )
+  ]);
   world.addEntity(healthOrbSpawner);
 
   final root = Entity();
-  root.add(CustomWidgetComponent(widgetType: 'particle_canvas'));
-  root.add(TagsComponent({'root'}));
-  root.add(ScreenInfoComponent(
-      width: 400, height: 800, orientation: ScreenOrientation.portrait));
-  root.add(BlackboardComponent(
-      {'score': 0, 'is_game_over': false, 'game_time': 0.0}));
+  root.addComponents([
+    CustomWidgetComponent(widgetType: 'particle_canvas'),
+    TagsComponent({'root'}),
+    ScreenInfoComponent(
+        width: 400, height: 800, orientation: ScreenOrientation.portrait),
+    BlackboardComponent({'score': 0, 'is_game_over': false, 'game_time': 0.0})
+  ]);
   world.addEntity(root);
 
   return world;

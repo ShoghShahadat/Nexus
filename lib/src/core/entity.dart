@@ -41,6 +41,16 @@ class Entity extends ChangeNotifier {
     notifyListeners();
   }
 
+  // *** NEW: Added a convenience method to add multiple components at once. ***
+  // *** جدید: یک متد کمکی برای اضافه کردن چندین کامپوننت به صورت یکجا اضافه شد. ***
+  void addComponents(List<Component> components) {
+    for (final component in components) {
+      // Use the generic add method to ensure type safety and correct registration.
+      // از متد add ژنریک استفاده می‌کنیم تا از صحت نوع و ثبت صحیح اطمینان حاصل شود.
+      add(component);
+    }
+  }
+
   /// Removes a component of a specific type using generics and notifies listeners.
   T? remove<T extends Component>() {
     final removed = _components.remove(T) as T?;
@@ -50,7 +60,6 @@ class Entity extends ChangeNotifier {
     return removed;
   }
 
-  // --- NEW: Method to remove a component by its Type object ---
   /// Removes a component of a specific type using a Type object and notifies listeners.
   Component? removeByType(Type componentType) {
     final removed = _components.remove(componentType);
@@ -59,7 +68,6 @@ class Entity extends ChangeNotifier {
     }
     return removed;
   }
-  // --- END NEW ---
 
   /// Retrieves a component of a specific type from the entity using generics.
   T? get<T extends Component>() {

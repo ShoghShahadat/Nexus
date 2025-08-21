@@ -9,6 +9,10 @@ class NexusWorld {
   final GetIt services;
   late final EventBus eventBus;
 
+  /// A convenience getter to access the automatically created root entity.
+  /// یک getter راحت برای دسترسی به موجودیت root که به صورت خودکار ساخته شده است.
+  late final Entity rootEntity;
+
   final Set<EntityId> _removedEntityIdsThisFrame = {};
 
   Map<EntityId, Entity> get entities => Map.unmodifiable(_entities);
@@ -17,10 +21,24 @@ class NexusWorld {
   NexusWorld({GetIt? serviceLocator, EventBus? eventBus})
       : services = serviceLocator ?? GetIt.instance {
     this.eventBus = eventBus ?? EventBus();
-    // --- FIX: Prevent crash on Hot Reload by checking if already registered ---
     if (!services.isRegistered<EventBus>()) {
       services.registerSingleton<EventBus>(this.eventBus);
     }
+    // Automatically create and add the root entity upon world creation.
+    // به صورت خودکار موجودیت root را هنگام ساخت دنیا ایجاد و اضافه می‌کند.
+    _createRootEntity();
+  }
+
+  /// Creates and adds the default root entity to the world.
+  void _createRootEntity() {
+    rootEntity = Entity();
+    rootEntity.addComponents([
+      TagsComponent({'root'}),
+      // Initialize with default values; ResponsivenessSystem will update it.
+      ScreenInfoComponent(
+          width: 0, height: 0, orientation: ScreenOrientation.portrait),
+    ]);
+    addEntity(rootEntity);
   }
 
   /// Initializes the world, running any async setup required by its systems.
@@ -60,8 +78,6 @@ class NexusWorld {
     if (entity != null) {
       _removedEntityIdsThisFrame.add(id);
       for (final system in _systems) {
-        // A matching check is not strictly needed here but is good practice.
-        // onEntityRemoved should be safe to call even if it doesn't match.
         system.onEntityRemoved(entity);
       }
       entity.dispose();
@@ -80,18 +96,28 @@ class NexusWorld {
     system.onAddedToWorld(this);
   }
 
+  void addSystems(List<System> systems) {
+    for (final system in systems) {
+      addSystem(system);
+    }
+  }
+
   void removeSystem(System system) {
     if (_systems.remove(system)) {
       system.onRemovedFromWorld();
     }
   }
 
+  void removeSystems(List<System> systems) {
+    for (final system in systems) {
+      removeSystem(system);
+    }
+  }
+
   void update(double dt) {
-    // Create a copy to prevent concurrent modification errors if systems add/remove entities.
     final entitiesList = List<Entity>.from(_entities.values);
     for (final system in _systems) {
       for (final entity in entitiesList) {
-        // Ensure the entity hasn't been removed by a previous system in the same frame.
         if (_entities.containsKey(entity.id) && system.matches(entity)) {
           system.update(entity, dt);
         }
