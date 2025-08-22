@@ -1,13 +1,19 @@
 import 'package:nexus/src/core/component.dart';
 import 'package:nexus/src/core/serialization/serializable_component.dart';
+import 'package:nexus/src/core/serialization/net_component.dart';
+// CRITICAL FIX: Add this import for the generated part file to use.
+import 'package:nexus/src/core/serialization/binary_reader_writer.dart';
+
+part 'position_component.g.dart';
 
 /// A component that stores the 2D position and size of an entity.
+@NetComponent(1) // Mark for binary serialization with a unique type ID.
 class PositionComponent extends Component with SerializableComponent {
-  double x;
-  double y;
-  double width;
-  double height;
-  double scale;
+  final double x;
+  final double y;
+  final double width;
+  final double height;
+  final double scale;
 
   PositionComponent({
     this.x = 0.0,

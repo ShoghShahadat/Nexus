@@ -5,17 +5,25 @@ targets:
       # The key here should match the name of the builder in the factory.
       nexus|gpu_shader_builder:
         enabled: true
+      # Enable our new binary builder
+      nexus|binary_builder:
+        enabled: true
 
 builders:
-  # A unique key for our builder.
+  # A unique key for our GPU builder.
   gpu_shader_builder:
-    # The package that contains the builder.
     import: "package:nexus/builder.dart"
-    # The function in the imported library that creates the builder.
     builder_factories: ["gpuShaderBuilder"]
-    # The extension for the generated files.
     build_extensions: {".dart": [".g.dart"]}
-    # What files to run on. We target files ending with '_gpu_system.dart'.
     build_to: source
-    # Automatically run this builder when dependencies change.
+    auto_apply: dependents
+
+  # A unique key for our new binary builder.
+  binary_builder:
+    import: "package:nexus/builder.dart"
+    builder_factories: ["binaryBuilder"]
+    build_extensions: {".dart": [".g.dart"]}
+    # We want this to run on any file that might contain a NetComponent.
+    # For simplicity, we'll let it run on all .dart files.
+    build_to: source
     auto_apply: dependents
