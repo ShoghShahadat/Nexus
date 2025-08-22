@@ -1,5 +1,3 @@
-// === File: example/attractor/lib/world/world_provider.dart (Modified) ===
-
 import 'dart:math';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/core/serialization/binary_component_factory.dart';
@@ -18,7 +16,7 @@ import '../systems/network_system.dart';
 import '../systems/player_control_system.dart';
 import '../systems/server_systems.dart';
 
-// --- Prefabs (Shared Logic) ---
+// Prefabs remain the same.
 
 Entity createHealthOrbPrefab(NexusWorld world) {
   final orb = Entity();
@@ -111,7 +109,6 @@ Entity createMeteorPrefab(NexusWorld world) {
 NexusWorld provideServerWorld() {
   final world = NexusWorld();
   world.addSystems([
-    // Core Systems
     GarbageCollectorSystem(),
     PhysicsSystem(),
     SpawnerSystem(),
@@ -121,20 +118,19 @@ NexusWorld provideServerWorld() {
     MeteorBurnSystem(),
     HealthOrbSystem(),
     HealingSystem(),
-    // Custom Server Logic
     ServerGameLogicSystem(),
   ]);
 
-  // Server root entity for global state
   world.rootEntity.addComponents([
     ScreenInfoComponent(
         width: 800, height: 600, orientation: ScreenOrientation.landscape),
     BlackboardComponent({'score': 0, 'is_game_over': false, 'game_time': 0.0}),
   ]);
 
-  // Server-side spawners
+  // Server-side spawners with Lifecycle Policies
   world.addEntity(Entity()
     ..add(TagsComponent({'meteor_spawner'}))
+    ..add(LifecyclePolicyComponent(isPersistent: true)) // Fix warning
     ..add(SpawnerComponent(
         prefab: () => createMeteorPrefab(world),
         frequency: const Frequency.perSecond(2.0),
@@ -142,6 +138,7 @@ NexusWorld provideServerWorld() {
 
   world.addEntity(Entity()
     ..add(TagsComponent({'health_orb_spawner'}))
+    ..add(LifecyclePolicyComponent(isPersistent: true)) // Fix warning
     ..add(SpawnerComponent(
         prefab: () => createHealthOrbPrefab(world),
         frequency: Frequency.every(const Duration(seconds: 15)),
@@ -156,25 +153,19 @@ NexusWorld provideAttractorWorld() {
   final world = NexusWorld();
   final serializer = BinaryWorldSerializer(BinaryComponentFactory.I);
 
-  // The Mock Server now creates its own world internally.
-  // CRITICAL FIX: Pass a closure to provideServerWorld instead of calling it directly.
-  final server = MockServer(() => provideServerWorld(), serializer);
+  final server = MockServer(provideServerWorld, serializer);
   world.services.registerSingleton<MockServer>(server);
 
   world.addSystems([
-    // Core Systems for client-side visuals and responsiveness
     ResponsivenessSystem(),
     DebugSystem(),
-
-    // Client-Side Networking and Input
-    NetworkSystem('ws://localhost:8080', serializer),
+    NetworkSystem(serializer),
     PlayerControlSystem(),
   ]);
 
-  // The client root entity holds UI state
   world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),
-    BlackboardComponent({'score': 0}), // Score is synced from server
+    BlackboardComponent({'score': 0, 'local_player_id': null}),
     DebugInfoComponent(),
     NetworkStateComponent(),
   ]);

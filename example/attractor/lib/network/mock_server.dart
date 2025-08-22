@@ -1,67 +1,75 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/core/serialization/binary_component.dart'; // <-- FIX: Added this missing import
 import 'package:nexus/src/core/serialization/binary_reader_writer.dart';
 import 'package:nexus/src/core/serialization/binary_world_serializer.dart';
 import '../components/network_components.dart';
-import '../systems/server_systems.dart';
 
 class _Player {
-  final WebSocket socket;
   final int sessionId;
   final Entity entity;
-  _Player(this.socket, this.sessionId, this.entity);
+  // The stream that sends data from the server TO this client.
+  final StreamController<Uint8List> toClientController;
+
+  _Player(this.sessionId, this.entity, this.toClientController);
 }
 
-/// A mock WebSocket server that runs the actual game logic.
+/// A mock WebSocket server that runs in-process and communicates via streams.
+/// This version is web-compatible as it does not use dart:io.
 class MockServer {
   final NexusWorld _world;
   final BinaryWorldSerializer _serializer;
-  HttpServer? _httpServer;
   final Map<int, _Player> _players = {};
   int _nextSessionId = 1;
   Timer? _gameLoopTimer;
   final _stopwatch = Stopwatch();
 
+  // A stream for messages coming FROM all clients TO the server.
+  final _fromClientsController =
+      StreamController<({int sessionId, Uint8List data})>.broadcast();
+
   MockServer(NexusWorld Function() serverWorldProvider, this._serializer)
-      : _world = serverWorldProvider();
-
-  Future<void> start() async {
-    try {
-      await _world.init();
-      _httpServer = await HttpServer.bind(InternetAddress.loopbackIPv4, 8080);
-      print('[SERVER] Mock server listening on ws://localhost:8080');
-
-      _httpServer!.listen((HttpRequest request) {
-        if (WebSocketTransformer.isUpgradeRequest(request)) {
-          WebSocketTransformer.upgrade(request).then(_handleConnection);
-        } else {
-          request.response
-            ..statusCode = HttpStatus.forbidden
-            ..write('WebSocket connections only')
-            ..close();
-        }
-      });
-
-      _stopwatch.start();
-      _gameLoopTimer =
-          Timer.periodic(const Duration(milliseconds: 16), _gameLoop);
-    } catch (e) {
-      print('[SERVER] Error starting mock server: $e');
-    }
+      : _world = serverWorldProvider() {
+    _fromClientsController.stream.listen(_handleMessage);
   }
 
-  void _handleConnection(WebSocket socket) {
+  Future<void> start() async {
+    await _world.init();
+    print('[SERVER] Mock server started.');
+    _stopwatch.start();
+    _gameLoopTimer =
+        Timer.periodic(const Duration(milliseconds: 16), _gameLoop);
+  }
+
+  // Called by the NetworkSystem to establish a "connection".
+  Stream<Uint8List> connectClient(Stream<Uint8List> fromClient) {
     final sessionId = _nextSessionId++;
     print('[SERVER] Player connected with session ID: $sessionId');
 
+    final toClientController = StreamController<Uint8List>.broadcast();
+
+    // Listen to messages from this specific client and forward them to the
+    // central server stream with their session ID.
+    fromClient.listen((data) {
+      _fromClientsController.add((sessionId: sessionId, data: data));
+    }, onDone: () => _handleDisconnect(sessionId));
+
+    final playerEntity = _createPlayerEntity(sessionId);
+    final player = _Player(sessionId, playerEntity, toClientController);
+    _players[sessionId] = player;
+
+    _sendInitialState(player);
+
+    return toClientController.stream;
+  }
+
+  Entity _createPlayerEntity(int sessionId) {
     final playerEntity = Entity();
-    final startX = Random().nextDouble() *
-        (_world.rootEntity.get<ScreenInfoComponent>()?.width ?? 800);
-    final startY =
-        (_world.rootEntity.get<ScreenInfoComponent>()?.height ?? 600) * 0.8;
+    final screenInfo = _world.rootEntity.get<ScreenInfoComponent>();
+    final startX = Random().nextDouble() * (screenInfo?.width ?? 800);
+    final startY = (screenInfo?.height ?? 600) * 0.8;
 
     playerEntity
         .add(PositionComponent(x: startX, y: startY, width: 20, height: 20));
@@ -71,50 +79,45 @@ class MockServer {
     playerEntity.add(TagsComponent({'player'}));
     playerEntity.add(CollisionComponent(
         tag: 'player', radius: 10, collidesWith: {'meteor', 'health_orb'}));
+    playerEntity
+        .add(LifecyclePolicyComponent(isPersistent: true)); // Add policy
     _world.addEntity(playerEntity);
-
-    final player = _Player(socket, sessionId, playerEntity);
-    _players[sessionId] = player;
-
-    // Send a special initial packet to this player so they know who they are.
-    _sendInitialState(player);
-
-    socket.listen(
-      (data) => _handleMessage(sessionId, data),
-      onDone: () => _handleDisconnect(sessionId),
-      onError: (e) => _handleDisconnect(sessionId),
-      cancelOnError: true,
-    );
+    return playerEntity;
   }
 
   void _sendInitialState(_Player player) {
+    // --- FIX: Temporarily set the isLocalPlayer flag for the initial packet ---
+    // This allows the client to identify which entity it controls.
     final playerComponent = player.entity.get<PlayerComponent>()!;
-    // Temporarily set the isLocalPlayer flag for this one packet
     playerComponent.isLocalPlayer = true;
-    player.entity.add(playerComponent);
+    player.entity.add(playerComponent); // Re-add to mark as dirty
 
+    // Serialize the entire world state for the new player.
     final packet = _serializer.serialize(_world.entities.values.toList());
-    player.socket.add(packet);
+    player.toClientController.add(packet);
 
-    // Revert the flag after sending
+    // --- FIX: Immediately reset the flag on the server after sending ---
+    // This ensures subsequent world state broadcasts don't mark this player
+    // as "local" for other clients.
     playerComponent.isLocalPlayer = false;
-    player.entity.add(playerComponent);
+    player.entity.add(playerComponent); // Re-add to mark as dirty
   }
 
-  void _handleMessage(int sessionId, dynamic data) {
-    if (data is! Uint8List) return;
-    final reader = BinaryReader(data);
+  void _handleMessage(({int sessionId, Uint8List data}) message) {
+    final reader = BinaryReader(message.data);
     final messageType = reader.readInt32();
 
     if (messageType == 1) {
       // Player Input
       final x = reader.readDouble();
       final y = reader.readDouble();
-      final playerEntity = _players[sessionId]?.entity;
+      final playerEntity = _players[message.sessionId]?.entity;
       final health = playerEntity?.get<HealthComponent>();
-      // Only accept input from players who are alive
       if (playerEntity != null && (health?.currentHealth ?? 0) > 0) {
         final pos = playerEntity.get<PositionComponent>()!;
+        // --- FIX: Directly update the target position ---
+        // The server's physics system will handle smoothing or velocity changes.
+        // For this example, direct setting is fine.
         pos.x = x;
         pos.y = y;
         playerEntity.add(pos);
@@ -126,6 +129,7 @@ class MockServer {
     print('[SERVER] Player disconnected: $sessionId');
     final player = _players.remove(sessionId);
     if (player != null) {
+      player.toClientController.close();
       _world.removeEntity(player.entity.id);
     }
   }
@@ -143,19 +147,28 @@ class MockServer {
   void _broadcastGameState() {
     if (_players.isEmpty) return;
 
-    final packet = _serializer.serialize(_world.entities.values.toList());
+    // --- FIX: Only serialize entities that have binary components ---
+    // This prevents sending client-only or server-only entities over the network.
+    final entitiesToSync = _world.entities.values
+        .where((e) => e.allComponents.any((c) => c is BinaryComponent))
+        .toList();
+
+    if (entitiesToSync.isEmpty) return;
+
+    final packet = _serializer.serialize(entitiesToSync);
     if (packet.isEmpty) return;
 
     for (final player in _players.values) {
-      if (player.socket.readyState == WebSocket.open) {
-        player.socket.add(packet);
-      }
+      player.toClientController.add(packet);
     }
   }
 
   void stop() {
     _gameLoopTimer?.cancel();
-    _httpServer?.close();
+    for (final player in _players.values) {
+      player.toClientController.close();
+    }
+    _fromClientsController.close();
     _world.clear();
     print('[SERVER] Mock server stopped.');
   }

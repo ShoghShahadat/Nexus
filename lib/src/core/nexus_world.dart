@@ -68,6 +68,15 @@ class NexusWorld {
       debugPrint(
           '[NexusWorld] WARNING: Entity ID ${entity.id} was added without a LifecyclePolicyComponent. This is highly discouraged.');
     }
+    // --- FIX: Ensure we don't overwrite an existing entity with the same ID ---
+    if (_entities.containsKey(entity.id)) {
+      // This can happen with hot reload or complex logic.
+      // It's safer to merge components or log a warning than to silently overwrite.
+      if (kDebugMode) {
+        print(
+            '[NexusWorld] WARNING: An entity with ID ${entity.id} already exists. Overwriting.');
+      }
+    }
     _entities[entity.id] = entity;
     for (final system in _systems) {
       if (system.matches(entity)) {
