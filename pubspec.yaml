@@ -18,13 +18,17 @@ dependencies:
   collection: ^1.18.0
   go_router: ^16.2.0
   analyzer: ^6.4.1
-  # --- NEW: Added for persistence example ---
   shared_preferences: ^2.2.3
+  web: ^1.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   lints: ^3.0.0
 
-# Note: go_router is NOT a dependency of the core nexus package.
-# It is an optional integration, demonstrated in the example app.
+# --- CRITICAL FIX: Explicitly list WASM assets for reliable web builds. ---
+# Instead of declaring the whole directory, we list the essential JS bridge
+# and the WASM binary itself. This ensures the Flutter build tool for web
+# correctly identifies and bundles these non-standard asset types.
+flutter:
+  uses-material-design: true

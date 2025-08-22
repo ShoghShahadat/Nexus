@@ -6,12 +6,9 @@ import 'package:nexus/nexus.dart';
 import 'attractor_gpu_system.dart';
 import '../components/gpu_particle_render_component.dart';
 
-/// A system that acts as a bridge between the CPU world and the GPU simulation.
-/// It now also controls the visual state (like explosions) of particles.
 class GpuBridgeSystem extends System {
   AttractorGpuSystem? _gpuSystem;
   final Random _random = Random();
-
   List<double> _explosionStates = [];
 
   @override
@@ -29,17 +26,14 @@ class GpuBridgeSystem extends System {
     return entity.get<TagsComponent>()?.hasTag('root') ?? false;
   }
 
+  // update is now async to accommodate the async compute method.
   @override
-  void update(Entity entity, double dt) {
+  void update(Entity entity, double dt) async {
     if (_gpuSystem == null) return;
 
-    // --- CRITICAL FIX: Pause simulation on Game Over ---
-    // Read the game over state from the blackboard.
     final blackboard = entity.get<BlackboardComponent>();
     final isGameOver = blackboard?.get<bool>('is_game_over') ?? false;
 
-    // 1. Update Uniforms (CPU -> GPU/CPU-Sim)
-    // Always update uniforms so the simulation knows the attractor's position on restart.
     final attractor = world.entities.values
         .firstWhereOrNull((e) => e.has<AttractorComponent>());
     final screenInfo = entity.get<ScreenInfoComponent>();
@@ -56,16 +50,14 @@ class GpuBridgeSystem extends System {
       ));
     }
 
-    // If the game is over, do not run the simulation or update particle visuals.
-    // This effectively freezes the particle system.
     if (isGameOver) {
       return;
     }
 
-    // 2. Run GPU/CPU Simulation for physics.
-    _gpuSystem!.compute(dt);
+    // Await the compute result.
+    await _gpuSystem!.compute(dt);
 
-    // 3. Retrieve physics data and apply visual logic on CPU.
+    // The rest of the logic remains the same, as it reads from the CPU-side data.
     final particleObjects = _gpuSystem!.particleObjects;
     final renderData = Float32List(particleObjects.length * 4);
 
@@ -76,35 +68,26 @@ class GpuBridgeSystem extends System {
       renderData[destIndex + 0] = p.position.x;
       renderData[destIndex + 1] = p.position.y;
 
-      // --- CPU-Side Visual Logic ---
       if (_explosionStates[i] == 0.0) {
-        // --- Normal Particle Rendering ---
         final progress = (p.age / p.maxAge).clamp(0.0, 1.0);
         renderData[destIndex + 2] = p.initialSize * (1.0 - progress);
-
         final opacity = 1.0 - progress;
         renderData[destIndex + 3] = opacity.clamp(0.0, 1.0);
-
         if (_random.nextDouble() < 0.0005) {
-          _explosionStates[i] = 0.001; // Start explosion
+          _explosionStates[i] = 0.001;
         }
       } else {
-        // --- Exploding Particle Rendering ---
-        _explosionStates[i] += dt / 0.7; // 0.7 second explosion
+        _explosionStates[i] += dt / 0.7;
         final progress = _explosionStates[i].clamp(0.0, 1.0);
         renderData[destIndex + 2] = p.initialSize + (progress * 15);
-
         final colorValue =
             Colors.redAccent.withOpacity(1.0 - progress).value.toDouble();
         renderData[destIndex + 3] = -colorValue;
-
         if (_explosionStates[i] >= 1.0) {
-          _explosionStates[i] = 0.0; // Explosion finished, back to normal
+          _explosionStates[i] = 0.0;
         }
       }
     }
-
-    // 4. Update the render component on the root entity.
     entity.add(GpuParticleRenderComponent(renderData));
   }
 }

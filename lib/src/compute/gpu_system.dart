@@ -1,59 +1,44 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/compute/gpu_context.dart';
 
-// Note: No 'dart:ffi' import here. This file is now platform-agnostic.
-
-/// Defines the execution mode for the GpuSystem.
 enum GpuMode {
-  /// The system has not yet been initialized.
   notInitialized,
-
-  /// The system is running computations on the GPU.
   gpu,
-
-  /// The system failed to initialize the GPU and is using the CPU as a fallback.
   cpuFallback,
 }
 
-/// A context object providing access to global variables inside `gpuLogic`.
 class GpuKernelContext {
-  /// The time elapsed since the last frame, in seconds.
   final double deltaTime;
-
   GpuKernelContext({required this.deltaTime});
 }
 
-/// Abstract base class for a System that performs computations on the GPU
-/// with a seamless CPU fallback.
 abstract class GpuSystem<T> extends System {
   final GpuContext _gpu = GpuContext();
   GpuMode _mode = GpuMode.notInitialized;
 
-  /// The current execution mode of the system (GPU or CPU).
   GpuMode get mode => _mode;
 
-  // Switched from 'late final' to 'late' to allow re-initialization.
   late List<T> _cpuData;
-  late GpuBuffer<dynamic> _gpuDataBuffer;
+  // This buffer is now only used for the initial data transfer on native.
+  GpuBuffer<dynamic>? _gpuDataBuffer;
 
   List<T> initializeData();
 
   @protected
   void gpuLogic(T element, GpuKernelContext ctx);
 
-  /// Forces the system to re-run its `initializeData` method, effectively
-  /// resetting the simulation state. This is crucial for CPU fallback mode.
   void reinitializeData() {
-    if (_mode == GpuMode.cpuFallback) {
-      _cpuData = initializeData();
-    }
-    // In a full GPU implementation, this would also re-upload the data buffer.
+    _cpuData = initializeData();
+    // On web, the data is managed within the WASM module after initialization.
+    // On native, we would need a way to update the GPU buffer here if needed.
   }
 
-  int compute(double deltaTime) {
+  // compute is now async to handle the async nature of web simulation.
+  Future<int> compute(double deltaTime) async {
     if (_mode == GpuMode.gpu) {
-      return _gpu.runSimulation(deltaTime);
+      return await _gpu.runSimulation(deltaTime);
     } else if (_mode == GpuMode.cpuFallback) {
       final stopwatch = Stopwatch()..start();
       final ctx = GpuKernelContext(deltaTime: deltaTime);
@@ -70,17 +55,19 @@ abstract class GpuSystem<T> extends System {
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
     if (_mode == GpuMode.notInitialized) {
+      // Initialization is now async.
       _initialize();
     }
   }
 
-  void _initialize() {
+  // _initialize is now async.
+  Future<void> _initialize() async {
     _cpuData = initializeData();
     final flatData = flattenData(_cpuData);
 
     try {
-      _gpuDataBuffer = Float32GpuBuffer.fromList(flatData);
-      _gpu.initialize(_gpuDataBuffer as Float32GpuBuffer);
+      // The initialize method is now async for the web.
+      await _gpu.initialize(flatData);
       _mode = GpuMode.gpu;
       debugPrint(
           '[Nexus GpuSystem] Successfully initialized in GPU mode. All computations will be offloaded.');
@@ -95,21 +82,16 @@ abstract class GpuSystem<T> extends System {
 
   @override
   void onRemovedFromWorld() {
-    if (_mode == GpuMode.gpu) {
-      _gpu.dispose();
-      _gpuDataBuffer.dispose();
-    }
+    _gpu.dispose();
+    _gpuDataBuffer?.dispose();
     _mode = GpuMode.notInitialized;
     super.onRemovedFromWorld();
   }
 
   Float32List getGpuDataAsFloat32List() {
-    if (_mode == GpuMode.gpu) {
-      return (_gpuDataBuffer as Float32GpuBuffer).toList();
-    } else if (_mode == GpuMode.cpuFallback) {
-      return flattenData(_cpuData);
-    }
-    return Float32List(0);
+    // This method's purpose changes slightly. On web, it's harder to get data
+    // back from the GPU without performance cost. We'll return the CPU state.
+    return flattenData(_cpuData);
   }
 
   Float32List flattenData(List<T> data);
