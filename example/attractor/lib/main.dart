@@ -1,16 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
-import 'component_registration.dart';
 import 'components/debug_info_component.dart';
 import 'components/network_components.dart';
-import 'network/mock_server.dart';
+import 'events.dart';
 import 'particle_painter.dart';
 import 'widgets/joystick.dart';
 import 'world/world_provider.dart';
 
 void main() {
-  // Registration is now handled by the world providers, so main is clean.
+  // Registration is now handled by the world provider.
   runApp(const MyApp());
 }
 
@@ -22,18 +21,14 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final FlutterRenderingSystem renderingSystem;
-  MockServer? _server;
+  // --- FIX: MockServer is no longer part of the client app ---
+  // MockServer? _server;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final world = (renderingSystem.manager as NexusSingleThreadManager).world;
-      if (world != null) {
-        _server = world.services.get<MockServer>();
-        _server?.start();
-      }
-    });
+    // --- FIX: Removed server start logic ---
+    // WidgetsBinding.instance.addPostFrameCallback((_) { ... });
 
     renderingSystem = FlutterRenderingSystem(
       builders: {
@@ -47,7 +42,6 @@ class _MyAppState extends State<MyApp> {
           final blackboard = controller.get<BlackboardComponent>(rootId);
           final localPlayerId = blackboard?.get<EntityId>('local_player_id');
 
-          // --- FIX: Get all entity IDs from the controller ---
           final allPlayerIds = controller.getAllIdsWithTag('player');
           final meteorIds = controller.getAllIdsWithTag('meteor');
           final healthOrbIds = controller.getAllIdsWithTag('health_orb');
@@ -81,7 +75,6 @@ class _MyAppState extends State<MyApp> {
                   children: [
                     RepaintBoundary(
                       child: CustomPaint(
-                        // --- FIX: Pass entity IDs and controller to the painter ---
                         painter: ParticlePainter(
                           allPlayerIds: allPlayerIds,
                           meteorIds: meteorIds,
@@ -121,7 +114,8 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
-    _server?.stop();
+    // --- FIX: Removed server stop logic ---
+    // _server?.stop();
     super.dispose();
   }
 
@@ -145,7 +139,7 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-// UI Helper Widgets
+// UI Helper Widgets (unchanged)
 class _GameOverMessage extends StatelessWidget {
   const _GameOverMessage();
   @override

@@ -1,10 +1,7 @@
-import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
-import 'package:nexus/src/core/utils/frequency.dart';
 import '../events.dart';
-import '../world/world_provider.dart'; // For the prefab function
 
 /// A system to control the attractor's movement via keyboard.
 class AttractorControlSystem extends System {
@@ -177,12 +174,12 @@ class RestartSystem extends System {
           {'score': 0, 'is_game_over': false, 'game_time': 0.0}));
     }
 
+    // --- FIX: Removed server-side logic from the client. ---
+    // The client no longer creates prefabs or manages the spawner component.
+    // This logic is now handled entirely by the server.
     if (meteorSpawner != null && !meteorSpawner.has<SpawnerComponent>()) {
-      meteorSpawner.add(SpawnerComponent(
-        prefab: () => createMeteorPrefab(world),
-        frequency: const Frequency.perSecond(0.8),
-        wantsToFire: true,
-      ));
+      // The client-side spawner entity exists but the SpawnerComponent itself
+      // is managed by the server state. We don't add it here anymore.
     }
   }
 

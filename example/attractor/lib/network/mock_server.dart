@@ -1,25 +1,27 @@
 import 'dart:async';
-import 'dart:math';
 import 'dart:typed_data';
 import 'package:nexus/nexus.dart';
 import '../components/network_components.dart';
+import '../logic/game_logic.dart';
 
-class _Player {
+class _PlayerConnection {
   final int sessionId;
   final Entity entity;
   final StreamController<Uint8List> toClientController;
 
-  _Player(this.sessionId, this.entity, this.toClientController);
+  _PlayerConnection(this.sessionId, this.entity, this.toClientController);
 }
 
 /// A mock WebSocket server that runs in-process and communicates via streams.
+/// This class is now only responsible for network communication and state sync.
 class MockServer {
   static const double playerMoveSpeed = 300.0;
   static const double playerBaseSize = 20.0;
 
-  final NexusWorld _world;
+  final GameLogic
+      _gameLogic; // The server now HAS a game logic, it IS NOT the game logic.
   final BinaryWorldSerializer _serializer;
-  final Map<int, _Player> _players = {};
+  final Map<int, _PlayerConnection> _connections = {};
   int _nextSessionId = 1;
   Timer? _gameLoopTimer;
   final _stopwatch = Stopwatch();
@@ -27,13 +29,12 @@ class MockServer {
   final _fromClientsController =
       StreamController<({int sessionId, Uint8List data})>.broadcast();
 
-  MockServer(NexusWorld Function() serverWorldProvider, this._serializer)
-      : _world = serverWorldProvider() {
+  MockServer(this._gameLogic, this._serializer) {
     _fromClientsController.stream.listen(_handleMessage);
   }
 
   Future<void> start() async {
-    await _world.init();
+    await _gameLogic.init();
     print('[SERVER] Mock server started.');
     _stopwatch.start();
     _gameLoopTimer =
@@ -50,46 +51,27 @@ class MockServer {
       _fromClientsController.add((sessionId: sessionId, data: data));
     }, onDone: () => _handleDisconnect(sessionId));
 
-    final playerEntity = _createPlayerEntity(sessionId);
-    final player = _Player(sessionId, playerEntity, toClientController);
-    _players[sessionId] = player;
+    // Let the game logic handle creating the player
+    final playerEntity = _gameLogic.onPlayerConnected(sessionId);
+    final connection =
+        _PlayerConnection(sessionId, playerEntity, toClientController);
+    _connections[sessionId] = connection;
 
-    _sendInitialState(player);
+    _sendInitialState(connection);
 
     return toClientController.stream;
   }
 
-  Entity _createPlayerEntity(int sessionId) {
-    final playerEntity = Entity();
-    final screenInfo = _world.rootEntity.get<ScreenInfoComponent>();
-    final startX = Random().nextDouble() * (screenInfo?.width ?? 800);
-    final startY = (screenInfo?.height ?? 600) * 0.8;
-
-    playerEntity.add(PositionComponent(
-        x: startX, y: startY, width: playerBaseSize, height: playerBaseSize));
-    playerEntity.add(VelocityComponent());
-    playerEntity.add(HealthComponent(maxHealth: 100));
-    playerEntity.add(PlayerComponent(sessionId: sessionId));
-    playerEntity.add(TagsComponent({'player'}));
-    playerEntity.add(CollisionComponent(
-        tag: 'player',
-        radius: playerBaseSize / 2,
-        collidesWith: {'meteor', 'health_orb'}));
-    playerEntity.add(LifecyclePolicyComponent(isPersistent: true));
-    _world.addEntity(playerEntity);
-    return playerEntity;
-  }
-
-  void _sendInitialState(_Player player) {
-    final playerComponent = player.entity.get<PlayerComponent>()!;
+  void _sendInitialState(_PlayerConnection connection) {
+    final playerComponent = connection.entity.get<PlayerComponent>()!;
     playerComponent.isLocalPlayer = true;
-    player.entity.add(playerComponent);
+    connection.entity.add(playerComponent);
 
-    final packet = _serializer.serialize(_world.entities.values.toList());
-    player.toClientController.add(packet);
+    final packet = _serializer.serialize(_gameLogic.entitiesToSync);
+    connection.toClientController.add(packet);
 
     playerComponent.isLocalPlayer = false;
-    player.entity.add(playerComponent);
+    connection.entity.add(playerComponent);
   }
 
   void _handleMessage(({int sessionId, Uint8List data}) message) {
@@ -99,24 +81,17 @@ class MockServer {
     if (messageType == 1) {
       final dx = reader.readDouble();
       final dy = reader.readDouble();
-      final playerEntity = _players[message.sessionId]?.entity;
-      final health = playerEntity?.get<HealthComponent>();
-
-      if (playerEntity != null && (health?.currentHealth ?? 0) > 0) {
-        final vel = playerEntity.get<VelocityComponent>()!;
-        vel.x = dx * playerMoveSpeed;
-        vel.y = dy * playerMoveSpeed;
-        playerEntity.add(vel);
-      }
+      // Pass the input to the game logic to process
+      _gameLogic.handlePlayerInput(message.sessionId, dx, dy);
     }
   }
 
   void _handleDisconnect(int sessionId) {
     print('[SERVER] Player disconnected: $sessionId');
-    final player = _players.remove(sessionId);
-    if (player != null) {
-      player.toClientController.close();
-      _world.removeEntity(player.entity.id);
+    final connection = _connections.remove(sessionId);
+    if (connection != null) {
+      connection.toClientController.close();
+      _gameLogic.onPlayerDisconnected(sessionId);
     }
   }
 
@@ -126,34 +101,31 @@ class MockServer {
     _stopwatch.reset();
     _stopwatch.start();
 
-    _world.update(dt);
+    _gameLogic.update(dt);
     _broadcastGameState();
   }
 
   void _broadcastGameState() {
-    if (_players.isEmpty) return;
+    if (_connections.isEmpty) return;
 
-    final entitiesToSync = _world.entities.values
-        .where((e) => e.allComponents.any((c) => c is BinaryComponent))
-        .toList();
-
+    final entitiesToSync = _gameLogic.entitiesToSync;
     if (entitiesToSync.isEmpty) return;
 
     final packet = _serializer.serialize(entitiesToSync);
     if (packet.isEmpty) return;
 
-    for (final player in _players.values) {
-      player.toClientController.add(packet);
+    for (final connection in _connections.values) {
+      connection.toClientController.add(packet);
     }
   }
 
   void stop() {
     _gameLoopTimer?.cancel();
-    for (final player in _players.values) {
-      player.toClientController.close();
+    for (final connection in _connections.values) {
+      connection.toClientController.close();
     }
     _fromClientsController.close();
-    _world.clear();
+    _gameLogic.dispose();
     print('[SERVER] Mock server stopped.');
   }
 }

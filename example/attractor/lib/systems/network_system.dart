@@ -2,45 +2,47 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
+import 'package:web_socket_channel/web_socket_channel.dart'; // Import the WebSocket library
 import '../components/network_components.dart';
 import '../events.dart';
-import '../network/mock_server.dart';
 
-/// Manages the client-side connection and state synchronization with the game server.
+/// Manages the client-side connection and state synchronization with the REAL game server.
 class NetworkSystem extends System {
-  final BinaryWorldSerializer _serializer;
+  // --- FIX: Replace MockServer with a real WebSocketChannel ---
+  final String serverUrl;
+  WebSocketChannel? _channel;
   StreamSubscription? _serverSubscription;
-  StreamController<Uint8List>? _toServerController;
-  MockServer? _server;
 
+  final BinaryWorldSerializer _serializer;
   final Map<int, Entity> _serverEntityMap = {};
 
-  NetworkSystem(this._serializer);
+  NetworkSystem(this._serializer, {required this.serverUrl});
 
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    _server = world.services.get<MockServer>();
     _connect();
-    // --- FIX: Listen for the correct event to send to the server ---
     listen<SendDirectionalInputEvent>(_onSendInput);
   }
 
   void _connect() {
-    if (_server == null || _toServerController != null) return;
-    _updateStatus('Connecting...');
+    if (_channel != null) return;
+    _updateStatus('Connecting to $serverUrl...');
 
-    _toServerController = StreamController<Uint8List>.broadcast();
-    final fromServerStream =
-        _server!.connectClient(_toServerController!.stream);
+    try {
+      // Establish a real WebSocket connection
+      _channel = WebSocketChannel.connect(Uri.parse(serverUrl));
 
-    _serverSubscription = fromServerStream.listen(
-      _onData,
-      onDone: _onDisconnect,
-      onError: (e) => _onDisconnect(error: e.toString()),
-      cancelOnError: true,
-    );
-    _updateStatus('Connected!', isConnected: true);
+      _serverSubscription = _channel!.stream.listen(
+        _onData,
+        onDone: _onDisconnect,
+        onError: (e) => _onDisconnect(error: e.toString()),
+        cancelOnError: true,
+      );
+      _updateStatus('Connected!', isConnected: true);
+    } catch (e) {
+      _onDisconnect(error: "Connection failed: ${e.toString()}");
+    }
   }
 
   void _onData(dynamic data) {
@@ -58,7 +60,6 @@ class NetworkSystem extends System {
           world.addEntity(clientEntity);
           _serverEntityMap[serverId] = clientEntity;
         }
-
         clientEntity.addComponents(components);
       }
 
@@ -88,25 +89,25 @@ class NetworkSystem extends System {
     }
   }
 
-  // --- FIX: Method updated to handle the correct event type ---
   void _onSendInput(SendDirectionalInputEvent event) {
-    if (_toServerController != null && !_toServerController!.isClosed) {
+    if (_channel != null) {
       final writer = BinaryWriter();
-      writer.writeInt32(1); // Message Type: Directional Input
+      writer.writeInt32(1);
       writer.writeDouble(event.dx);
       writer.writeDouble(event.dy);
-      _toServerController!.add(writer.toBytes());
+      _channel!.sink.add(writer.toBytes());
     }
   }
 
   void _onDisconnect({String? error}) {
     _serverSubscription?.cancel();
-    _toServerController?.close();
+    _channel?.sink.close();
     _serverSubscription = null;
-    _toServerController = null;
+    _channel = null;
     _updateStatus(error ?? 'Disconnected.', isConnected: false);
     world.rootEntity.get<BlackboardComponent>()?.remove('local_player_id');
 
+    // Attempt to reconnect after a delay.
     Future.delayed(const Duration(seconds: 3), () {
       if (world.systems.contains(this)) _connect();
     });
@@ -126,7 +127,7 @@ class NetworkSystem extends System {
   @override
   void onRemovedFromWorld() {
     _serverSubscription?.cancel();
-    _toServerController?.close();
+    _channel?.sink.close();
     _serverEntityMap.clear();
     super.onRemovedFromWorld();
   }
