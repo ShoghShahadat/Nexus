@@ -1,3 +1,5 @@
+// === File: example/attractor/lib/systems/network_system.dart (Modified) ===
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -49,6 +51,20 @@ class NetworkSystem extends System {
   void _onData(dynamic data) {
     if (data is Uint8List) {
       _serializer.deserialize(world, data);
+
+      // After deserializing, find our player and update the root blackboard.
+      for (final entity in world.entities.values) {
+        final playerComp = entity.get<PlayerComponent>();
+        if (playerComp != null && playerComp.isLocalPlayer) {
+          world.rootEntity
+              .get<BlackboardComponent>()
+              ?.set('local_player_id', entity.id);
+          // Unset the flag on the client to avoid confusion
+          playerComp.isLocalPlayer = false;
+          entity.add(playerComp);
+          break;
+        }
+      }
     }
   }
 
@@ -68,10 +84,10 @@ class NetworkSystem extends System {
     _socketSubscription?.cancel();
     _socketSubscription = null;
     _updateStatus(error ?? 'Disconnected.', isConnected: false);
+    world.rootEntity.get<BlackboardComponent>()?.remove('local_player_id');
 
-    // Attempt to reconnect after a delay.
     Future.delayed(const Duration(seconds: 3), () {
-      if (!_isConnecting) _connect();
+      if (!_isConnecting && world.systems.contains(this)) _connect();
     });
   }
 
@@ -81,7 +97,7 @@ class NetworkSystem extends System {
   }
 
   @override
-  bool matches(Entity entity) => false; // Event-driven
+  bool matches(Entity entity) => false;
 
   @override
   void update(Entity entity, double dt) {}

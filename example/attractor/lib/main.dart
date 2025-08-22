@@ -1,60 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/core/serialization/binary_component_factory.dart';
-
-import 'components/complex_movement_component.dart';
 import 'components/debug_info_component.dart';
-import 'components/explosion_component.dart';
-import 'components/health_orb_component.dart';
-import 'components/meteor_component.dart';
 import 'components/network_components.dart';
-import 'components/particle_render_data_component.dart';
-import 'events.dart';
 import 'network/mock_server.dart';
 import 'particle_painter.dart';
 import 'world/world_provider.dart';
 
-/// Registers all custom components for JSON serialization.
 void registerAttractorJsonComponents() {
   final customComponents = <String, ComponentFactory>{
-    'ExplodingParticleComponent': (json) =>
-        ExplodingParticleComponent.fromJson(json),
-    'ComplexMovementComponent': (json) =>
-        ComplexMovementComponent.fromJson(json),
-    'MeteorComponent': (json) => MeteorComponent.fromJson(json),
-    'HealthOrbComponent': (json) => HealthOrbComponent.fromJson(json),
-    'ParticleRenderDataComponent': (json) =>
-        ParticleRenderDataComponent.fromJson(json),
     'DebugInfoComponent': (json) => DebugInfoComponent.fromJson(json),
   };
   ComponentFactoryRegistry.I.registerAll(customComponents);
 }
 
-/// Registers all components enabled for binary network serialization.
 void registerNetworkComponents() {
   final factory = BinaryComponentFactory.I;
   factory.register(1, () => PositionComponent());
   factory.register(2, () => PlayerComponent());
-  factory.register(
-      3,
-      () =>
-          HealthComponent(maxHealth: 0)); // Max health is server-authoritative
+  factory.register(3, () => HealthComponent(maxHealth: 100));
   factory.register(4, () => VelocityComponent());
 }
 
 void main() {
-  // Register components for both JSON (for persistence/hot reload)
-  // and Binary (for networking) serialization.
   registerCoreComponents();
   registerAttractorJsonComponents();
   registerNetworkComponents();
-
   runApp(const MyApp());
 }
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
-
   @override
   State<MyApp> createState() => _MyAppState();
 }
@@ -66,10 +42,6 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-
-    // The NexusManager is now static in NexusWidget for debug builds,
-    // so we can reliably access the world and its services after a hot reload.
-    // We start the server in a post-frame callback to ensure the world is ready.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final world = (renderingSystem.manager as NexusSingleThreadManager).world;
       if (world != null) {
@@ -81,64 +53,53 @@ class _MyAppState extends State<MyApp> {
     renderingSystem = FlutterRenderingSystem(
       builders: {
         'particle_canvas': (context, id, controller, manager, child) {
-          // --- UI LOGIC FOR MULTIPLAYER ---
-
           final rootId = controller.getAllIdsWithTag('root').firstOrNull;
           if (rootId == null) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // Get network status
           final networkState = controller.get<NetworkStateComponent>(rootId);
+          final blackboard = controller.get<BlackboardComponent>(rootId);
+          final localPlayerId = blackboard?.get<EntityId>('local_player_id');
 
-          // Get all players and find the local one
-          final playerEntities = controller.getAllIdsWithTag('player');
-          final localPlayerEntityId =
-              controller.getAllIdsWithTag('controlled_player').firstOrNull;
-
-          final allPlayerPositions = playerEntities
+          final allPlayerPositions = controller
+              .getAllIdsWithTag('player')
               .map((id) => controller.get<PositionComponent>(id))
-              .where((p) => p != null)
-              .map((p) => Offset(p!.x, p.y))
+              .whereType<PositionComponent>()
+              .map((p) => Offset(p.x, p.y))
               .toList();
 
-          final localPlayerPos = localPlayerEntityId != null
-              ? controller.get<PositionComponent>(localPlayerEntityId)
+          final localPlayerPos = localPlayerId != null
+              ? controller.get<PositionComponent>(localPlayerId)
               : null;
-          final localPlayerHealth = localPlayerEntityId != null
-              ? controller.get<HealthComponent>(localPlayerEntityId)
+          final localPlayerHealth = localPlayerId != null
+              ? controller.get<HealthComponent>(localPlayerId)
               : null;
 
-          // Get other game objects
           final meteorPositions = controller
               .getAllIdsWithTag('meteor')
               .map((id) => controller.get<PositionComponent>(id))
-              .where((p) => p != null)
-              .map((p) => Offset(p!.x, p.y))
+              .whereType<PositionComponent>()
+              .map((p) => Offset(p.x, p.y))
               .toList();
 
           final healthOrbPositions = controller
               .getAllIdsWithTag('health_orb')
               .map((id) => controller.get<PositionComponent>(id))
-              .where((p) => p != null)
-              .map((p) => Offset(p!.x, p.y))
+              .whereType<PositionComponent>()
+              .map((p) => Offset(p.x, p.y))
               .toList();
 
           final debugInfo = controller.get<DebugInfoComponent>(rootId);
-          final blackboard = controller.get<BlackboardComponent>(rootId);
-          final score = blackboard?.get<num>('score') ?? 0;
           final isGameOver =
               localPlayerHealth != null && localPlayerHealth.currentHealth <= 0;
 
           return Column(
             children: [
-              // --- NETWORK STATUS BAR ---
               if (networkState != null && !networkState.isConnected)
                 Container(
                   padding: const EdgeInsets.all(8),
-                  color: networkState.isConnected
-                      ? Colors.green.shade900
-                      : Colors.red.shade900,
+                  color: Colors.red.shade900,
                   child: Center(
                     child: Text(
                       networkState.statusMessage,
@@ -146,14 +107,6 @@ class _MyAppState extends State<MyApp> {
                     ),
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text('Score: $score',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold)),
-              ),
               Expanded(
                 child: Stack(
                   children: [
@@ -170,42 +123,16 @@ class _MyAppState extends State<MyApp> {
                         child: const SizedBox.expand(),
                       ),
                     ),
-                    if (isGameOver)
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.7),
-                              borderRadius: BorderRadius.circular(16)),
-                          child: const Text(
-                              'GAME OVER\nWaiting for next round...',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  color: Colors.redAccent,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  shadows: [
-                                    Shadow(blurRadius: 10, color: Colors.black)
-                                  ])),
-                        ),
+                    if (isGameOver && localPlayerId != null)
+                      const Center(
+                        child: _GameOverMessage(),
                       ),
                   ],
                 ),
               ),
               if (debugInfo != null) _DebugInfoBar(debugInfo: debugInfo),
               if (localPlayerHealth != null)
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: LinearProgressIndicator(
-                    value: (localPlayerHealth.currentHealth /
-                            localPlayerHealth.maxHealth)
-                        .clamp(0.0, 1.0),
-                    backgroundColor: Colors.grey.shade700,
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(Colors.greenAccent),
-                    minHeight: 10,
-                  ),
-                ),
+                _HealthBar(health: localPlayerHealth),
             ],
           );
         },
@@ -226,12 +153,11 @@ class _MyAppState extends State<MyApp> {
       home: Scaffold(
         backgroundColor: const Color(0xFF1a1a1a),
         appBar: AppBar(
-          title: const Text('Nexus Attractor: Multiplayer Edition'),
+          title: const Text('Nexus Attractor: Multiplayer'),
           backgroundColor: Colors.grey.shade900,
           foregroundColor: Colors.white,
         ),
         body: NexusWidget(
-          // Use the new multiplayer world provider
           worldProvider: provideAttractorWorld,
           renderingSystem: renderingSystem,
         ),
@@ -240,11 +166,47 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-// Helper Widgets
+// UI Helper Widgets
+class _GameOverMessage extends StatelessWidget {
+  const _GameOverMessage();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.75),
+          borderRadius: BorderRadius.circular(16)),
+      child: const Text('GAME OVER\nWaiting for next round...',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+              color: Colors.redAccent,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              shadows: [Shadow(blurRadius: 10, color: Colors.black)])),
+    );
+  }
+}
+
+class _HealthBar extends StatelessWidget {
+  const _HealthBar({required this.health});
+  final HealthComponent health;
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: LinearProgressIndicator(
+        value: (health.currentHealth / health.maxHealth).clamp(0.0, 1.0),
+        backgroundColor: Colors.grey.shade700,
+        valueColor: const AlwaysStoppedAnimation<Color>(Colors.greenAccent),
+        minHeight: 10,
+      ),
+    );
+  }
+}
+
 class _DebugInfoBar extends StatelessWidget {
   const _DebugInfoBar({required this.debugInfo});
   final DebugInfoComponent debugInfo;
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -271,13 +233,10 @@ class _DebugStat extends StatelessWidget {
   final String label;
   final String value;
   final Color valueColor;
-
-  const _DebugStat({
-    required this.label,
-    required this.value,
-    this.valueColor = Colors.white,
-  });
-
+  const _DebugStat(
+      {required this.label,
+      required this.value,
+      this.valueColor = Colors.white});
   @override
   Widget build(BuildContext context) {
     return Column(
