@@ -20,18 +20,18 @@ dependencies:
   analyzer: ^6.4.1
   shared_preferences: ^2.2.3
   web: ^1.0.0
-  # --- FIX: Moved build tools to regular dependencies for the package to work ---
-  source_gen: ^1.5.0
-  build: ^2.4.1
+  # Build tools were moved to dev_dependencies
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   lints: ^3.0.0
-  # --- build_runner itself is a development tool ---
   build_runner: ^2.4.9
+  # --- FIX: Moved build tools to dev_dependencies for semantic correctness ---
+  source_gen: ^1.5.0
+  build: ^2.4.1
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/pkg/
+
+

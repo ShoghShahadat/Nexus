@@ -71,11 +71,34 @@ class _WgslBodyVisitor extends SimpleAstVisitor<void> {
       return _mapIdentifier(expression.toSource());
     }
     if (expression is MethodInvocation) {
-      final target = _translateExpression(expression.target!);
+      final methodName = expression.methodName.name;
       final arguments = expression.argumentList.arguments
           .map(_translateExpression)
           .join(', ');
-      return '$target.${expression.methodName.name}($arguments)';
+
+      // --- FIX: Handle top-level function calls like sqrt(), cos(), etc. ---
+      if (expression.target == null) {
+        // Map common Dart math functions to WGSL built-in functions
+        const supportedFunctions = {
+          'sqrt',
+          'cos',
+          'sin',
+          'tan',
+          'abs',
+          'floor',
+          'ceil',
+          'min',
+          'max'
+        };
+        if (supportedFunctions.contains(methodName)) {
+          return '$methodName($arguments)';
+        } else {
+          return '// Unsupported function: $methodName';
+        }
+      } else {
+        final target = _translateExpression(expression.target!);
+        return '$target.$methodName($arguments)';
+      }
     }
     if (expression is SimpleIdentifier) {
       return _mapIdentifier(expression.name);
@@ -93,8 +116,13 @@ class _WgslBodyVisitor extends SimpleAstVisitor<void> {
   String _mapIdentifier(String dartIdentifier) {
     // This is where you map Dart variables/properties to WGSL equivalents.
     return dartIdentifier
-        .replaceAll('p.position', 'p.pos')
-        .replaceAll('p.velocity', 'p.vel')
+        .replaceAll('p.position.x', 'p.pos.x')
+        .replaceAll('p.position.y', 'p.pos.y')
+        .replaceAll('p.velocity.x', 'p.vel.x')
+        .replaceAll('p.velocity.y', 'p.vel.y')
+        .replaceAll('p.age', 'p.age')
+        .replaceAll('p.maxAge', 'p.max_age')
+        .replaceAll('p.initialSize', 'p.initial_size')
         .replaceAll('ctx.deltaTime', 'params.delta_time')
         .replaceAll('ctx.attractorX', 'params.attractor_x')
         .replaceAll('ctx.attractorY', 'params.attractor_y')
