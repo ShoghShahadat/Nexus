@@ -5,11 +5,16 @@ import 'package:nexus/src/compute/gpu_buffer_native.dart';
 import 'package:path/path.dart' as path;
 import 'dart:typed_data';
 
-// FFI Signatures for the Rust core library
+// --- CRITICAL FIX: Update FFI signatures to accept the shader code string ---
+// The native function now expects a pointer to the initial data, its length,
+// and a pointer to the UTF8-encoded shader code string.
+// --- اصلاح حیاتی: به‌روزرسانی امضای FFI برای پذیرش رشته کد شیدر ---
+// تابع نیتیو اکنون یک اشاره‌گر به داده‌های اولیه، طول آن، و یک اشاره‌گر
+// به رشته کد شیدر با انکدینگ UTF8 را انتظار دارد.
 typedef InitGpuC = Pointer<Void> Function(
-    Pointer<Float> initial_data, Int32 len);
+    Pointer<Float> initial_data, Int32 len, Pointer<Utf8> shader_code);
 typedef InitGpuDart = Pointer<Void> Function(
-    Pointer<Float> initial_data, int len);
+    Pointer<Float> initial_data, int len, Pointer<Utf8> shader_code);
 
 typedef ReleaseGpuC = Void Function(Pointer<Void> context);
 typedef ReleaseGpuDart = void Function(Pointer<Void> context);
@@ -59,15 +64,28 @@ class GpuContext {
     }
   }
 
-  void initialize(GpuBuffer<Float> buffer) {
+  // --- CRITICAL FIX: Update the method signature to accept the shader code ---
+  // --- اصلاح حیاتی: به‌روزرسانی امضای متد برای پذیرش کد شیدر ---
+  void initialize(GpuBuffer<Float> buffer, String shaderCode) {
     if (_isInitialized) return;
     _loadLibrary();
-    _context = _initGpu(buffer.pointer, buffer.length);
-    if (_context == nullptr) {
-      throw Exception(
-          'Failed to initialize GPU context. The native code returned a null pointer.');
+
+    // Convert the Dart String to a C-compatible, null-terminated UTF8 string.
+    // رشته Dart را به یک رشته UTF8 سازگار با C تبدیل می‌کنیم.
+    final shaderCodeC = shaderCode.toNativeUtf8();
+
+    try {
+      _context = _initGpu(buffer.pointer, buffer.length, shaderCodeC);
+      if (_context == nullptr) {
+        throw Exception(
+            'Failed to initialize GPU context. The native code returned a null pointer.');
+      }
+      _isInitialized = true;
+    } finally {
+      // ALWAYS free the allocated native string memory to prevent memory leaks.
+      // همیشه حافظه اختصاص داده شده به رشته نیتیو را برای جلوگیری از نشت حافظه آزاد می‌کنیم.
+      malloc.free(shaderCodeC);
     }
-    _isInitialized = true;
   }
 
   Future<int> runSimulation(double deltaTime, double attractorX,
@@ -84,29 +102,13 @@ class GpuContext {
     if (!_isInitialized || _context == null) {
       throw StateError('GpuContext is not initialized.');
     }
-    // 1. Allocate a temporary native buffer
     final buffer = malloc.allocate<Float>(sizeOf<Float>() * length);
     try {
-      // 2. Ask Rust to fill our temporary buffer with GPU data
       _readGpuBuffer(_context!, buffer, length);
-
-      // 3. Create a Dart-side view of the native data
       final view = buffer.asTypedList(length);
-
-      // --- CRITICAL FIX: Create a safe copy ---
-      // Instead of returning the view (which points to memory we are about to free),
-      // we create a new Float32List. This copies the data from the native buffer
-      // into a new, garbage-collected Dart object.
-      // --- اصلاح حیاتی: ایجاد یک کپی امن ---
-      // به جای بازگرداندن نما (که به حافظه‌ای اشاره دارد که می‌خواهیم آزاد کنیم)،
-      // یک Float32List جدید ایجاد می‌کنیم. این کار داده‌ها را از بافر نیتیو
-      // به یک شیء جدید Dart که توسط garbage collector مدیریت می‌شود، کپی می‌کند.
       final safeList = Float32List.fromList(view);
-
-      // 5. Return the safe, Dart-managed copy
       return safeList;
     } finally {
-      // 4. ALWAYS free the temporary native buffer
       malloc.free(buffer);
     }
   }
@@ -120,8 +122,6 @@ class GpuContext {
   }
 
   String? _getLibraryPath() {
-    // This path assumes the DLL is copied to a `rust_lib` directory
-    // next to the executable. The build script handles this.
     if (Platform.isWindows) {
       return path.join(Directory.current.path, 'rust_lib', 'rust_core.dll');
     }

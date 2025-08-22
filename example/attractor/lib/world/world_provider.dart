@@ -125,11 +125,9 @@ NexusWorld provideAttractorWorld() {
     PhysicsSystem(),
     ResponsivenessSystem(),
     ParticleLifecycleSystem(),
-
-    AttractorGpuSystem(), // This now spawns 500 particles by default
+    AttractorGpuSystem(),
     GpuBridgeSystem(),
     DebugSystem(),
-
     SpawnerSystem(),
     TargetingSystem(),
     CollisionSystem(),
@@ -168,12 +166,6 @@ NexusWorld provideAttractorWorld() {
       prefab: () => createMeteorPrefab(world),
       frequency: const Frequency.perSecond(0.8),
       wantsToFire: true,
-      // --- CONFIGURATION FIX: Add condition to limit max meteors ---
-      // This function will only allow a new meteor to spawn if the
-      // current count is less than 10.
-      // --- اصلاح پیکربندی: افزودن شرط برای محدود کردن حداکثر شهاب‌سنگ‌ها ---
-      // این تابع فقط زمانی اجازه تولید شهاب‌سنگ جدید را می‌دهد که
-      // تعداد فعلی کمتر از ۱۰ باشد.
       condition: () {
         final meteorCount = world.entities.values
             .where((e) => e.get<TagsComponent>()?.hasTag('meteor') ?? false)
@@ -209,7 +201,12 @@ NexusWorld provideAttractorWorld() {
     CustomWidgetComponent(widgetType: 'particle_canvas'),
     BlackboardComponent({'score': 0, 'is_game_over': false, 'game_time': 0.0}),
     GpuParticleRenderComponent(Float32List(0)),
-    GpuUniformsComponent(),
+    // --- CRITICAL FIX: Removed the obsolete GpuUniformsComponent ---
+    // This component was deleted in the refactor to a dynamic transpiler system.
+    // The uniform data is now passed directly to the `compute` method.
+    // --- اصلاح حیاتی: حذف GpuUniformsComponent منسوخ شده ---
+    // این کامپوننت در بازسازی به سیستم ترنسپایلر پویا حذف شد.
+    // داده‌های یونیفرم اکنون مستقیماً به متد `compute` ارسال می‌شوند.
     DebugInfoComponent(),
     GpuTimeComponent(0),
   ]);

@@ -5,16 +5,8 @@ import 'dart:typed_data';
 import 'package:nexus/nexus.dart';
 import '../events.dart';
 
-// A simple 2D vector class for our particle data structure.
-class Vec2 with EquatableMixin {
-  double x, y;
-  Vec2(this.x, this.y);
-
-  @override
-  List<Object?> get props => [x, y];
-}
-
-// The data structure for a single particle.
+// The Dart data structure for a single particle.
+// The GpuSystem will use this to understand the data layout.
 class ParticleData {
   final Vec2 position;
   final Vec2 velocity;
@@ -31,33 +23,61 @@ class ParticleData {
   });
 }
 
-// A component to hold global data (uniforms) for the GPU simulation.
-class GpuUniformsComponent extends Component {
-  final double attractorX;
-  final double attractorY;
-  final double attractorStrength;
-  final double screenWidth;
-  final double screenHeight;
-
-  GpuUniformsComponent({
-    this.attractorX = 0.0,
-    this.attractorY = 0.0,
-    this.attractorStrength = 1.0,
-    this.screenWidth = 400.0,
-    this.screenHeight = 800.0,
-  });
-
+// A simple 2D vector class.
+class Vec2 with EquatableMixin {
+  double x, y;
+  Vec2(this.x, this.y);
   @override
-  List<Object?> get props =>
-      [attractorX, attractorY, attractorStrength, screenWidth, screenHeight];
+  List<Object?> get props => [x, y];
 }
 
 class AttractorGpuSystem extends GpuSystem<ParticleData> {
-  // --- CONFIGURATION FIX: Set particle count to user's preference ---
-  // --- اصلاح پیکربندی: تنظیم تعداد ذرات بر اساس درخواست کاربر ---
   final int particleCount;
   final Random _random = Random();
   late List<ParticleData> _particleObjects;
+
+  // --- THE NEW ARCHITECTURE ---
+  // Instead of a pre-compiled shader, we define the GPU logic
+  // right here in Dart! The GpuSystem will transpile this.
+  // --- معماری جدید ---
+  // به جای یک شیدر از پیش کامپایل شده، ما منطق GPU را
+  // دقیقاً اینجا در Dart تعریف می‌کنیم! GpuSystem این را ترجمه خواهد کرد.
+  @override
+  String get gpuLogicSourceCode => '''
+    void gpuLogic(Particle p, SimParams params) {
+      if (p.age >= p.max_age) {
+          p.pos.x = params.attractor_x;
+          p.pos.y = params.attractor_y;
+          
+          let seed = p.seed + (params.delta_time * 1000.0);
+          let angle = hash(seed) * 2.0 * 3.14159;
+          let speed = 50.0 + hash(seed * 2.0) * 100.0;
+          p.vel.x = cos(angle) * speed;
+          p.vel.y = sin(angle) * speed;
+          p.age = 0.0;
+          p.seed = p.seed + 1.0; // Change seed for next respawn
+      }
+
+      let attractor_pos_x = params.attractor_x;
+      let attractor_pos_y = params.attractor_y;
+      
+      let dir_x = attractor_pos_x - p.pos.x;
+      let dir_y = attractor_pos_y - p.pos.y;
+      
+      let dist_sq = (dir_x * dir_x) + (dir_y * dir_y);
+
+      if (dist_sq > 1.0) {
+          let dist = sqrt(dist_sq);
+          let force = params.attractor_strength * 1000.0 / dist_sq;
+          p.vel.x = p.vel.x + (dir_x / dist) * force * params.delta_time;
+          p.vel.y = p.vel.y + (dir_y / dist) * force * params.delta_time;
+      }
+      
+      p.pos.x = p.pos.x + p.vel.x * params.delta_time;
+      p.pos.y = p.pos.y + p.vel.y * params.delta_time;
+      p.age = p.age + params.delta_time;
+    }
+  ''';
 
   AttractorGpuSystem({this.particleCount = 500});
 
@@ -91,15 +111,9 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
   }
 
   @override
-  void gpuLogic(ParticleData p, GpuKernelContext ctx) {
-    // This method is now only required for the CPU fallback mode.
-    // The main GPU logic resides entirely in the shader.
-  }
-
-  @override
   Float32List flattenData(List<ParticleData> data) {
     if (data.isEmpty) return Float32List(0);
-    // Stride is 8 to account for memory padding in the shader
+    // Stride is now 8: pos(2), vel(2), age(1), max_age(1), initial_size(1), seed(1)
     final list = Float32List(data.length * 8);
     for (int i = 0; i < data.length; i++) {
       final p = data[i];
@@ -111,10 +125,8 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
       list[baseIndex + 4] = p.age;
       list[baseIndex + 5] = p.maxAge;
       list[baseIndex + 6] = p.initialSize;
-      list[baseIndex + 7] = 0.0; // Padding
+      list[baseIndex + 7] = _random.nextDouble() * 1000.0; // Initial seed
     }
     return list;
   }
-
-  List<ParticleData> get particleObjects => _particleObjects;
 }

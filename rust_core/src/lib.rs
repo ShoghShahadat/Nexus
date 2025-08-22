@@ -1,4 +1,5 @@
-use std::ffi::c_void;
+use std::ffi::{c_void, CStr};
+use std::os::raw::c_char;
 use std::slice;
 use std::sync::Once;
 use std::time::Instant;
@@ -7,8 +8,6 @@ use log;
 
 static INIT_LOGGER: Once = Once::new();
 
-// This struct MUST EXACTLY match the `SimParams` struct in `shader.wgsl`
-// این ساختار باید دقیقاً با ساختار `SimParams` در `shader.wgsl` مطابقت داشته باشد
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct SimParams {
@@ -18,10 +17,6 @@ struct SimParams {
     attractor_strength: f32,
 }
 
-// This struct is for Rust's internal logic, not passed to the shader directly.
-// The data layout from Dart (8 floats) is mapped to the `Particle` struct in the shader.
-// این ساختار برای منطق داخلی Rust است و مستقیماً به شیدر ارسال نمی‌شود.
-// چیدمان داده از Dart (۸ فلوت) به ساختار `Particle` در شیدر مپ می‌شود.
 pub struct GpuContext {
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -34,30 +29,24 @@ pub struct GpuContext {
 }
 
 #[no_mangle]
-pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_void {
+pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize, shader_code_ptr: *const c_char) -> *mut c_void {
     INIT_LOGGER.call_once(|| {
         env_logger::init_from_env(env_logger::Env::default().default_filter_or("wgpu_core=warn,wgpu_hal=warn,rust_core=info"));
     });
     
-    log::info!("[Rust] >> init_gpu called with data length: {}", len);
+    let shader_code = unsafe { CStr::from_ptr(shader_code_ptr).to_str().unwrap() };
+    log::info!("[Rust] >> init_gpu called with dynamic shader.");
 
     let initial_data = unsafe { slice::from_raw_parts(initial_data_ptr, len) };
     let particle_count = (len / 8) as u32;
-    log::info!("[Rust] Calculated particle count: {}", particle_count);
 
     let context = pollster::block_on(async {
         let instance = wgpu::Instance::default();
-        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-            ..Default::default()
-        }).await.unwrap();
-        
-        log::info!("[Rust] Using adapter: {}", adapter.get_info().name);
+        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions::default()).await.unwrap();
         let (device, queue) = adapter.request_device(&Default::default(), None).await.unwrap();
 
-        let shader_code = include_str!("shader.wgsl");
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Simulation Shader"),
+            label: Some("Dynamic Simulation Shader"),
             source: wgpu::ShaderSource::Wgsl(shader_code.into()),
         });
         
@@ -65,7 +54,7 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
             label: Some("Simulation Bind Group Layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0, // Corresponds to @binding(0) in shader for particles
+                    binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -74,8 +63,12 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
                     },
                     count: None,
                 },
+                // --- CRITICAL FIX: Correct syntax for Uniform Buffer Binding ---
+                // The API for wgpu has been updated. This is the new, correct structure.
+                // --- اصلاح حیاتی: سینتکس صحیح برای بایندینگ بافر یونیفرم ---
+                // API کتابخانه wgpu به‌روزرسانی شده است. این ساختار جدید و صحیح است.
                 wgpu::BindGroupLayoutEntry {
-                    binding: 1, // Corresponds to @binding(1) in shader for params
+                    binding: 1,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -109,14 +102,14 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
         });
 
         let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Staging Buffer (for readback)"),
+            label: Some("Staging Buffer"),
             size: buffer_size,
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Params Uniform Buffer"),
+            label: Some("Params Buffer"),
             size: std::mem::size_of::<SimParams>() as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -137,7 +130,7 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
             ],
         });
 
-        log::info!("[Rust] GPU context created successfully.");
+        log::info!("[Rust] Dynamic GPU context created successfully.");
         GpuContext {
             device,
             queue,
@@ -197,12 +190,7 @@ async fn run_simulation(context: &GpuContext, delta_time: f32, attractor_x: f32,
 pub extern "C" fn run_gpu_simulation(context_ptr: *mut c_void, delta_time: f32, attractor_x: f32, attractor_y: f32, attractor_strength: f32) -> u64 {
     if context_ptr.is_null() { return 0; }
     let context = unsafe { &*(context_ptr as *mut GpuContext) };
-    // ADDED LOG
-    log::info!("[Rust] >> run_gpu_simulation called with dt: {:.4}", delta_time);
-    let result = pollster::block_on(run_simulation(context, delta_time, attractor_x, attractor_y, attractor_strength));
-    // ADDED LOG
-    log::info!("[Rust] << run_gpu_simulation finished in {} µs", result);
-    result
+    pollster::block_on(run_simulation(context, delta_time, attractor_x, attractor_y, attractor_strength))
 }
 
 #[no_mangle]
@@ -210,9 +198,6 @@ pub extern "C" fn read_gpu_buffer(context_ptr: *mut c_void, output_ptr: *mut f32
     if context_ptr.is_null() { return; }
     let context = unsafe { &*(context_ptr as *mut GpuContext) };
     let output_slice = unsafe { slice::from_raw_parts_mut(output_ptr, len) };
-    
-    // ADDED LOG
-    log::info!("[Rust] >> read_gpu_buffer called for {} floats.", len);
 
     pollster::block_on(async {
         let buffer_size = (len * std::mem::size_of::<f32>()) as wgpu::BufferAddress;
@@ -245,8 +230,6 @@ pub extern "C" fn read_gpu_buffer(context_ptr: *mut c_void, output_ptr: *mut f32
             
             drop(data);
             context.staging_buffer.unmap();
-            // ADDED LOG
-            log::info!("[Rust] << read_gpu_buffer finished successfully.");
         } else {
             log::error!("[Rust] << Failed to map staging buffer for reading.");
         }
