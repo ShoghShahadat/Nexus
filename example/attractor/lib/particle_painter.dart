@@ -1,36 +1,29 @@
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:nexus/nexus.dart';
 
 /// A custom painter to efficiently render a large number of particles from raw GPU data,
 /// along with other game entities like the attractor, meteors, and health orbs.
 class ParticlePainter extends CustomPainter {
   final Float32List? gpuParticleData;
-  final List<EntityId> meteorIds;
-  final EntityId attractorId;
-  final List<EntityId> healthOrbIds;
-  final FlutterRenderingSystem controller;
+  final List<Offset> meteorPositions;
+  final Offset? attractorPosition;
+  final List<Offset> healthOrbPositions;
 
   ParticlePainter({
     required this.gpuParticleData,
-    required this.meteorIds,
-    required this.attractorId,
-    required this.healthOrbIds,
-    required this.controller,
+    required this.meteorPositions,
+    required this.attractorPosition,
+    required this.healthOrbPositions,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    // --- Particle Rendering (Corrected) ---
     final particlePaint = Paint();
-    final attractorPaint = Paint()..color = Colors.yellowAccent;
-    final meteorPaint = Paint();
-    final healthOrbPaint = Paint()..color = Colors.greenAccent.shade400;
-    final healthBarBgPaint = Paint()..color = Colors.grey.shade800;
-    final healthBarFgPaint = Paint()..color = Colors.green;
-
     if (gpuParticleData != null) {
       final data = gpuParticleData!;
-      // Data layout is now [x, y, size, opacity_or_negative_color]
+      // This loop is highly optimized for drawing particles from raw data.
       for (int i = 0; i < data.length; i += 4) {
         final x = data[i];
         final y = data[i + 1];
@@ -38,13 +31,11 @@ class ParticlePainter extends CustomPainter {
         final fourthValue = data[i + 3];
 
         if (radius > 0.1) {
-          // FIX: Use a robust check. Positive values are opacity for white particles.
-          // Negative values are the color for exploding particles.
           if (fourthValue >= 0) {
-            // It's a normal particle, fourthValue is opacity.
-            particlePaint.color = Colors.white.withOpacity(fourthValue);
+            // Use a simple white color with varying opacity.
+            particlePaint.color = Color.fromRGBO(255, 255, 255, fourthValue);
           } else {
-            // It's an exploding particle, fourthValue is the negative color.
+            // Use the negative value as the full ARGB color for explosions.
             particlePaint.color = Color((-fourthValue).toInt());
           }
           canvas.drawCircle(Offset(x, y), radius, particlePaint);
@@ -52,62 +43,45 @@ class ParticlePainter extends CustomPainter {
       }
     }
 
-    // --- The rest of the drawing logic remains the same ---
-
-    // Draw all the meteors
-    for (final id in meteorIds) {
-      final pos = controller.get<PositionComponent>(id);
-      if (pos == null) continue;
-
-      final rect =
-          Rect.fromCircle(center: Offset(pos.x, pos.y), radius: pos.width / 2);
+    // --- Meteor Rendering (VISUALS RESTORED) ---
+    // We go back to drawing circles in a loop to restore the correct visuals.
+    // This is still fast because we are iterating over a simple List<Offset>
+    // and not performing expensive lookups inside the paint method.
+    // به رسم دایره در یک حلقه بازمی‌گردیم تا ظاهر صحیح را بازیابی کنیم.
+    // این روش همچنان سریع است زیرا روی یک `List<Offset>` ساده پیمایش می‌کنیم
+    // و جستجوهای هزینه‌بر را درون متد paint انجام نمی‌دهیم.
+    final meteorPaint = Paint();
+    for (final pos in meteorPositions) {
+      final rect = Rect.fromCircle(center: pos, radius: 12);
+      // Restore the beautiful gradient shader for meteors
       meteorPaint.shader = const RadialGradient(
         colors: [Colors.white, Colors.orangeAccent, Colors.transparent],
         stops: [0.0, 0.4, 1.0],
       ).createShader(rect);
-
-      canvas.drawCircle(Offset(pos.x, pos.y), pos.width / 2, meteorPaint);
+      canvas.drawCircle(pos, 12, meteorPaint);
     }
 
-    // Draw all the health orbs
-    for (final id in healthOrbIds) {
-      final pos = controller.get<PositionComponent>(id);
-      final health = controller.get<HealthComponent>(id);
-      if (pos == null || health == null) continue;
-
-      canvas.drawCircle(Offset(pos.x, pos.y), pos.width / 2, healthOrbPaint);
-
-      final healthRatio =
-          (health.currentHealth / health.maxHealth).clamp(0.0, 1.0);
-      const barWidth = 20.0;
-      const barHeight = 4.0;
-      final barX = pos.x - barWidth / 2;
-      final barY = pos.y - (pos.width / 2) - 8;
-
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(Rect.fromLTWH(barX, barY, barWidth, barHeight),
-            const Radius.circular(2)),
-        healthBarBgPaint,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-            Rect.fromLTWH(barX, barY, barWidth * healthRatio, barHeight),
-            const Radius.circular(2)),
-        healthBarFgPaint,
-      );
+    // --- Health Orb Rendering (VISUALS RESTORED) ---
+    final healthOrbPaint = Paint()..color = Colors.greenAccent.shade400;
+    for (final pos in healthOrbPositions) {
+      canvas.drawCircle(pos, 6, healthOrbPaint);
     }
 
-    // Draw the attractor
-    final attractorPos = controller.get<PositionComponent>(attractorId);
-    if (attractorPos != null) {
+    // --- Attractor Rendering ---
+    if (attractorPosition != null) {
+      final attractorPaint = Paint()..color = Colors.yellowAccent;
       canvas.drawCircle(
-        Offset(attractorPos.x, attractorPos.y),
-        attractorPos.width / 2,
+        attractorPosition!,
+        10,
         attractorPaint,
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant ParticlePainter oldDelegate) => true;
+  bool shouldRepaint(covariant ParticlePainter oldDelegate) {
+    // We can add more granular checks here later if needed, but for now,
+    // always repainting is fine.
+    return true;
+  }
 }

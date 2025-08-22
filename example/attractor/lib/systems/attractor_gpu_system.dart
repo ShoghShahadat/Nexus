@@ -53,11 +53,13 @@ class GpuUniformsComponent extends Component {
 }
 
 class AttractorGpuSystem extends GpuSystem<ParticleData> {
+  // --- CONFIGURATION FIX: Set particle count to user's preference ---
+  // --- اصلاح پیکربندی: تنظیم تعداد ذرات بر اساس درخواست کاربر ---
   final int particleCount;
   final Random _random = Random();
   late List<ParticleData> _particleObjects;
 
-  AttractorGpuSystem({this.particleCount = 50000});
+  AttractorGpuSystem({this.particleCount = 500});
 
   @override
   void onAddedToWorld(NexusWorld world) {
@@ -88,7 +90,6 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
     );
   }
 
-  // --- FIX: All logic is now on the GPU. This is no longer used. ---
   @override
   void gpuLogic(ParticleData p, GpuKernelContext ctx) {
     // This method is now only required for the CPU fallback mode.
@@ -98,7 +99,7 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
   @override
   Float32List flattenData(List<ParticleData> data) {
     if (data.isEmpty) return Float32List(0);
-    // --- FIX: Stride is now 8 to account for memory padding in the shader ---
+    // Stride is 8 to account for memory padding in the shader
     final list = Float32List(data.length * 8);
     for (int i = 0; i < data.length; i++) {
       final p = data[i];

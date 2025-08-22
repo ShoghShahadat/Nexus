@@ -57,7 +57,6 @@ Entity createMeteorPrefab(NexusWorld world) {
   final startEdge = random.nextInt(4);
   double startX, startY;
 
-  // Use current screen info for spawning position
   final screenInfo = root.get<ScreenInfoComponent>();
   final screenWidth = screenInfo?.width ?? 400.0;
   final screenHeight = screenInfo?.height ?? 800.0;
@@ -127,9 +126,9 @@ NexusWorld provideAttractorWorld() {
     ResponsivenessSystem(),
     ParticleLifecycleSystem(),
 
-    AttractorGpuSystem(),
-    GpuBridgeSystem(), // Runs first to get GPU time
-    DebugSystem(), // Runs after to read the new GPU time
+    AttractorGpuSystem(), // This now spawns 500 particles by default
+    GpuBridgeSystem(),
+    DebugSystem(),
 
     SpawnerSystem(),
     TargetingSystem(),
@@ -169,6 +168,18 @@ NexusWorld provideAttractorWorld() {
       prefab: () => createMeteorPrefab(world),
       frequency: const Frequency.perSecond(0.8),
       wantsToFire: true,
+      // --- CONFIGURATION FIX: Add condition to limit max meteors ---
+      // This function will only allow a new meteor to spawn if the
+      // current count is less than 10.
+      // --- اصلاح پیکربندی: افزودن شرط برای محدود کردن حداکثر شهاب‌سنگ‌ها ---
+      // این تابع فقط زمانی اجازه تولید شهاب‌سنگ جدید را می‌دهد که
+      // تعداد فعلی کمتر از ۱۰ باشد.
+      condition: () {
+        final meteorCount = world.entities.values
+            .where((e) => e.get<TagsComponent>()?.hasTag('meteor') ?? false)
+            .length;
+        return meteorCount < 10;
+      },
     ),
     LifecyclePolicyComponent(isPersistent: true),
   ]);
@@ -200,7 +211,7 @@ NexusWorld provideAttractorWorld() {
     GpuParticleRenderComponent(Float32List(0)),
     GpuUniformsComponent(),
     DebugInfoComponent(),
-    GpuTimeComponent(0), // Add initial component
+    GpuTimeComponent(0),
   ]);
 
   return world;

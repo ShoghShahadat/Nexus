@@ -1,7 +1,5 @@
 // WGSL (WebGPU Shading Language) Code
 
-// This struct MUST EXACTLY match the `SimParams` struct in `lib.rs`
-// این ساختار باید دقیقاً با ساختار `SimParams` در `lib.rs` مطابقت داشته باشد
 struct SimParams {
     delta_time: f32,
     attractor_x: f32,
@@ -9,35 +7,31 @@ struct SimParams {
     attractor_strength: f32,
 };
 
-// This struct defines the layout of a single particle in the storage buffer.
-// It MUST EXACTLY match the data layout created by `flattenData` in Dart (8 floats).
-// vec2<f32> = 2 floats. So this struct is 2 + 2 + 1 + 1 + 1 + 1 = 8 floats total.
-// این ساختار چیدمان یک ذره را در بافر ذخیره‌سازی تعریف می‌کند.
-// باید دقیقاً با چیدمان داده ایجاد شده توسط `flattenData` در Dart (۸ فلوت) مطابقت داشته باشد.
 struct Particle {
     pos: vec2<f32>,
     vel: vec2<f32>,
     age: f32,
     max_age: f32,
     initial_size: f32,
-    _padding: f32, // Padding to ensure data alignment
+    _padding: f32,
 };
 
-// Binding for the uniform parameters
 @group(0) @binding(1)
 var<uniform> params: SimParams;
 
-// Binding for the main particle data storage buffer
 @group(0) @binding(0)
 var<storage, read_write> particles: array<Particle>;
 
-// The main entry point for the compute shader
+// A simple pseudo-random function using hashing.
+// یک تابع ساده شبه-تصادفی با استفاده از هش.
+fn hash(n: f32) -> f32 {
+    return fract(sin(n) * 43758.5453123);
+}
+
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let index = global_id.x;
     
-    // Prevent out-of-bounds access
-    // This is a safeguard; particle_count should be handled correctly by the dispatcher
     let array_len = arrayLength(&particles);
     if (index >= array_len) {
         return;
@@ -45,33 +39,39 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     var p = particles[index];
 
-    // --- Simulation Logic ---
+    // --- CRITICAL FIX: Complete respawn logic ---
+    // If a particle's age is over its max_age, reset its position to the
+    // attractor and give it a new random-like velocity to create a fountain effect.
+    // --- اصلاح حیاتی: منطق کامل بازآفرینی ---
+    // اگر عمر ذره‌ای از حداکثر عمرش بیشتر شود، موقعیت آن را به جاذب بازگردانده
+    // و یک سرعت جدید و شبه-تصادفی برای ایجاد افکت فواره‌ای به آن می‌دهیم.
+    if (p.age >= p.max_age) {
+        // 1. Reset position to the attractor's current location
+        p.pos = vec2<f32>(params.attractor_x, params.attractor_y);
+        
+        // 2. Generate a new pseudo-random velocity
+        let seed = f32(index) + (params.delta_time * 1000.0);
+        let angle = hash(seed) * 2.0 * 3.14159;
+        let speed = 50.0 + hash(seed * 2.0) * 100.0; // Speed between 50 and 150
+        p.vel = vec2<f32>(cos(angle) * speed, sin(angle) * speed);
 
-    // 1. Attractor Force Calculation
+        // 3. Reset age
+        p.age = 0.0;
+    }
+
+    // --- Simulation Logic ---
     let attractor_pos = vec2<f32>(params.attractor_x, params.attractor_y);
     let dir = attractor_pos - p.pos;
     let dist_sq = dot(dir, dir);
 
-    // Apply force only if not too close, to prevent division by zero and extreme velocities
     if (dist_sq > 1.0) {
         let dist = sqrt(dist_sq);
-        // Using a simplified gravity model
         let force = params.attractor_strength * 1000.0 / dist_sq;
         p.vel = p.vel + (dir / dist) * force * params.delta_time;
     }
     
-    // 2. Apply Velocity and Age
     p.pos = p.pos + p.vel * params.delta_time;
     p.age = p.age + params.delta_time;
 
-    // 3. Reset particle if its age exceeds its max_age
-    // This creates a continuous fountain effect from the spawn point
-    if (p.age >= p.max_age) {
-        // For this example, we just reset the age. A more complex system
-        // might reset position and velocity as well.
-        p.age = 0.0;
-    }
-
-    // Write the updated particle data back to the storage buffer
     particles[index] = p;
 }

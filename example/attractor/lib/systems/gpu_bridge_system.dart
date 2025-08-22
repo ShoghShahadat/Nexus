@@ -37,11 +37,10 @@ class GpuBridgeSystem extends System {
 
     final attractor = world.entities.values
         .firstWhereOrNull((e) => e.has<AttractorComponent>());
-    final screenInfo = entity.get<ScreenInfoComponent>();
 
     double attractorX = 0.0, attractorY = 0.0, attractorStrength = 0.0;
 
-    if (attractor != null && screenInfo != null) {
+    if (attractor != null) {
       final attractorPos = attractor.get<PositionComponent>()!;
       final attractorComp = attractor.get<AttractorComponent>()!;
       attractorX = attractorPos.x;
@@ -57,48 +56,49 @@ class GpuBridgeSystem extends System {
     );
     entity.add(GpuTimeComponent(gpuMicros));
 
-    if (isGameOver) return;
-
-    if (!kIsWeb && _gpuSystem!.mode == GpuMode.gpu) {
-      final gpuContext = GpuContext();
-      // --- FIX: Stride is now 8 to match the shader ---
-      final flatData = (gpuContext as dynamic)
-          .readBuffer(_gpuSystem!.particleObjects.length * 8);
-
-      for (int i = 0; i < _gpuSystem!.particleObjects.length; i++) {
-        final p = _gpuSystem!.particleObjects[i];
-        final baseIndex = i * 8;
-        p.position.x = flatData[baseIndex + 0];
-        p.position.y = flatData[baseIndex + 1];
-        p.velocity.x = flatData[baseIndex + 2];
-        p.velocity.y = flatData[baseIndex + 3];
-        p.age = flatData[baseIndex + 4];
-        // maxAge and initialSize are read-only and don't need to be updated from GPU
-      }
+    if (isGameOver) {
+      entity.add(GpuParticleRenderComponent(Float32List(0)));
+      return;
     }
 
-    final particleObjects = _gpuSystem!.particleObjects;
-    final renderData = Float32List(particleObjects.length * 4);
+    final flatData =
+        (GpuContext() as dynamic).readBuffer(_gpuSystem!.particleCount * 8);
 
-    for (int i = 0; i < particleObjects.length; i++) {
-      final p = particleObjects[i];
+    // --- CRITICAL FIX: Create a NEW list for render data every frame ---
+    // This ensures that the EquatableMixin in GpuParticleRenderComponent detects
+    // a change and notifies the rendering system to repaint. Mutating a list
+    // in place will not trigger the update.
+    // --- اصلاح حیاتی: هر فریم یک لیست جدید برای داده‌های رندر ایجاد کنید ---
+    // این تضمین می‌کند که EquatableMixin در GpuParticleRenderComponent تغییر را
+    // تشخیص داده و به سیستم رندرینگ برای بازрисовانی اطلاع دهد.
+    final renderData = Float32List(_gpuSystem!.particleCount * 4);
+
+    for (int i = 0; i < _gpuSystem!.particleCount; i++) {
+      final srcIndex = i * 8;
       final destIndex = i * 4;
 
-      renderData[destIndex + 0] = p.position.x;
-      renderData[destIndex + 1] = p.position.y;
+      final x = flatData[srcIndex + 0];
+      final y = flatData[srcIndex + 1];
+      final age = flatData[srcIndex + 4];
+      final maxAge = flatData[srcIndex + 5];
+      final initialSize = flatData[srcIndex + 6];
+
+      renderData[destIndex + 0] = x;
+      renderData[destIndex + 1] = y;
 
       if (_explosionStates[i] == 0.0) {
-        final progress = (p.age / p.maxAge).clamp(0.0, 1.0);
-        renderData[destIndex + 2] = p.initialSize * (1.0 - progress);
+        final progress = (age / maxAge).clamp(0.0, 1.0);
+        renderData[destIndex + 2] = initialSize * (1.0 - progress);
         final opacity = 1.0 - progress;
         renderData[destIndex + 3] = opacity.clamp(0.0, 1.0);
+
         if (_random.nextDouble() < 0.0005) {
           _explosionStates[i] = 0.001;
         }
       } else {
         _explosionStates[i] += dt / 0.7;
         final progress = _explosionStates[i].clamp(0.0, 1.0);
-        renderData[destIndex + 2] = p.initialSize + (progress * 15);
+        renderData[destIndex + 2] = initialSize + (progress * 15);
 
         final newAlpha = (255 * (1.0 - progress)).round();
         final colorValue =
@@ -110,6 +110,7 @@ class GpuBridgeSystem extends System {
         }
       }
     }
+
     entity.add(GpuParticleRenderComponent(renderData));
   }
 }

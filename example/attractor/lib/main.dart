@@ -29,7 +29,6 @@ void registerAttractorComponents() {
     'GpuParticleRenderComponent': (json) =>
         GpuParticleRenderComponent.fromJson(json),
     'DebugInfoComponent': (json) => DebugInfoComponent.fromJson(json),
-    // Register the new GPU time component
     'GpuTimeComponent': (json) => GpuTimeComponent.fromJson(json),
   };
   ComponentFactoryRegistry.I.registerAll(customComponents);
@@ -77,6 +76,28 @@ class _MyAppState extends State<MyApp> {
           final isGameOver = blackboard?.get<bool>('is_game_over') ?? false;
           final countdown = blackboard?.get<double>('restart_countdown') ?? 0.0;
 
+          // --- PERFORMANCE OPTIMIZATION: Pre-fetch all render data here ---
+          // Instead of fetching inside the painter, we extract all necessary
+          // positions once, creating efficient, flat lists for the painter.
+          // بهینه‌سازی عملکرد: تمام داده‌های رندر را اینجا پیش-واکشی می‌کنیم.
+          // به جای واکشی درون نقاش، تمام موقعیت‌های لازم را یکجا استخراج کرده
+          // و لیست‌های مسطح و کارآمد برای نقاش ایجاد می‌کنیم.
+          final meteorPositions = controller
+              .getAllIdsWithTag('meteor')
+              .map((id) => controller.get<PositionComponent>(id))
+              .where((p) => p != null)
+              .map((p) => Offset(p!.x, p.y))
+              .toList();
+
+          final healthOrbPositions = controller
+              .getAllIdsWithTag('health_orb')
+              .map((id) => controller.get<PositionComponent>(id))
+              .where((p) => p != null)
+              .map((p) => Offset(p!.x, p.y))
+              .toList();
+
+          final attractorPos = controller.get<PositionComponent>(attractorId);
+
           return Column(
             children: [
               Padding(
@@ -92,13 +113,15 @@ class _MyAppState extends State<MyApp> {
                   children: [
                     RepaintBoundary(
                       child: CustomPaint(
+                        // Pass the optimized, pre-fetched data to the painter.
+                        // داده‌های بهینه و پیش-واکشی شده را به نقاش پاس می‌دهیم.
                         painter: ParticlePainter(
                           gpuParticleData: gpuRenderData?.particleData,
-                          meteorIds: controller.getAllIdsWithTag('meteor'),
-                          attractorId: attractorId,
-                          healthOrbIds:
-                              controller.getAllIdsWithTag('health_orb'),
-                          controller: controller,
+                          meteorPositions: meteorPositions,
+                          attractorPosition: attractorPos != null
+                              ? Offset(attractorPos.x, attractorPos.y)
+                              : null,
+                          healthOrbPositions: healthOrbPositions,
                         ),
                         child: const SizedBox.expand(),
                       ),
