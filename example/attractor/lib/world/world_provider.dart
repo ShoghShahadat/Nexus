@@ -121,14 +121,16 @@ NexusWorld provideAttractorWorld() {
 
   world.addSystems([
     GarbageCollectorSystem(),
-    DebugSystem(),
     AnimationSystem(),
     AdvancedInputSystem(),
     PhysicsSystem(),
     ResponsivenessSystem(),
     ParticleLifecycleSystem(),
+
     AttractorGpuSystem(),
-    GpuBridgeSystem(),
+    GpuBridgeSystem(), // Runs first to get GPU time
+    DebugSystem(), // Runs after to read the new GPU time
+
     SpawnerSystem(),
     TargetingSystem(),
     CollisionSystem(),
@@ -159,28 +161,38 @@ NexusWorld provideAttractorWorld() {
   ]);
   world.addEntity(attractor);
 
-  final meteorSpawner = world.createSpawner(
-    tag: 'meteor_spawner',
-    prefab: () => createMeteorPrefab(world),
-    frequency: const Frequency.perSecond(0.8),
-  );
-  // --- FIX: Add LifecyclePolicy to spawner ---
-  meteorSpawner.add(LifecyclePolicyComponent(isPersistent: true));
+  final meteorSpawner = Entity();
+  meteorSpawner.addComponents([
+    TagsComponent({'meteor_spawner'}),
+    PositionComponent(),
+    SpawnerComponent(
+      prefab: () => createMeteorPrefab(world),
+      frequency: const Frequency.perSecond(0.8),
+      wantsToFire: true,
+    ),
+    LifecyclePolicyComponent(isPersistent: true),
+  ]);
+  world.addEntity(meteorSpawner);
 
-  final healthOrbSpawner = world.createSpawner(
-    tag: 'health_orb_spawner',
-    prefab: () => createHealthOrbPrefab(world),
-    frequency: Frequency.every(const Duration(seconds: 1)),
-    condition: () {
-      final isGameOver = world.rootEntity
-              .get<BlackboardComponent>()
-              ?.get<bool>('is_game_over') ??
-          false;
-      return !isGameOver;
-    },
-  );
-  // --- FIX: Add LifecyclePolicy to spawner ---
-  healthOrbSpawner.add(LifecyclePolicyComponent(isPersistent: true));
+  final healthOrbSpawner = Entity();
+  healthOrbSpawner.addComponents([
+    TagsComponent({'health_orb_spawner'}),
+    PositionComponent(),
+    SpawnerComponent(
+      prefab: () => createHealthOrbPrefab(world),
+      frequency: Frequency.every(const Duration(seconds: 10)),
+      wantsToFire: true,
+      condition: () {
+        final isGameOver = world.rootEntity
+                .get<BlackboardComponent>()
+                ?.get<bool>('is_game_over') ??
+            false;
+        return !isGameOver;
+      },
+    ),
+    LifecyclePolicyComponent(isPersistent: true),
+  ]);
+  world.addEntity(healthOrbSpawner);
 
   world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),
@@ -188,6 +200,7 @@ NexusWorld provideAttractorWorld() {
     GpuParticleRenderComponent(Float32List(0)),
     GpuUniformsComponent(),
     DebugInfoComponent(),
+    GpuTimeComponent(0), // Add initial component
   ]);
 
   return world;

@@ -34,3 +34,20 @@ class DebugInfoComponent extends Component with SerializableComponent {
   @override
   List<Object?> get props => [fps, frameTime, entityCount, gpuMode];
 }
+
+/// A component to store the raw computation time from the GPU in microseconds.
+class GpuTimeComponent extends Component with SerializableComponent {
+  final int microseconds;
+
+  GpuTimeComponent(this.microseconds);
+
+  factory GpuTimeComponent.fromJson(Map<String, dynamic> json) {
+    return GpuTimeComponent(json['microseconds'] as int);
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {'microseconds': microseconds};
+
+  @override
+  List<Object?> get props => [microseconds];
+}

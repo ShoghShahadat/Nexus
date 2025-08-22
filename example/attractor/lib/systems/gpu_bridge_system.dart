@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'attractor_gpu_system.dart';
+import '../components/debug_info_component.dart';
 import '../components/gpu_particle_render_component.dart';
 
 class GpuBridgeSystem extends System {
@@ -26,7 +27,6 @@ class GpuBridgeSystem extends System {
     return entity.get<TagsComponent>()?.hasTag('root') ?? false;
   }
 
-  // update is now async to accommodate the async compute method.
   @override
   void update(Entity entity, double dt) async {
     if (_gpuSystem == null) return;
@@ -51,13 +51,16 @@ class GpuBridgeSystem extends System {
     }
 
     if (isGameOver) {
+      // Still update GPU time even if game is over to see performance
+      final int gpuMicros = await _gpuSystem!.compute(dt);
+      entity.add(GpuTimeComponent(gpuMicros));
       return;
     }
 
-    // Await the compute result.
-    await _gpuSystem!.compute(dt);
+    // Await the compute result and capture the microseconds.
+    final int gpuMicros = await _gpuSystem!.compute(dt);
+    entity.add(GpuTimeComponent(gpuMicros));
 
-    // The rest of the logic remains the same, as it reads from the CPU-side data.
     final particleObjects = _gpuSystem!.particleObjects;
     final renderData = Float32List(particleObjects.length * 4);
 

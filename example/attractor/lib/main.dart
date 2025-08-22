@@ -28,8 +28,9 @@ void registerAttractorComponents() {
     'TargetingComponent': (json) => TargetingComponent.fromJson(json),
     'GpuParticleRenderComponent': (json) =>
         GpuParticleRenderComponent.fromJson(json),
-    // Register the new debug component
     'DebugInfoComponent': (json) => DebugInfoComponent.fromJson(json),
+    // Register the new GPU time component
+    'GpuTimeComponent': (json) => GpuTimeComponent.fromJson(json),
   };
   ComponentFactoryRegistry.I.registerAll(customComponents);
 }
@@ -68,7 +69,6 @@ class _MyAppState extends State<MyApp> {
           final health = controller.get<HealthComponent>(attractorId);
           final gpuRenderData =
               controller.get<GpuParticleRenderComponent>(rootId);
-          // Get the new debug info
           final debugInfo = controller.get<DebugInfoComponent>(rootId);
 
           final score = blackboard?.get<num>('score') ?? 0;
@@ -138,7 +138,6 @@ class _MyAppState extends State<MyApp> {
                   ],
                 ),
               ),
-              // --- NEW: Debug Info Border ---
               if (debugInfo != null)
                 Container(
                   padding:

@@ -6,40 +6,51 @@ import 'attractor_gpu_system.dart';
 
 /// A system that calculates and provides real-time performance metrics.
 class DebugSystem extends System {
-  // Use a deque for efficient adding and removing from both ends.
   final Queue<double> _frameTimes = Queue<double>();
-  final int _sampleSize = 60; // Average over the last 60 frames for stability.
+  // --- NEW: A queue to store raw GPU computation times for averaging ---
+  final Queue<int> _gpuTimes = Queue<int>();
+  final int _sampleSize = 60;
 
   @override
   bool matches(Entity entity) {
-    // This system runs once per frame on the root entity.
     return entity.get<TagsComponent>()?.hasTag('root') ?? false;
   }
 
   @override
   void update(Entity entity, double dt) {
-    // Add the latest frame time (delta time) and maintain the sample size.
+    // --- VSync-limited frame time calculation (for display) ---
     _frameTimes.addLast(dt);
     if (_frameTimes.length > _sampleSize) {
       _frameTimes.removeFirst();
     }
+    final totalFrameTime = _frameTimes.fold<double>(0, (prev, t) => prev + t);
+    final averageFrameTimeMs = (totalFrameTime / _frameTimes.length) * 1000;
 
-    if (_frameTimes.isEmpty) return;
+    // --- Potential FPS calculation (based on raw GPU time) ---
+    final gpuTimeComp = entity.get<GpuTimeComponent>();
+    if (gpuTimeComp != null && gpuTimeComp.microseconds > 0) {
+      _gpuTimes.addLast(gpuTimeComp.microseconds);
+      if (_gpuTimes.length > _sampleSize) {
+        _gpuTimes.removeFirst();
+      }
+    }
 
-    // Calculate metrics
-    final totalTime = _frameTimes.fold<double>(0, (prev, t) => prev + t);
-    final averageFrameTimeMs =
-        (totalTime / _frameTimes.length) * 1000; // Convert to milliseconds
-    final fps = 1.0 / (totalTime / _frameTimes.length);
+    double potentialFps = 0;
+    if (_gpuTimes.isNotEmpty) {
+      final totalGpuTime = _gpuTimes.fold<int>(0, (prev, t) => prev + t);
+      final averageGpuTime = totalGpuTime / _gpuTimes.length;
+      if (averageGpuTime > 0) {
+        potentialFps = 1000000.0 / averageGpuTime;
+      }
+    }
 
-    // Get other info
     final entityCount = world.entities.length;
     final gpuSystem = world.systems.whereType<AttractorGpuSystem>().firstOrNull;
     final gpuMode = gpuSystem?.mode.toString().split('.').last ?? 'N/A';
 
-    // Update the component on the root entity
     entity.add(DebugInfoComponent(
-      fps: fps,
+      // Use the calculated potential FPS for display
+      fps: potentialFps,
       frameTime: averageFrameTimeMs,
       entityCount: entityCount,
       gpuMode: gpuMode.toUpperCase(),

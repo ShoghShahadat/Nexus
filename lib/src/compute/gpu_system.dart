@@ -34,6 +34,7 @@ abstract class GpuSystem<T> extends System {
 
   Future<int> compute(double deltaTime) async {
     if (_mode == GpuMode.gpu) {
+      // --- FIX: No longer need a dynamic cast as the API is now unified ---
       return await _gpu.runSimulation(deltaTime);
     } else if (_mode == GpuMode.cpuFallback) {
       final stopwatch = Stopwatch()..start();
@@ -60,13 +61,14 @@ abstract class GpuSystem<T> extends System {
     final flatData = flattenData(_cpuData);
 
     try {
-      // --- FIX: Wrap the Float32List in a GpuBuffer for native platforms ---
-      // This ensures the correct type is passed to the native FFI.
-      // The web implementation of GpuBuffer will handle the Float32List directly.
-      _gpuDataBuffer = Float32GpuBuffer.fromList(flatData);
+      // The dynamic cast is still needed for initialize because the parameter types differ.
+      if (kIsWeb) {
+        await (_gpu as dynamic).initialize(flatData);
+      } else {
+        _gpuDataBuffer = Float32GpuBuffer.fromList(flatData);
+        await (_gpu as dynamic).initialize(_gpuDataBuffer!);
+      }
 
-      // The initialize method is now async for the web.
-      await _gpu.initialize(_gpuDataBuffer!);
       _mode = GpuMode.gpu;
       debugPrint(
           '[Nexus GpuSystem] Successfully initialized in GPU mode. All computations will be offloaded.');

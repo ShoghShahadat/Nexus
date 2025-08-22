@@ -50,14 +50,11 @@ class GpuContext {
     }
   }
 
-  /// Initializes the GPU context with the initial data from a buffer.
-  /// This method now accepts the GpuBuffer directly to encapsulate pointer logic.
   void initialize(GpuBuffer<Float> buffer) {
     if (_isInitialized) return;
 
     _loadLibrary();
 
-    // Extract the native pointer here, inside the platform-specific file.
     _context = _initGpu(buffer.pointer, buffer.length);
 
     if (_context == nullptr) {
@@ -67,12 +64,14 @@ class GpuContext {
     _isInitialized = true;
   }
 
-  int runSimulation(double deltaTime) {
+  // --- FIX: Unify the method signature with the web version to be async ---
+  Future<int> runSimulation(double deltaTime) async {
     if (!_isInitialized || _context == null) {
       throw StateError(
           'GpuContext is not initialized. Call initialize() first.');
     }
-    return _runGpuSimulation(_context!, deltaTime);
+    // The FFI call itself is synchronous/blocking, so we wrap the result in a Future.
+    return Future.value(_runGpuSimulation(_context!, deltaTime));
   }
 
   void dispose() {
