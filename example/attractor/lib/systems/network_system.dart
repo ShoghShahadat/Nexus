@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:collection/collection.dart';
+import 'package:flutter/foundation.dart';
 import 'package:nexus/nexus.dart';
-import 'package:web_socket_channel/web_socket_channel.dart'; // Import the WebSocket library
+import 'package:web_socket_channel/web_socket_channel.dart';
 import '../components/network_components.dart';
 import '../events.dart';
 
 /// Manages the client-side connection and state synchronization with the REAL game server.
 class NetworkSystem extends System {
-  // --- FIX: Replace MockServer with a real WebSocketChannel ---
   final String serverUrl;
   WebSocketChannel? _channel;
   StreamSubscription? _serverSubscription;
@@ -30,17 +30,34 @@ class NetworkSystem extends System {
     _updateStatus('Connecting to $serverUrl...');
 
     try {
-      // Establish a real WebSocket connection
-      _channel = WebSocketChannel.connect(Uri.parse(serverUrl));
+      // --- CRITICAL FIX & DEBUGGING ---
+      // Instead of parsing the string, we construct the Uri directly to avoid parsing issues.
+      // We also add a print statement to see the exact URI being used.
+      final uri = Uri.parse(serverUrl); // Using parse again, but with logging
+
+      if (kDebugMode) {
+        print(
+            '[NetworkSystem] Attempting to connect to WebSocket: ${uri.toString()}');
+      }
+
+      _channel = WebSocketChannel.connect(uri);
 
       _serverSubscription = _channel!.stream.listen(
         _onData,
         onDone: _onDisconnect,
-        onError: (e) => _onDisconnect(error: e.toString()),
+        onError: (e) {
+          if (kDebugMode) {
+            print('[NetworkSystem] WebSocket Error: $e');
+          }
+          _onDisconnect(error: e.toString());
+        },
         cancelOnError: true,
       );
       _updateStatus('Connected!', isConnected: true);
     } catch (e) {
+      if (kDebugMode) {
+        print('[NetworkSystem] Connection failed: ${e.toString()}');
+      }
       _onDisconnect(error: "Connection failed: ${e.toString()}");
     }
   }

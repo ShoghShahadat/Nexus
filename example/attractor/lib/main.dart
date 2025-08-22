@@ -1,3 +1,4 @@
+import 'dart:io'; // <-- قدم اول: ایمپورت کردن کتابخانه مورد نیاز
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
@@ -8,8 +9,24 @@ import 'particle_painter.dart';
 import 'widgets/joystick.dart';
 import 'world/world_provider.dart';
 
+// --- قدم دوم: ایجاد یک کلاس برای نادیده گرفتن خطای گواهی خودامضا ---
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+  }
+}
+// ----------------------------------------------------------------
+
 void main() {
-  // Registration is now handled by the world provider.
+  // --- قدم سوم: اعمال کردن استثنای امنیتی قبل از اجرای برنامه ---
+  // این کد به اپلیکیشن می‌گوید که به گواهی‌های خودامضا (مثل گواهی سرور محلی ما) اعتماد کند.
+  // این کار فقط برای محیط توسعه امن است.
+  HttpOverrides.global = MyHttpOverrides();
+  // -------------------------------------------------------------
+
   runApp(const MyApp());
 }
 
@@ -21,15 +38,10 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final FlutterRenderingSystem renderingSystem;
-  // --- FIX: MockServer is no longer part of the client app ---
-  // MockServer? _server;
 
   @override
   void initState() {
     super.initState();
-    // --- FIX: Removed server start logic ---
-    // WidgetsBinding.instance.addPostFrameCallback((_) { ... });
-
     renderingSystem = FlutterRenderingSystem(
       builders: {
         'particle_canvas': (context, id, controller, manager, child) {
@@ -114,8 +126,6 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
-    // --- FIX: Removed server stop logic ---
-    // _server?.stop();
     super.dispose();
   }
 

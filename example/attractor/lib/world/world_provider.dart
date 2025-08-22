@@ -7,8 +7,6 @@ import '../systems/player_control_system.dart';
 
 // --- CLIENT WORLD PROVIDER ---
 // This file now ONLY contains the logic for creating the CLIENT's world.
-// All server-side logic, prefabs, and mock server dependencies have been removed
-// to align with a true client-server architecture.
 
 NexusWorld provideAttractorWorld() {
   // This function should be called once at the start of the app.
@@ -18,10 +16,9 @@ NexusWorld provideAttractorWorld() {
   final world = NexusWorld();
   final serializer = BinaryWorldSerializer(BinaryComponentFactory.I);
 
-  // --- CRITICAL FIX: Corrected the WebSocket server URL ---
-  // The protocol is now 'wss' (WebSocket Secure) and the invalid port and fragment are removed.
-  // This should match the address your Python server is running on.
-  const serverUrl = 'wss://n8n.youapi.ir';
+  // --- CRITICAL FIX: Corrected the WebSocket protocol and added the explicit port ---
+  // The client now connects to 'ws://' on port 8765, matching the Python server configuration.
+  const serverUrl = 'wss://127.0.0.1:5000';
 
   world.addSystems([
     ResponsivenessSystem(),
