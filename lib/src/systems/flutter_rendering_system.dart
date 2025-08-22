@@ -17,7 +17,10 @@ typedef EntityWidgetBuilderFunc = Widget Function(
 class FlutterRenderingSystem extends ChangeNotifier {
   final Map<EntityId, Map<Type, Component>> _componentCache = {};
   final Map<String, EntityWidgetBuilderFunc> builders;
+
+  // CRITICAL FIX: Made the manager publicly accessible via a getter.
   NexusManager? _manager;
+  NexusManager? get manager => _manager;
 
   final Map<EntityId, ChangeNotifier> _entityNotifiers = {};
   final Map<EntityId, Widget> _selfWidgetCache = {};
@@ -95,10 +98,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
     }
   }
 
-  // --- NEW: Decoration Helper Methods ---
-
-  /// Converts our serializable `StyleColor` into a Flutter `Color` or `Gradient`.
-  /// `StyleColor` سریالایزبل ما را به `Color` یا `Gradient` فلاتر تبدیل می‌کند.
   dynamic _buildStyleColor(StyleColor styleColor) {
     if (styleColor is SolidColor) {
       return Color(styleColor.value);
@@ -114,8 +113,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
     return null;
   }
 
-  /// Converts our serializable `BoxShadowStyle` into a Flutter `BoxShadow`.
-  /// `BoxShadowStyle` سریالایزبل ما را به `BoxShadow` فلاتر تبدیل می‌کند.
   BoxShadow _buildBoxShadow(BoxShadowStyle shadowStyle) {
     return BoxShadow(
       color: Color(shadowStyle.color),
@@ -125,21 +122,16 @@ class FlutterRenderingSystem extends ChangeNotifier {
     );
   }
 
-  /// Builds a Flutter `BoxDecoration` from our `DecorationComponent`, handling animations.
-  /// یک `BoxDecoration` فلاتر از `DecorationComponent` ما می‌سازد و انیمیشن‌ها را مدیریت می‌کند.
   BoxDecoration? _buildDecoration(EntityId id) {
     final deco = get<DecorationComponent>(id);
     if (deco == null) return null;
 
     final animProgress = get<AnimationProgressComponent>(id)?.progress;
 
-    // If there's an active animation, interpolate between the start and end states.
-    // اگر انیمیشن فعالی وجود دارد، بین حالت‌های شروع و پایان درون‌یابی می‌کند.
     if (animProgress != null && deco.animateTo != null) {
       final start = deco;
       final end = deco.animateTo!;
 
-      // Interpolate colors/gradients
       final lerpedColor = Color.lerp(
           start.color is SolidColor
               ? Color((start.color as SolidColor).value)
@@ -149,7 +141,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
               : null,
           animProgress);
 
-      // Interpolate shadows
       final lerpedShadows = (start.boxShadow != null && end.boxShadow != null)
           ? List.generate(
               start.boxShadow!.length,
@@ -163,8 +154,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
       );
     }
 
-    // If no animation, just build the decoration from the current state.
-    // اگر انیمیشنی وجود ندارد، دکوراسیون را از وضعیت فعلی می‌سازد.
     final color = deco.color != null ? _buildStyleColor(deco.color!) : null;
     return BoxDecoration(
       color: color is Color ? color : null,
@@ -172,8 +161,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
       boxShadow: deco.boxShadow?.map(_buildBoxShadow).toList(),
     );
   }
-
-  // --- Main Build Logic ---
 
   Widget build(BuildContext context) {
     if (_manager == null || _componentCache.isEmpty) {
@@ -191,31 +178,18 @@ class FlutterRenderingSystem extends ChangeNotifier {
       });
       rootId = rootEntry.key;
 
-      // --- DEBUG LOGGING START ---
       if (kDebugMode) {
-        print('[RenderingSystem] Found root entity with ID: $rootId');
         final rootComponents = _componentCache[rootId];
         if (rootComponents != null) {
-          print(
-              '    Components: ${rootComponents.keys.map((t) => t.toString()).join(', ')}');
           if (!rootComponents.containsKey(CustomWidgetComponent)) {
             print(
                 '    !!! WARNING: Root entity is missing CustomWidgetComponent!');
           }
-        } else {
-          print(
-              '    !!! ERROR: Could not find components for root ID $rootId in cache.');
         }
       }
-      // --- DEBUG LOGGING END ---
     } catch (e) {
       if (kDebugMode) {
         print('[RenderingSystem] Error finding root entity: $e');
-        print('Available entities in cache:');
-        _componentCache.forEach((id, components) {
-          print(
-              '  - ID: $id, Components: ${components.keys.map((t) => t.toString()).join(', ')}');
-        });
       }
       return const Center(child: Text("Error: 'root' entity not found."));
     }
@@ -279,7 +253,6 @@ class FlutterRenderingSystem extends ChangeNotifier {
           builtChild = childrenWidget;
         }
 
-        // --- MODIFIED: Apply decoration if it exists ---
         final decoration = _buildDecoration(id);
         Widget finalWidget = decoration != null
             ? Container(decoration: decoration, child: builtChild)

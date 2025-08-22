@@ -1,20 +1,15 @@
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/core/serialization/binary_component.dart';
+import 'package:nexus/src/core/serialization/binary_reader_writer.dart';
 import 'package:nexus/src/core/utils/frequency.dart';
 
 // --- Spawning ---
 
-/// A logic-only component for spawning new entities.
-/// This component is NOT serializable because it contains functions.
 class SpawnerComponent extends Component {
-  /// A factory function that creates a new entity instance (a "prefab").
   final Entity Function() prefab;
-
   Frequency frequency;
   double cooldown;
   bool wantsToFire;
-
-  /// An optional condition that must return true for spawning to occur.
-  /// یک شرط اختیاری که برای رخ دادن ساخت، باید true برگرداند.
   final bool Function()? condition;
 
   SpawnerComponent({
@@ -32,10 +27,9 @@ class SpawnerComponent extends Component {
 
 // --- Targeting & Movement ---
 
-/// A serializable component that makes an entity seek a target.
 class TargetingComponent extends Component with SerializableComponent {
   final EntityId targetId;
-  final double turnSpeed; // Radians per second
+  final double turnSpeed;
 
   TargetingComponent({required this.targetId, this.turnSpeed = 2.0});
 
@@ -56,10 +50,8 @@ class TargetingComponent extends Component with SerializableComponent {
 
 // --- Collision & Physics ---
 
-/// Defines the physical shape for collision detection.
 enum CollisionShape { circle }
 
-/// A serializable component that gives an entity a physical presence for collision detection.
 class CollisionComponent extends Component with SerializableComponent {
   final CollisionShape shape;
   final double radius;
@@ -96,13 +88,26 @@ class CollisionComponent extends Component with SerializableComponent {
 
 // --- Health & Damage ---
 
-/// A serializable component that gives an entity health points.
-class HealthComponent extends Component with SerializableComponent {
-  final double currentHealth;
+class HealthComponent extends Component
+    with SerializableComponent, BinaryComponent {
+  double currentHealth;
   final double maxHealth;
 
   HealthComponent({required this.maxHealth, double? currentHealth})
       : currentHealth = currentHealth ?? maxHealth;
+
+  @override
+  int get typeId => 3; // Unique network ID
+
+  @override
+  void fromBinary(BinaryReader reader) {
+    currentHealth = reader.readDouble();
+  }
+
+  @override
+  void toBinary(BinaryWriter writer) {
+    writer.writeDouble(currentHealth);
+  }
 
   factory HealthComponent.fromJson(Map<String, dynamic> json) {
     return HealthComponent(
@@ -119,7 +124,6 @@ class HealthComponent extends Component with SerializableComponent {
   List<Object?> get props => [currentHealth, maxHealth];
 }
 
-/// A serializable component that defines how much damage an entity deals on collision.
 class DamageComponent extends Component with SerializableComponent {
   final double damage;
 

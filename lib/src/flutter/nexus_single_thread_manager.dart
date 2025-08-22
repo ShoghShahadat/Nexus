@@ -4,7 +4,10 @@ import 'package:flutter/scheduler.dart';
 import 'package:nexus/nexus.dart';
 
 class NexusSingleThreadManager implements NexusManager {
+  // CRITICAL FIX: Made the world publicly accessible via a getter.
   NexusWorld? _world;
+  NexusWorld? get world => _world;
+
   Ticker? _ticker;
   final _stopwatch = Stopwatch();
 
@@ -71,11 +74,8 @@ class NexusSingleThreadManager implements NexusManager {
 
   @override
   Future<void> dispose({bool isHotReload = false}) async {
-    // --- NEW: Guaranteed state saving logic ---
     if (isHotReload && _world != null) {
-      print("--- Firing final SaveDataEvent before Hot Reload ---");
       _world!.eventBus.fire(SaveDataEvent());
-      // Run one final update loop to ensure the save event is processed.
       _updateLoop();
     }
     _ticker?.stop();
@@ -83,7 +83,6 @@ class NexusSingleThreadManager implements NexusManager {
     _ticker = null;
     _world?.clear();
     _world = null;
-    // Use await to ensure the controller is closed before proceeding.
     await _renderPacketController.close();
   }
 }
