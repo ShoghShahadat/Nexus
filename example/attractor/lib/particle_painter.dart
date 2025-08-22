@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 
 /// A custom painter to efficiently render all game entities.
-/// This version includes health bars for players and lifetime indicators for health orbs.
 class ParticlePainter extends CustomPainter {
   final List<EntityId> allPlayerIds;
   final List<EntityId> meteorIds;
@@ -27,13 +26,14 @@ class ParticlePainter extends CustomPainter {
       final pos = controller.get<PositionComponent>(id);
       if (pos == null) continue;
 
-      final rect =
-          Rect.fromCircle(center: Offset(pos.x, pos.y), radius: pos.width / 2);
+      final radius = pos.width / 2;
+      final offset = Offset(pos.x, pos.y);
+      final rect = Rect.fromCircle(center: offset, radius: radius);
       meteorPaint.shader = const RadialGradient(
         colors: [Colors.white, Colors.orangeAccent, Colors.transparent],
         stops: [0.0, 0.4, 1.0],
       ).createShader(rect);
-      canvas.drawCircle(Offset(pos.x, pos.y), pos.width / 2, meteorPaint);
+      canvas.drawCircle(offset, radius, meteorPaint);
     }
 
     // --- Health Orb Rendering with Lifetime Indicator ---
@@ -51,12 +51,11 @@ class ParticlePainter extends CustomPainter {
       final offset = Offset(pos.x, pos.y);
       canvas.drawCircle(offset, 6, healthOrbPaint);
 
-      // Draw the depleting arc
       final healthRatio =
           (health.currentHealth / health.maxHealth).clamp(0.0, 1.0);
       canvas.drawArc(
         Rect.fromCircle(center: offset, radius: 9),
-        -pi / 2, // Start from the top
+        -pi / 2,
         2 * pi * healthRatio,
         false,
         healthOrbArcPaint,
@@ -81,13 +80,16 @@ class ParticlePainter extends CustomPainter {
 
       final offset = Offset(pos.x, pos.y);
       final isLocal = id == localPlayerId;
+      // --- FIX: Use size from PositionComponent instead of hardcoded values ---
+      final radius = pos.width / 2;
 
       // Draw player body
       if (isLocal) {
-        canvas.drawCircle(offset, 12, localPlayerGlow);
-        canvas.drawCircle(offset, 10, localPlayerPaint);
+        canvas.drawCircle(
+            offset, radius * 1.2, localPlayerGlow); // Glow is slightly larger
+        canvas.drawCircle(offset, radius, localPlayerPaint);
       } else {
-        canvas.drawCircle(offset, 10, otherPlayerPaint);
+        canvas.drawCircle(offset, radius, otherPlayerPaint);
       }
 
       // Draw health bar above the player
@@ -96,15 +98,14 @@ class ParticlePainter extends CustomPainter {
             (health.currentHealth / health.maxHealth).clamp(0.0, 1.0);
         const barWidth = 30.0;
         const barHeight = 5.0;
-        final barOffset = Offset(offset.dx - barWidth / 2, offset.dy - 25);
+        final barOffset =
+            Offset(offset.dx - barWidth / 2, offset.dy - (radius + 15));
 
-        // Background
         canvas.drawRRect(
             RRect.fromRectAndRadius(
                 Rect.fromLTWH(barOffset.dx, barOffset.dy, barWidth, barHeight),
                 const Radius.circular(2)),
             healthBarBackgroundPaint);
-        // Foreground
         canvas.drawRRect(
             RRect.fromRectAndRadius(
                 Rect.fromLTWH(barOffset.dx, barOffset.dy,
@@ -117,7 +118,6 @@ class ParticlePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ParticlePainter oldDelegate) {
-    // For simplicity, always repaint. Can be optimized later if needed.
     return true;
   }
 }

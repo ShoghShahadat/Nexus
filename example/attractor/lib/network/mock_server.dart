@@ -14,8 +14,8 @@ class _Player {
 
 /// A mock WebSocket server that runs in-process and communicates via streams.
 class MockServer {
-  // --- FIX: Expose player move speed as a public constant ---
   static const double playerMoveSpeed = 300.0;
+  static const double playerBaseSize = 20.0;
 
   final NexusWorld _world;
   final BinaryWorldSerializer _serializer;
@@ -65,14 +65,16 @@ class MockServer {
     final startX = Random().nextDouble() * (screenInfo?.width ?? 800);
     final startY = (screenInfo?.height ?? 600) * 0.8;
 
-    playerEntity
-        .add(PositionComponent(x: startX, y: startY, width: 20, height: 20));
+    playerEntity.add(PositionComponent(
+        x: startX, y: startY, width: playerBaseSize, height: playerBaseSize));
     playerEntity.add(VelocityComponent());
     playerEntity.add(HealthComponent(maxHealth: 100));
     playerEntity.add(PlayerComponent(sessionId: sessionId));
     playerEntity.add(TagsComponent({'player'}));
     playerEntity.add(CollisionComponent(
-        tag: 'player', radius: 10, collidesWith: {'meteor', 'health_orb'}));
+        tag: 'player',
+        radius: playerBaseSize / 2,
+        collidesWith: {'meteor', 'health_orb'}));
     playerEntity.add(LifecyclePolicyComponent(isPersistent: true));
     _world.addEntity(playerEntity);
     return playerEntity;

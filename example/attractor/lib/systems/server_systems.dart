@@ -1,15 +1,15 @@
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 import '../components/network_components.dart';
+import '../network/mock_server.dart';
 
 /// An event fired on the server world to reset the game state for a new round.
 class ServerResetGameEvent {}
 
 /// A system that runs ONLY on the server to manage the overall game state.
-/// It checks for game-over conditions and triggers a global reset.
 class ServerGameLogicSystem extends System {
   bool _isGameOver = false;
-  double _gameOverTimer = 5.0; // 5 seconds until reset
+  double _gameOverTimer = 5.0;
 
   @override
   void onAddedToWorld(NexusWorld world) {
@@ -19,7 +19,6 @@ class ServerGameLogicSystem extends System {
 
   @override
   bool matches(Entity entity) {
-    // This system runs once per frame, tied to the server's root entity.
     return entity.get<TagsComponent>()?.hasTag('root') ?? false;
   }
 
@@ -33,10 +32,8 @@ class ServerGameLogicSystem extends System {
       return;
     }
 
-    // --- FIX: Handle individual player death ---
     for (final player in players) {
       final health = player.get<HealthComponent>();
-      // If player is defeated but still has collision/velocity, "deactivate" them.
       if (health != null &&
           health.currentHealth <= 0 &&
           player.has<CollisionComponent>()) {
@@ -47,7 +44,6 @@ class ServerGameLogicSystem extends System {
       }
     }
 
-    // Check if all players are defeated to start the reset timer.
     final allPlayersDefeated = players
         .every((p) => (p.get<HealthComponent>()?.currentHealth ?? 1) <= 0);
 
@@ -71,7 +67,6 @@ class ServerGameLogicSystem extends System {
   }
 
   void _resetGame() {
-    // Reset all players' health and reactivate them.
     final players =
         world.entities.values.where((e) => e.has<PlayerComponent>());
     for (final player in players) {
@@ -79,13 +74,21 @@ class ServerGameLogicSystem extends System {
       if (health != null) {
         player.add(HealthComponent(maxHealth: health.maxHealth));
       }
-      // --- FIX: Restore components to make the player active again ---
+
+      final pos = player.get<PositionComponent>();
+      if (pos != null) {
+        pos.width = MockServer.playerBaseSize;
+        pos.height = MockServer.playerBaseSize;
+        player.add(pos);
+      }
+
       player.add(VelocityComponent());
       player.add(CollisionComponent(
-          tag: 'player', radius: 10, collidesWith: {'meteor', 'health_orb'}));
+          tag: 'player',
+          radius: MockServer.playerBaseSize / 2,
+          collidesWith: {'meteor', 'health_orb'}));
     }
 
-    // Remove all meteors and health orbs.
     final entitiesToRemove = world.entities.values
         .where((e) {
           final tags = e.get<TagsComponent>();
@@ -99,7 +102,6 @@ class ServerGameLogicSystem extends System {
       world.removeEntity(id);
     }
 
-    // Reset score and game time
     final blackboard = world.rootEntity.get<BlackboardComponent>();
     if (blackboard != null) {
       blackboard.set('score', 0);

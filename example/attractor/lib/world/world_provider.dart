@@ -6,12 +6,13 @@ import '../components/meteor_component.dart';
 import '../components/network_components.dart';
 import '../network/mock_server.dart';
 import '../systems/debug_system.dart';
-import '../systems/game_rules_system.dart'; // <-- Import the new system
+import '../systems/game_rules_system.dart';
 import '../systems/health_orb_system.dart';
 import '../systems/healing_system.dart';
 import '../systems/meteor_burn_system.dart';
 import '../systems/network_system.dart';
 import '../systems/player_control_system.dart';
+import '../systems/power_up_system.dart';
 import '../systems/server_systems.dart';
 
 Entity createHealthOrbPrefab(NexusWorld world) {
@@ -121,11 +122,12 @@ NexusWorld provideServerWorld() {
     SpawnerSystem(),
     TargetingSystem(),
     CollisionSystem(),
-    DamageSystem(), // Generic damage system
-    GameRulesSystem(), // Game-specific collision rules
+    DamageSystem(),
+    GameRulesSystem(),
     MeteorBurnSystem(),
     HealthOrbSystem(),
     HealingSystem(),
+    PowerUpSystem(), // <-- Add the new system to the server
     ServerGameLogicSystem(),
   ]);
 
