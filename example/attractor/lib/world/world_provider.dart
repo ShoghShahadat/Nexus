@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:attractor_example/gpu/attractor_gpu_system.dart';
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
 import 'package:nexus/src/core/utils/frequency.dart';
@@ -11,7 +12,6 @@ import '../systems/game_systems.dart';
 import '../systems/health_orb_system.dart';
 import '../systems/healing_system.dart';
 import '../systems/meteor_burn_system.dart';
-import '../systems/attractor_gpu_system.dart';
 import '../systems/gpu_bridge_system.dart';
 import '../components/gpu_particle_render_component.dart';
 

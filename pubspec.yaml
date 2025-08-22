@@ -1,6 +1,6 @@
 name: nexus
 description: A highly scalable, clean, and data-oriented framework for Flutter, inspired by ECS and powered by BLoC and GetIt.
-version: 1.2.0-dev.1
+version: 2.0.0-dev.1
 homepage: https://github.com/ShoghShahadat/Nexus 
 repository: https://github.com/ShoghShahadat/Nexus 
 issue_tracker: https://github.com/ShoghShahadat/Nexus/issues
@@ -20,19 +20,18 @@ dependencies:
   analyzer: ^6.4.1
   shared_preferences: ^2.2.3
   web: ^1.0.0
+  # --- FIX: Moved build tools to regular dependencies for the package to work ---
   source_gen: ^1.5.0
+  build: ^2.4.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   lints: ^3.0.0
+  # --- build_runner itself is a development tool ---
   build_runner: ^2.4.9
-  build: ^2.4.1
-# --- CRITICAL FIX: Explicitly list WASM assets for reliable web builds. ---
-# Instead of declaring the whole directory, we list the essential JS bridge
-# and the WASM binary itself. This ensures the Flutter build tool for web
-# correctly identifies and bundles these non-standard asset types.
+
 flutter:
   uses-material-design: true
-
   assets:
     - assets/pkg/

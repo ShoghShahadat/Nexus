@@ -1,31 +1,21 @@
-# Configuration for the build_runner
-# This tells the build system how to use our custom transpiler builder.
-# پیکربندی برای build_runner
-# این به سیستم ساخت می‌گوید که چگونه از مبدل سفارشی ما استفاده کند.
-
+# Configuration for the build_runner package.
 targets:
   $default:
     builders:
-      # The key must match the one defined in the builder script.
-      # کلید باید با کلید تعریف شده در اسکریپت builder مطابقت داشته باشد.
-      nexus|transpiler:
+      # The key here should match the name of the builder in the factory.
+      nexus|gpu_shader_builder:
         enabled: true
 
 builders:
   # A unique key for our builder.
-  transpiler:
-    # The package that contains the builder script.
-    import: "package:nexus/tool/builder/transpiler_builder.dart"
-    # The function in that file that creates the builder instance.
-    builder_factories: ["shaderBuilder"]
-    # The extensions of the files that are generated.
+  gpu_shader_builder:
+    # The package that contains the builder.
+    import: "package:nexus/builder.dart"
+    # The function in the imported library that creates the builder.
+    builder_factories: ["gpuShaderBuilder"]
+    # The extension for the generated files.
     build_extensions: {".dart": [".g.dart"]}
-    # The builder will run on its own, not on the output of other builders.
-    auto_applied: root_package
-    # Specifies which files this builder should run on.
-    # We target any file inside a 'gpu' directory.
-    # مشخص می‌کند که این builder باید روی کدام فایل‌ها اجرا شود.
-    # ما هر فایلی را در داخل پوشه 'gpu' هدف قرار می‌دهیم.
+    # What files to run on. We target files ending with '_gpu_system.dart'.
     build_to: source
-    applies_to:
-      - 'lib/gpu/**.dart'
+    # Automatically run this builder when dependencies change.
+    auto_apply: dependents

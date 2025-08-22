@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:meta/meta.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/compute/gpu_context.dart';
 
@@ -9,9 +10,29 @@ enum GpuMode {
   cpuFallback,
 }
 
-/// A base class for systems that perform high-performance computations on the GPU.
-/// This version expects a pre-transpiled WGSL shader code, provided by a generated
-/// part file via the `wgslSourceCode` getter.
+class GpuKernelContext {
+  final double deltaTime;
+  final double attractorX;
+  final double attractorY;
+  final double attractorStrength;
+
+  GpuKernelContext({
+    required this.deltaTime,
+    this.attractorX = 0.0,
+    this.attractorY = 0.0,
+    this.attractorStrength = 0.0,
+  });
+}
+
+// --- FIX: The annotation class is now public ---
+/// Annotation to mark a GpuSystem for shader transpilation.
+class TranspileGpuSystem {
+  const TranspileGpuSystem();
+}
+
+/// The constant instance of the annotation to be used on classes.
+const transpileGpuSystem = TranspileGpuSystem();
+
 abstract class GpuSystem<T> extends System {
   final GpuContext _gpu = GpuContext();
   GpuMode _mode = GpuMode.notInitialized;
@@ -21,14 +42,12 @@ abstract class GpuSystem<T> extends System {
   late List<T> _cpuData;
   GpuBuffer<dynamic>? _gpuDataBuffer;
 
-  /// Subclasses must implement this getter to provide the WGSL source code.
-  /// This will typically be a constant from a generated `.g.dart` file.
-  /// کلاس‌های فرزند باید این getter را برای ارائه سورس کد WGSL پیاده‌سازی کنند.
-  /// این معمولاً یک ثابت از یک فایل تولید شده `.g.dart` خواهد بود.
+  @protected
+  void gpuLogic(T p, GpuKernelContext ctx);
+
   String get wgslSourceCode;
 
   List<T> initializeData();
-  Float32List flattenData(List<T> data);
 
   void reinitializeData() {
     _cpuData = initializeData();
@@ -41,12 +60,21 @@ abstract class GpuSystem<T> extends System {
     double attractorStrength = 0.0,
   }) async {
     if (_mode == GpuMode.gpu) {
-      return await (_gpu as dynamic).runSimulation(
-        deltaTime,
-        attractorX,
-        attractorY,
-        attractorStrength,
+      return await (_gpu as dynamic)
+          .runSimulation(deltaTime, attractorX, attractorY, attractorStrength);
+    } else if (_mode == GpuMode.cpuFallback) {
+      final stopwatch = Stopwatch()..start();
+      final ctx = GpuKernelContext(
+        deltaTime: deltaTime,
+        attractorX: attractorX,
+        attractorY: attractorY,
+        attractorStrength: attractorStrength,
       );
+      for (final element in _cpuData) {
+        gpuLogic(element, ctx);
+      }
+      stopwatch.stop();
+      return stopwatch.elapsedMicroseconds;
     }
     return 0;
   }
@@ -64,22 +92,16 @@ abstract class GpuSystem<T> extends System {
     final flatData = flattenData(_cpuData);
 
     try {
-      final shaderCode = wgslSourceCode;
-      if (shaderCode.isEmpty) {
-        throw Exception(
-            "wgslSourceCode getter returned an empty string. Did the build_runner run?");
-      }
-
+      final shader = wgslSourceCode;
       if (kIsWeb) {
-        await (_gpu as dynamic).initialize(flatData, shaderCode);
+        await (_gpu as dynamic).initialize(flatData, shader);
       } else {
         _gpuDataBuffer = Float32GpuBuffer.fromList(flatData);
-        await (_gpu as dynamic).initialize(_gpuDataBuffer!, shaderCode);
+        await (_gpu as dynamic).initialize(_gpuDataBuffer!, shader);
       }
 
       _mode = GpuMode.gpu;
-      debugPrint(
-          '[Nexus GpuSystem] Successfully initialized in GPU mode (Build-Time Transpiled).');
+      debugPrint('[Nexus GpuSystem] Successfully initialized in GPU mode.');
     } catch (e) {
       _mode = GpuMode.cpuFallback;
       debugPrint(
@@ -96,8 +118,11 @@ abstract class GpuSystem<T> extends System {
     super.onRemovedFromWorld();
   }
 
+  Float32List flattenData(List<T> data);
+
   @override
   bool matches(Entity entity) => false;
+
   @override
   void update(Entity entity, double dt) {}
 }

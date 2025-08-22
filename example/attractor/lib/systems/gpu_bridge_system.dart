@@ -1,9 +1,9 @@
 import 'dart:math';
+import 'package:attractor_example/gpu/attractor_gpu_system.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
-import 'attractor_gpu_system.dart';
 import '../components/debug_info_component.dart';
 import '../components/gpu_particle_render_component.dart';
 import 'package:nexus/src/compute/gpu_context.dart';

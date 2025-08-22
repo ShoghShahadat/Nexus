@@ -1,8 +1,8 @@
 import 'dart:collection';
+import 'package:attractor_example/gpu/attractor_gpu_system.dart';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 import '../components/debug_info_component.dart';
-import 'attractor_gpu_system.dart';
 
 /// A system that calculates and provides real-time performance metrics.
 class DebugSystem extends System {

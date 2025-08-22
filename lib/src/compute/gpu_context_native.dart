@@ -5,16 +5,11 @@ import 'package:nexus/src/compute/gpu_buffer_native.dart';
 import 'package:path/path.dart' as path;
 import 'dart:typed_data';
 
-// --- CRITICAL FIX: Update FFI signatures to accept the shader code string ---
-// The native function now expects a pointer to the initial data, its length,
-// and a pointer to the UTF8-encoded shader code string.
-// --- اصلاح حیاتی: به‌روزرسانی امضای FFI برای پذیرش رشته کد شیدر ---
-// تابع نیتیو اکنون یک اشاره‌گر به داده‌های اولیه، طول آن، و یک اشاره‌گر
-// به رشته کد شیدر با انکدینگ UTF8 را انتظار دارد.
+// --- MODIFIED FFI Signature: Added shader_source parameter ---
 typedef InitGpuC = Pointer<Void> Function(
-    Pointer<Float> initial_data, Int32 len, Pointer<Utf8> shader_code);
+    Pointer<Float> initial_data, Int32 len, Pointer<Utf8> shader_source);
 typedef InitGpuDart = Pointer<Void> Function(
-    Pointer<Float> initial_data, int len, Pointer<Utf8> shader_code);
+    Pointer<Float> initial_data, int len, Pointer<Utf8> shader_source);
 
 typedef ReleaseGpuC = Void Function(Pointer<Void> context);
 typedef ReleaseGpuDart = void Function(Pointer<Void> context);
@@ -64,27 +59,20 @@ class GpuContext {
     }
   }
 
-  // --- CRITICAL FIX: Update the method signature to accept the shader code ---
-  // --- اصلاح حیاتی: به‌روزرسانی امضای متد برای پذیرش کد شیدر ---
-  void initialize(GpuBuffer<Float> buffer, String shaderCode) {
+  // --- MODIFIED: Accepts shaderSource string ---
+  void initialize(GpuBuffer<Float> buffer, String shaderSource) {
     if (_isInitialized) return;
     _loadLibrary();
-
-    // Convert the Dart String to a C-compatible, null-terminated UTF8 string.
-    // رشته Dart را به یک رشته UTF8 سازگار با C تبدیل می‌کنیم.
-    final shaderCodeC = shaderCode.toNativeUtf8();
-
+    final shaderSourcePtr = shaderSource.toNativeUtf8();
     try {
-      _context = _initGpu(buffer.pointer, buffer.length, shaderCodeC);
+      _context = _initGpu(buffer.pointer, buffer.length, shaderSourcePtr);
       if (_context == nullptr) {
         throw Exception(
             'Failed to initialize GPU context. The native code returned a null pointer.');
       }
       _isInitialized = true;
     } finally {
-      // ALWAYS free the allocated native string memory to prevent memory leaks.
-      // همیشه حافظه اختصاص داده شده به رشته نیتیو را برای جلوگیری از نشت حافظه آزاد می‌کنیم.
-      malloc.free(shaderCodeC);
+      malloc.free(shaderSourcePtr);
     }
   }
 
