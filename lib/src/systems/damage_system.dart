@@ -1,9 +1,8 @@
 import 'package:nexus/nexus.dart';
-import '../components/meteor_component.dart';
 
-/// A system that processes `CollisionEvent`s to apply damage to entities
-/// with a `HealthComponent`. It also handles special collision cases,
-/// like meteor-on-meteor destruction.
+/// A generic system that processes `CollisionEvent`s to apply damage.
+/// It applies damage from an entity with a `DamageComponent` to an entity
+/// with a `HealthComponent`. This system contains no game-specific logic.
 class DamageSystem extends System {
   @override
   void onAddedToWorld(NexusWorld world) {
@@ -17,19 +16,8 @@ class DamageSystem extends System {
 
     if (entityA == null || entityB == null) return;
 
-    // --- FIX: Handle meteor-on-meteor collision ---
-    final isAMeteor = entityA.has<MeteorComponent>();
-    final isBMeteor = entityB.has<MeteorComponent>();
-
-    if (isAMeteor && isBMeteor) {
-      // Both are meteors, destroy them both.
-      // Setting health to 0 will trigger their respective destruction logic.
-      entityA.add(HealthComponent(maxHealth: 1, currentHealth: 0));
-      entityB.add(HealthComponent(maxHealth: 1, currentHealth: 0));
-      return; // Stop further processing for this pair
-    }
-
-    // Standard damage logic
+    // This generic system simply applies damage if the components are present.
+    // It doesn't know or care about what is colliding.
     _applyDamage(entityA, entityB);
     _applyDamage(entityB, entityA);
   }
@@ -39,8 +27,6 @@ class DamageSystem extends System {
     final damage = source.get<DamageComponent>();
 
     if (health == null || damage == null) return;
-
-    // Avoid applying damage if the target is already defeated
     if (health.currentHealth <= 0) return;
 
     final newHealth = health.currentHealth - damage.damage;

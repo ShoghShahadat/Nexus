@@ -1,5 +1,3 @@
-// === File: example/attractor/lib/systems/server_systems.dart (New) ===
-
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 import '../components/network_components.dart';
@@ -30,20 +28,34 @@ class ServerGameLogicSystem extends System {
     final players =
         world.entities.values.where((e) => e.has<PlayerComponent>()).toList();
 
-    // If there are no players, do nothing.
     if (players.isEmpty) {
       _isGameOver = false;
       return;
     }
 
-    // Check if all players are defeated.
+    // --- FIX: Handle individual player death ---
+    for (final player in players) {
+      final health = player.get<HealthComponent>();
+      // If player is defeated but still has collision/velocity, "deactivate" them.
+      if (health != null &&
+          health.currentHealth <= 0 &&
+          player.has<CollisionComponent>()) {
+        print(
+            '[SERVER] Player ${player.get<PlayerComponent>()!.sessionId} defeated.');
+        player.remove<VelocityComponent>();
+        player.remove<CollisionComponent>();
+      }
+    }
+
+    // Check if all players are defeated to start the reset timer.
     final allPlayersDefeated = players
         .every((p) => (p.get<HealthComponent>()?.currentHealth ?? 1) <= 0);
 
     if (allPlayersDefeated && !_isGameOver) {
-      print('[SERVER] All players defeated! Game Over.');
+      print(
+          '[SERVER] All players defeated! Game Over. Resetting in 5 seconds...');
       _isGameOver = true;
-      _gameOverTimer = 5.0; // Reset countdown
+      _gameOverTimer = 5.0;
       entity.get<BlackboardComponent>()?.set('is_game_over', true);
     }
 
@@ -59,7 +71,7 @@ class ServerGameLogicSystem extends System {
   }
 
   void _resetGame() {
-    // Reset all players' health.
+    // Reset all players' health and reactivate them.
     final players =
         world.entities.values.where((e) => e.has<PlayerComponent>());
     for (final player in players) {
@@ -67,6 +79,10 @@ class ServerGameLogicSystem extends System {
       if (health != null) {
         player.add(HealthComponent(maxHealth: health.maxHealth));
       }
+      // --- FIX: Restore components to make the player active again ---
+      player.add(VelocityComponent());
+      player.add(CollisionComponent(
+          tag: 'player', radius: 10, collidesWith: {'meteor', 'health_orb'}));
     }
 
     // Remove all meteors and health orbs.
@@ -83,7 +99,12 @@ class ServerGameLogicSystem extends System {
       world.removeEntity(id);
     }
 
-    // Reset score
-    world.rootEntity.get<BlackboardComponent>()?.set('score', 0);
+    // Reset score and game time
+    final blackboard = world.rootEntity.get<BlackboardComponent>();
+    if (blackboard != null) {
+      blackboard.set('score', 0);
+      blackboard.set('game_time', 0.0);
+      world.rootEntity.add(blackboard);
+    }
   }
 }

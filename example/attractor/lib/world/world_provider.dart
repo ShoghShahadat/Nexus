@@ -6,6 +6,7 @@ import '../components/meteor_component.dart';
 import '../components/network_components.dart';
 import '../network/mock_server.dart';
 import '../systems/debug_system.dart';
+import '../systems/game_rules_system.dart'; // <-- Import the new system
 import '../systems/health_orb_system.dart';
 import '../systems/healing_system.dart';
 import '../systems/meteor_burn_system.dart';
@@ -43,8 +44,9 @@ Entity createMeteorPrefab(NexusWorld world) {
       root.get<BlackboardComponent>()?.get<double>('game_time') ?? 0.0;
   final size = (25 + (gameTime / 30.0) * 25).clamp(25.0, 50.0);
 
-  // --- FIX: Meteor speed is now 5x player speed ---
-  final speed = MockServer.playerMoveSpeed * 5;
+  final timeToMaxSpeed = 60.0;
+  final speedMultiplier = (1 + (gameTime / timeToMaxSpeed) * 4).clamp(1.0, 5.0);
+  final speed = MockServer.playerMoveSpeed * speedMultiplier;
 
   final startEdge = random.nextInt(4);
   double startX, startY;
@@ -71,7 +73,6 @@ Entity createMeteorPrefab(NexusWorld world) {
   }
   meteor.addComponents([
     PositionComponent(x: startX, y: startY, width: size, height: size),
-    // --- FIX: Meteors now collide with each other ---
     CollisionComponent(
         tag: 'meteor', radius: size / 2, collidesWith: {'player', 'meteor'}),
     MeteorComponent(),
@@ -120,7 +121,8 @@ NexusWorld provideServerWorld() {
     SpawnerSystem(),
     TargetingSystem(),
     CollisionSystem(),
-    DamageSystem(),
+    DamageSystem(), // Generic damage system
+    GameRulesSystem(), // Game-specific collision rules
     MeteorBurnSystem(),
     HealthOrbSystem(),
     HealingSystem(),
