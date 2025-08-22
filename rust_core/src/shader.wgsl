@@ -1,27 +1,43 @@
-// A struct for our particle data
+// WGSL (WebGPU Shading Language) Code
+
+// This struct MUST EXACTLY match the `SimParams` struct in `lib.rs`
+// این ساختار باید دقیقاً با ساختار `SimParams` در `lib.rs` مطابقت داشته باشد
+struct SimParams {
+    delta_time: f32,
+    attractor_x: f32,
+    attractor_y: f32,
+    attractor_strength: f32,
+};
+
+// This struct defines the layout of a single particle in the storage buffer.
+// It MUST EXACTLY match the data layout created by `flattenData` in Dart (8 floats).
+// vec2<f32> = 2 floats. So this struct is 2 + 2 + 1 + 1 + 1 + 1 = 8 floats total.
+// این ساختار چیدمان یک ذره را در بافر ذخیره‌سازی تعریف می‌کند.
+// باید دقیقاً با چیدمان داده ایجاد شده توسط `flattenData` در Dart (۸ فلوت) مطابقت داشته باشد.
 struct Particle {
     pos: vec2<f32>,
     vel: vec2<f32>,
+    age: f32,
+    max_age: f32,
+    initial_size: f32,
+    _padding: f32, // Padding to ensure data alignment
 };
 
-// A struct for simulation parameters
-struct SimParams {
-    delta_time: f32,
-    vortex_strength: f32,
-};
-
-// The main data buffer, now read_write
-@group(0) @binding(0)
-var<storage, read_write> particles: array<Particle>;
-
-// The uniform buffer for parameters
+// Binding for the uniform parameters
 @group(0) @binding(1)
 var<uniform> params: SimParams;
 
-// The main compute shader function
+// Binding for the main particle data storage buffer
+@group(0) @binding(0)
+var<storage, read_write> particles: array<Particle>;
+
+// The main entry point for the compute shader
 @compute @workgroup_size(256)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let index = global_id.x;
+    
+    // Prevent out-of-bounds access
+    // This is a safeguard; particle_count should be handled correctly by the dispatcher
     let array_len = arrayLength(&particles);
     if (index >= array_len) {
         return;
@@ -29,40 +45,33 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     var p = particles[index];
 
-    // --- MORE COMPLEX CALCULATION ---
-    // Calculate distance from center (0,0)
-    let dist = length(p.pos);
+    // --- Simulation Logic ---
 
-    if (dist > 0.01) { // Avoid division by zero at the center
-        // Calculate direction perpendicular to the vector from the center
-        let perp_dir = vec2<f32>(-p.pos.y, p.pos.x) / dist;
-        
-        // Add a vortex force that pulls particles in a circle
-        // The force is stronger near the center
-        let vortex_force = perp_dir * (params.vortex_strength / (dist + 0.1));
-        p.vel = p.vel + vortex_force * params.delta_time;
+    // 1. Attractor Force Calculation
+    let attractor_pos = vec2<f32>(params.attractor_x, params.attractor_y);
+    let dir = attractor_pos - p.pos;
+    let dist_sq = dot(dir, dir);
+
+    // Apply force only if not too close, to prevent division by zero and extreme velocities
+    if (dist_sq > 1.0) {
+        let dist = sqrt(dist_sq);
+        // Using a simplified gravity model
+        let force = params.attractor_strength * 1000.0 / dist_sq;
+        p.vel = p.vel + (dir / dist) * force * params.delta_time;
     }
-
-    // Add a sine wave to the velocity for more complex movement
-    p.vel.x = p.vel.x + sin(p.pos.y * 10.0) * 0.1 * params.delta_time;
-    p.vel.y = p.vel.y + cos(p.pos.x * 10.0) * 0.1 * params.delta_time;
-
-    // Apply gravity
-    p.vel.y = p.vel.y - 1.0 * params.delta_time;
     
-    // Update position
+    // 2. Apply Velocity and Age
     p.pos = p.pos + p.vel * params.delta_time;
+    p.age = p.age + params.delta_time;
 
-    // Simple bounce off screen edges
-    if (p.pos.x < -1.0 || p.pos.x > 1.0) {
-        p.pos.x = clamp(p.pos.x, -1.0, 1.0);
-        p.vel.x = -p.vel.x * 0.8;
-    }
-    if (p.pos.y < -1.0 || p.pos.y > 1.0) {
-        p.pos.y = clamp(p.pos.y, -1.0, 1.0);
-        p.vel.y = -p.vel.y * 0.8;
+    // 3. Reset particle if its age exceeds its max_age
+    // This creates a continuous fountain effect from the spawn point
+    if (p.age >= p.max_age) {
+        // For this example, we just reset the age. A more complex system
+        // might reset position and velocity as well.
+        p.age = 0.0;
     }
 
-    // Write the updated data back to the buffer
+    // Write the updated particle data back to the storage buffer
     particles[index] = p;
 }

@@ -3,16 +3,25 @@ use std::slice;
 use std::sync::Once;
 use std::time::Instant;
 use wgpu::util::DeviceExt;
+use log;
 
 static INIT_LOGGER: Once = Once::new();
 
+// This struct MUST EXACTLY match the `SimParams` struct in `shader.wgsl`
+// این ساختار باید دقیقاً با ساختار `SimParams` در `shader.wgsl` مطابقت داشته باشد
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct SimParams {
     delta_time: f32,
-    vortex_strength: f32,
+    attractor_x: f32,
+    attractor_y: f32,
+    attractor_strength: f32,
 }
 
+// This struct is for Rust's internal logic, not passed to the shader directly.
+// The data layout from Dart (8 floats) is mapped to the `Particle` struct in the shader.
+// این ساختار برای منطق داخلی Rust است و مستقیماً به شیدر ارسال نمی‌شود.
+// چیدمان داده از Dart (۸ فلوت) به ساختار `Particle` در شیدر مپ می‌شود.
 pub struct GpuContext {
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -27,11 +36,14 @@ pub struct GpuContext {
 #[no_mangle]
 pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_void {
     INIT_LOGGER.call_once(|| {
-        env_logger::init_from_env(env_logger::Env::default().default_filter_or("wgpu_core=warn,wgpu_hal=warn"));
+        env_logger::init_from_env(env_logger::Env::default().default_filter_or("wgpu_core=warn,wgpu_hal=warn,rust_core=info"));
     });
     
+    log::info!("[Rust] >> init_gpu called with data length: {}", len);
+
     let initial_data = unsafe { slice::from_raw_parts(initial_data_ptr, len) };
-    let particle_count = (len / 4) as u32;
+    let particle_count = (len / 8) as u32;
+    log::info!("[Rust] Calculated particle count: {}", particle_count);
 
     let context = pollster::block_on(async {
         let instance = wgpu::Instance::default();
@@ -40,7 +52,7 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
             ..Default::default()
         }).await.unwrap();
         
-        log::info!("Using adapter: {}", adapter.get_info().name);
+        log::info!("[Rust] Using adapter: {}", adapter.get_info().name);
         let (device, queue) = adapter.request_device(&Default::default(), None).await.unwrap();
 
         let shader_code = include_str!("shader.wgsl");
@@ -53,7 +65,7 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
             label: Some("Simulation Bind Group Layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0,
+                    binding: 0, // Corresponds to @binding(0) in shader for particles
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Storage { read_only: false },
@@ -63,7 +75,7 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 1,
+                    binding: 1, // Corresponds to @binding(1) in shader for params
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
@@ -78,7 +90,7 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Simulation Pipeline Layout"),
             bind_group_layouts: &[&bind_group_layout],
-            ..Default::default()
+            push_constant_ranges: &[],
         });
 
         let compute_pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
@@ -97,14 +109,14 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
         });
 
         let staging_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Staging Buffer"),
+            label: Some("Staging Buffer (for readback)"),
             size: buffer_size,
             usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Params Buffer"),
+            label: Some("Params Uniform Buffer"),
             size: std::mem::size_of::<SimParams>() as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -125,6 +137,7 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
             ],
         });
 
+        log::info!("[Rust] GPU context created successfully.");
         GpuContext {
             device,
             queue,
@@ -144,23 +157,26 @@ pub extern "C" fn init_gpu(initial_data_ptr: *mut f32, len: usize) -> *mut c_voi
 pub extern "C" fn release_gpu(context_ptr: *mut c_void) {
     if !context_ptr.is_null() {
         unsafe { let _ = Box::from_raw(context_ptr as *mut GpuContext); }
-        log::info!("GPU Context released.");
+        log::info!("[Rust] << GPU Context released.");
     }
 }
 
-async fn run_simulation(context: &GpuContext, delta_time: f32) -> u64 {
+async fn run_simulation(context: &GpuContext, delta_time: f32, attractor_x: f32, attractor_y: f32, attractor_strength: f32) -> u64 {
     let start_time = Instant::now();
-    let device = &context.device;
-    let queue = &context.queue;
-
-    let params = SimParams { delta_time, vortex_strength: 5.0 };
-    queue.write_buffer(
+    
+    let params = SimParams { 
+        delta_time, 
+        attractor_x, 
+        attractor_y, 
+        attractor_strength 
+    };
+    context.queue.write_buffer(
         &context.params_buffer,
         0,
         bytemuck::cast_slice(&[params]),
     );
     
-    let mut encoder = device.create_command_encoder(&Default::default());
+    let mut encoder = context.device.create_command_encoder(&Default::default());
     {
         let mut compute_pass = encoder.begin_compute_pass(&Default::default());
         compute_pass.set_pipeline(&context.compute_pipeline);
@@ -170,16 +186,69 @@ async fn run_simulation(context: &GpuContext, delta_time: f32) -> u64 {
         let workgroup_count = (context.particle_count + workgroup_size - 1) / workgroup_size;
         compute_pass.dispatch_workgroups(workgroup_count, 1, 1);
     }
-    queue.submit(Some(encoder.finish()));
+    context.queue.submit(Some(encoder.finish()));
     
-    device.poll(wgpu::Maintain::Wait);
+    context.device.poll(wgpu::Maintain::Wait);
 
     start_time.elapsed().as_micros() as u64
 }
 
 #[no_mangle]
-pub extern "C" fn run_gpu_simulation(context_ptr: *mut c_void, delta_time: f32) -> u64 {
+pub extern "C" fn run_gpu_simulation(context_ptr: *mut c_void, delta_time: f32, attractor_x: f32, attractor_y: f32, attractor_strength: f32) -> u64 {
     if context_ptr.is_null() { return 0; }
     let context = unsafe { &*(context_ptr as *mut GpuContext) };
-    pollster::block_on(run_simulation(context, delta_time))
+    // ADDED LOG
+    log::info!("[Rust] >> run_gpu_simulation called with dt: {:.4}", delta_time);
+    let result = pollster::block_on(run_simulation(context, delta_time, attractor_x, attractor_y, attractor_strength));
+    // ADDED LOG
+    log::info!("[Rust] << run_gpu_simulation finished in {} µs", result);
+    result
+}
+
+#[no_mangle]
+pub extern "C" fn read_gpu_buffer(context_ptr: *mut c_void, output_ptr: *mut f32, len: usize) {
+    if context_ptr.is_null() { return; }
+    let context = unsafe { &*(context_ptr as *mut GpuContext) };
+    let output_slice = unsafe { slice::from_raw_parts_mut(output_ptr, len) };
+    
+    // ADDED LOG
+    log::info!("[Rust] >> read_gpu_buffer called for {} floats.", len);
+
+    pollster::block_on(async {
+        let buffer_size = (len * std::mem::size_of::<f32>()) as wgpu::BufferAddress;
+        let mut encoder = context.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Readback Encoder"),
+        });
+        
+        encoder.copy_buffer_to_buffer(
+            &context.storage_buffer,
+            0,
+            &context.staging_buffer,
+            0,
+            buffer_size,
+        );
+
+        context.queue.submit(Some(encoder.finish()));
+        
+        let buffer_slice = context.staging_buffer.slice(..);
+        
+        let (sender, receiver) = futures_intrusive::channel::shared::oneshot_channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |v| sender.send(v).unwrap());
+        
+        context.device.poll(wgpu::Maintain::Wait);
+
+        if let Some(Ok(())) = receiver.receive().await {
+            let data = buffer_slice.get_mapped_range();
+            let result: &[f32] = bytemuck::cast_slice(&data);
+            
+            output_slice.copy_from_slice(result);
+            
+            drop(data);
+            context.staging_buffer.unmap();
+            // ADDED LOG
+            log::info!("[Rust] << read_gpu_buffer finished successfully.");
+        } else {
+            log::error!("[Rust] << Failed to map staging buffer for reading.");
+        }
+    });
 }

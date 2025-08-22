@@ -14,7 +14,6 @@ typedef InitGpuDart = Pointer<Void> Function(
 typedef ReleaseGpuC = Void Function(Pointer<Void> context);
 typedef ReleaseGpuDart = void Function(Pointer<Void> context);
 
-// --- FIX: Signature now correctly matches the Rust function with all 5 parameters ---
 typedef GpuSimC = Uint64 Function(Pointer<Void> context, Float delta_time,
     Float attractor_x, Float attractor_y, Float attractor_strength);
 typedef GpuSimDart = int Function(Pointer<Void> context, double delta_time,
@@ -85,11 +84,31 @@ class GpuContext {
     if (!_isInitialized || _context == null) {
       throw StateError('GpuContext is not initialized.');
     }
+    // 1. Allocate a temporary native buffer
     final buffer = malloc.allocate<Float>(sizeOf<Float>() * length);
-    _readGpuBuffer(_context!, buffer, length);
-    final list = buffer.asTypedList(length);
-    malloc.free(buffer);
-    return list;
+    try {
+      // 2. Ask Rust to fill our temporary buffer with GPU data
+      _readGpuBuffer(_context!, buffer, length);
+
+      // 3. Create a Dart-side view of the native data
+      final view = buffer.asTypedList(length);
+
+      // --- CRITICAL FIX: Create a safe copy ---
+      // Instead of returning the view (which points to memory we are about to free),
+      // we create a new Float32List. This copies the data from the native buffer
+      // into a new, garbage-collected Dart object.
+      // --- اصلاح حیاتی: ایجاد یک کپی امن ---
+      // به جای بازگرداندن نما (که به حافظه‌ای اشاره دارد که می‌خواهیم آزاد کنیم)،
+      // یک Float32List جدید ایجاد می‌کنیم. این کار داده‌ها را از بافر نیتیو
+      // به یک شیء جدید Dart که توسط garbage collector مدیریت می‌شود، کپی می‌کند.
+      final safeList = Float32List.fromList(view);
+
+      // 5. Return the safe, Dart-managed copy
+      return safeList;
+    } finally {
+      // 4. ALWAYS free the temporary native buffer
+      malloc.free(buffer);
+    }
   }
 
   void dispose() {
@@ -101,6 +120,8 @@ class GpuContext {
   }
 
   String? _getLibraryPath() {
+    // This path assumes the DLL is copied to a `rust_lib` directory
+    // next to the executable. The build script handles this.
     if (Platform.isWindows) {
       return path.join(Directory.current.path, 'rust_lib', 'rust_core.dll');
     }
