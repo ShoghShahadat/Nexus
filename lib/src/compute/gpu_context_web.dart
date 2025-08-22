@@ -8,19 +8,14 @@ import 'package:web/web.dart' as web;
 
 // --- JS Interop Bindings for our WASM module ---
 
-// --- CRITICAL FIX: Define the shape of the entire JS module object ---
-// This tells Dart that the imported module is an object containing functions.
 @JS()
 @staticInterop
 class WasmModule {}
 
 extension WasmModuleExtension on WasmModule {
-  // The 'default' export is the main initializer function.
-  // We access it as a property on the module object.
   @JS('default')
   external JSFunction get defaultInitializer;
 
-  // Our named 'init' function is also a property on the module object.
   external JSPromise<JSObject> init(JSFloat32Array initialData);
 }
 
@@ -49,22 +44,19 @@ class GpuContext {
     _isInitializing = true;
 
     try {
-      // --- FINAL CORRECT IMPLEMENTATION ---
-
+      // --- FIX: Modernized WASM initialization ---
       // Step 1: Load the JavaScript module object.
       final module = await importModule('/assets/pkg/rust_core.js'.toJS).toDart;
 
-      // Step 2: Load the .wasm binary file.
-      final wasmBinary = await rootBundle.load('assets/pkg/rust_core_bg.wasm');
-
-      // Step 3: Cast the loaded module to our defined shape and call the
-      // 'default' initializer function from within it.
+      // Step 2: Cast the loaded module and call the default initializer.
+      // Modern wasm-bindgen often doesn't require passing the binary manually.
+      // The JS glue code handles fetching the .wasm file itself.
       final wasmModule = module as WasmModule;
-      final JSPromise initPromise = wasmModule.defaultInitializer
-          .callAsFunction(null, wasmBinary.buffer.toJS) as JSPromise;
+      final JSPromise initPromise =
+          wasmModule.defaultInitializer.callAsFunction(null) as JSPromise;
       await initPromise.toDart;
 
-      // Step 4: Now that the module is fully initialized, call our named 'init' function.
+      // Step 3: Now that the module is fully initialized, call our named 'init' function from lib.rs.
       final jsContext = await wasmModule.init(initialData.toJS).toDart;
       _wasmContext = jsContext as WasmGpuContext;
       _isInitialized = true;

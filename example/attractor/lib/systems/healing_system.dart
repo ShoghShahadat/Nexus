@@ -63,6 +63,7 @@ class HealingSystem extends System {
       final angle = _random.nextDouble() * 2 * pi;
       final speed = _random.nextDouble() * 80 + 40; // Speed between 40 and 120
       final size = _random.nextDouble() * 3 + 1; // Size between 1 and 4
+      final maxAge = _random.nextDouble() * 1.0 + 0.5; // Lifespan 0.5s to 1.5s
 
       particle.add(PositionComponent(
         x: orbPos.x,
@@ -73,11 +74,20 @@ class HealingSystem extends System {
       particle
           .add(VelocityComponent(x: cos(angle) * speed, y: sin(angle) * speed));
       particle.add(ParticleComponent(
-        maxAge: _random.nextDouble() * 1.0 + 0.5, // Lifespan 0.5s to 1.5s
+        maxAge: maxAge,
         initialColorValue: 0xFF4CAF50, // Green
         finalColorValue: 0x00FFFFFF, // Fade to transparent
       ));
       particle.add(TagsComponent({'particle'}));
+
+      // --- FIX: Add LifecyclePolicy to prevent memory leak warnings ---
+      particle.add(LifecyclePolicyComponent(
+        destructionCondition: (e) {
+          final p = e.get<ParticleComponent>();
+          return p != null && p.age >= p.maxAge;
+        },
+      ));
+
       world.addEntity(particle);
     }
   }

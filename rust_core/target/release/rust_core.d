@@ -1,1 +1,0 @@
-C:\Users\ASUS\Desktop\flutter_project\packages\nexus\rust_core\target\release\rust_core.dll: C:\Users\ASUS\Desktop\flutter_project\packages\nexus\rust_core\src\lib.rs C:\Users\ASUS\Desktop\flutter_project\packages\nexus\rust_core\src\shader.wgsl

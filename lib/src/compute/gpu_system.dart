@@ -21,7 +21,6 @@ abstract class GpuSystem<T> extends System {
   GpuMode get mode => _mode;
 
   late List<T> _cpuData;
-  // This buffer is now only used for the initial data transfer on native.
   GpuBuffer<dynamic>? _gpuDataBuffer;
 
   List<T> initializeData();
@@ -31,11 +30,8 @@ abstract class GpuSystem<T> extends System {
 
   void reinitializeData() {
     _cpuData = initializeData();
-    // On web, the data is managed within the WASM module after initialization.
-    // On native, we would need a way to update the GPU buffer here if needed.
   }
 
-  // compute is now async to handle the async nature of web simulation.
   Future<int> compute(double deltaTime) async {
     if (_mode == GpuMode.gpu) {
       return await _gpu.runSimulation(deltaTime);
@@ -55,19 +51,22 @@ abstract class GpuSystem<T> extends System {
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
     if (_mode == GpuMode.notInitialized) {
-      // Initialization is now async.
       _initialize();
     }
   }
 
-  // _initialize is now async.
   Future<void> _initialize() async {
     _cpuData = initializeData();
     final flatData = flattenData(_cpuData);
 
     try {
+      // --- FIX: Wrap the Float32List in a GpuBuffer for native platforms ---
+      // This ensures the correct type is passed to the native FFI.
+      // The web implementation of GpuBuffer will handle the Float32List directly.
+      _gpuDataBuffer = Float32GpuBuffer.fromList(flatData);
+
       // The initialize method is now async for the web.
-      await _gpu.initialize(flatData);
+      await _gpu.initialize(_gpuDataBuffer!);
       _mode = GpuMode.gpu;
       debugPrint(
           '[Nexus GpuSystem] Successfully initialized in GPU mode. All computations will be offloaded.');
@@ -89,8 +88,6 @@ abstract class GpuSystem<T> extends System {
   }
 
   Float32List getGpuDataAsFloat32List() {
-    // This method's purpose changes slightly. On web, it's harder to get data
-    // back from the GPU without performance cost. We'll return the CPU state.
     return flattenData(_cpuData);
   }
 

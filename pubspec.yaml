@@ -32,3 +32,6 @@ dev_dependencies:
 # correctly identifies and bundles these non-standard asset types.
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/pkg/

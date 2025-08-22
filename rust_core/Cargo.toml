@@ -8,19 +8,18 @@ edition = "2021"
 crate-type = ["cdylib"] 
 
 [dependencies]
-wgpu = "0.19"
+# --- FINAL FIX: Using the latest stable wgpu version ---
+# This aligns the project with modern WebGPU specifications and is crucial
+# for resolving compatibility errors with the browser/driver.
+wgpu = "0.20.1" 
 pollster = "0.3"
 env_logger = "0.11"
 bytemuck = { version = "1.14", features = ["derive"] }
 futures-intrusive = "0.5"
 log = "0.4"
 
-# --- NEW SECTION FOR WASM ---
 # These dependencies are only used when compiling for the web.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-# The bridge between Rust and JavaScript/WASM
 wasm-bindgen = "0.2"
-# Provides access to web APIs like console.log
 web-sys = { version = "0.3", features = ["console"] }
-# Allows Rust futures to work in a WASM environment
 wasm-bindgen-futures = "0.4"

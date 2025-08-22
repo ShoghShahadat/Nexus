@@ -90,12 +90,10 @@ Entity createMeteorPrefab(NexusWorld world) {
     HealthComponent(maxHealth: 20),
     VelocityComponent(y: speed * 0.5),
     DamageComponent(25),
-    // --- FIX: Destruction condition now reads LIVE screen data ---
     LifecyclePolicyComponent(
       destructionCondition: (e) {
         final pos = e.get<PositionComponent>()!;
         final health = e.get<HealthComponent>()?.currentHealth ?? 1;
-        // Get the most up-to-date screen info from the root entity.
         final currentScreenInfo = world.rootEntity.get<ScreenInfoComponent>()!;
         final currentWidth = currentScreenInfo.width;
         final currentHeight = currentScreenInfo.height;
@@ -128,11 +126,9 @@ NexusWorld provideAttractorWorld() {
     AdvancedInputSystem(),
     PhysicsSystem(),
     ResponsivenessSystem(),
-    ParticleLifecycleSystem(), // This system now handles particle removal.
-
+    ParticleLifecycleSystem(),
     AttractorGpuSystem(),
     GpuBridgeSystem(),
-
     SpawnerSystem(),
     TargetingSystem(),
     CollisionSystem(),
@@ -168,6 +164,7 @@ NexusWorld provideAttractorWorld() {
     prefab: () => createMeteorPrefab(world),
     frequency: const Frequency.perSecond(0.8),
   );
+  // --- FIX: Add LifecyclePolicy to spawner ---
   meteorSpawner.add(LifecyclePolicyComponent(isPersistent: true));
 
   final healthOrbSpawner = world.createSpawner(
@@ -182,6 +179,7 @@ NexusWorld provideAttractorWorld() {
       return !isGameOver;
     },
   );
+  // --- FIX: Add LifecyclePolicy to spawner ---
   healthOrbSpawner.add(LifecyclePolicyComponent(isPersistent: true));
 
   world.rootEntity.addComponents([
