@@ -12,6 +12,7 @@ dependencies:
     # This now points to the local nexus package we are developing.
     path: ../../
   collection: ^1.18.0
+  socket_io_client: ^2.0.3
 
 dev_dependencies:
   flutter_test:

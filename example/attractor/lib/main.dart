@@ -1,15 +1,19 @@
-import 'dart:io'; // <-- قدم اول: ایمپورت کردن کتابخانه مورد نیاز
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
 import 'components/debug_info_component.dart';
 import 'components/network_components.dart';
 import 'events.dart';
+import 'network/i_web_socket_client.dart';
+// --- MODIFIED: Import the new adapter with the correct class name ---
+// --- ویرایش: ایمپورت آداپتور جدید با نام کلاس صحیح ---
+import 'network/socket_io_client_adapter.dart';
 import 'particle_painter.dart';
 import 'widgets/joystick.dart';
 import 'world/world_provider.dart';
 
-// --- قدم دوم: ایجاد یک کلاس برای نادیده گرفتن خطای گواهی خودامضا ---
 class MyHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
@@ -18,15 +22,16 @@ class MyHttpOverrides extends HttpOverrides {
           (X509Certificate cert, String host, int port) => true;
   }
 }
-// ----------------------------------------------------------------
+
+// --- Isolate Initializer Function ---
+Future<void> isolateInitializer() async {
+  // --- MODIFIED: Register the correctly named SocketIOClientAdapter ---
+  // --- ویرایش: ثبت SocketIOClientAdapter با نام صحیح ---
+  GetIt.I.registerSingleton<IWebSocketClient>(SocketIOClientAdapter());
+}
 
 void main() {
-  // --- قدم سوم: اعمال کردن استثنای امنیتی قبل از اجرای برنامه ---
-  // این کد به اپلیکیشن می‌گوید که به گواهی‌های خودامضا (مثل گواهی سرور محلی ما) اعتماد کند.
-  // این کار فقط برای محیط توسعه امن است.
   HttpOverrides.global = MyHttpOverrides();
-  // -------------------------------------------------------------
-
   runApp(const MyApp());
 }
 
@@ -136,13 +141,14 @@ class _MyAppState extends State<MyApp> {
       home: Scaffold(
         backgroundColor: const Color(0xFF1a1a1a),
         appBar: AppBar(
-          title: const Text('Nexus Attractor: Multiplayer'),
+          title: const Text('Nexus Attractor: Multiplayer (Socket.IO)'),
           backgroundColor: Colors.grey.shade900,
           foregroundColor: Colors.white,
         ),
         body: NexusWidget(
           worldProvider: provideAttractorWorld,
           renderingSystem: renderingSystem,
+          isolateInitializer: isolateInitializer,
         ),
       ),
     );

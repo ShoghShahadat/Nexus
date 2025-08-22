@@ -1,6 +1,6 @@
 name: nexus
 description: A highly scalable, clean, and data-oriented framework for Flutter, inspired by ECS and powered by BLoC and GetIt.
-version: 2.0.0-dev.1
+version: 3.0.0
 homepage: https://github.com/ShoghShahadat/Nexus
 repository: https://github.com/ShoghShahadat/Nexus
 issue_tracker: https://github.com/ShoghShahadat/Nexus/issues
@@ -19,6 +19,11 @@ dependencies:
   go_router: ^16.2.0
   shared_preferences: ^2.2.3
   web: ^1.0.0
+  dio: ^5.4.3+1
+  # --- MODIFIED: Replaced web_socket_channel with the correct Socket.IO client ---
+  # --- ویرایش: جایگزینی web_socket_channel با کلاینت صحیح Socket.IO ---
+  socket_io_client: ^2.0.3
+
 
 dev_dependencies:
   flutter_test:
@@ -33,3 +38,4 @@ dev_dependencies:
 # prevent pub from picking a potentially incompatible version.
 dependency_overrides:
   analyzer: '8.1.1'
+

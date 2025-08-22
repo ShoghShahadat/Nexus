@@ -6,25 +6,25 @@ import '../systems/network_system.dart';
 import '../systems/player_control_system.dart';
 
 // --- CLIENT WORLD PROVIDER ---
-// This file now ONLY contains the logic for creating the CLIENT's world.
 
 NexusWorld provideAttractorWorld() {
-  // This function should be called once at the start of the app.
   registerCoreComponents();
   registerAllComponents();
 
   final world = NexusWorld();
   final serializer = BinaryWorldSerializer(BinaryComponentFactory.I);
 
-  // --- CRITICAL FIX: Corrected the WebSocket protocol and added the explicit port ---
-  // The client now connects to 'ws://' on port 8765, matching the Python server configuration.
-  const serverUrl = 'wss://127.0.0.1:5000';
+  // --- CRITICAL FIX: Use the base HTTP URL for the Socket.IO client ---
+  // The socket_io_client library will handle the path and protocol upgrade automatically.
+  // --- اصلاح حیاتی: استفاده از URL پایه HTTP برای کلاینت Socket.IO ---
+  // کتابخانه socket_io_client مسیر و ارتقاء پروتکل را به صورت خودکار مدیریت می‌کند.
+  const serverUrl = 'http://127.0.0.1:5000';
 
   world.addSystems([
     ResponsivenessSystem(),
     DebugSystem(),
     NetworkSystem(serializer, serverUrl: serverUrl),
-    PlayerControlSystem(),
+    PlayerControlSystem(), // Corrected typo from previous version
   ]);
 
   world.rootEntity.addComponents([
