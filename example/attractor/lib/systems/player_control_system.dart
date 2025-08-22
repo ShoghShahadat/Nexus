@@ -1,45 +1,82 @@
 import 'dart:async';
-import 'package:collection/collection.dart';
+import 'dart:math';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:nexus/nexus.dart';
-import '../components/network_components.dart';
 import '../events.dart';
 
-/// A client-side system that reads local input (pointer/mouse) and sends it
-/// to the server via events.
+/// A client-side system that reads local input (keyboard and joystick)
+/// and sends a normalized directional vector to the server.
 class PlayerControlSystem extends System {
-  StreamSubscription? _pointerMoveSubscription;
-  double _lastSentX = 0;
-  double _lastSentY = 0;
+  final _keysDown = <LogicalKeyboardKey>{};
+  var _joystickVector = Offset.zero;
+  var _lastSentVector = Offset.zero;
 
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    _pointerMoveSubscription =
-        world.eventBus.on<NexusPointerMoveEvent>(_onPointerMove);
+    // --- FIX: Listen for the correct, core-library events ---
+    listen<ClientKeyboardEvent>(_onKeyboardEvent);
+    listen<JoystickUpdateEvent>(_onJoystickUpdate);
   }
 
-  void _onPointerMove(NexusPointerMoveEvent event) {
-    // To avoid flooding the network, we could add some throttling here,
-    // but for a local mock server, it's fine to send every event.
-    if ((event.x - _lastSentX).abs() > 1 || (event.y - _lastSentY).abs() > 1) {
-      world.eventBus.fire(SendInputEvent(event.x, event.y));
-      _lastSentX = event.x;
-      _lastSentY = event.y;
+  void _onKeyboardEvent(ClientKeyboardEvent event) {
+    if (event.isDown) {
+      _keysDown.add(event.key);
+    } else {
+      _keysDown.remove(event.key);
     }
+  }
+
+  void _onJoystickUpdate(JoystickUpdateEvent event) {
+    _joystickVector = event.vector;
   }
 
   @override
   bool matches(Entity entity) {
-    // This system doesn't need to process any entities in the update loop.
-    return false;
+    // This system runs once per frame, tied to the root entity.
+    return entity.get<TagsComponent>()?.hasTag('root') ?? false;
   }
 
   @override
-  void update(Entity entity, double dt) {}
+  void update(Entity entity, double dt) {
+    // 1. Calculate keyboard vector
+    var keyboardDx = 0.0;
+    var keyboardDy = 0.0;
+    if (_keysDown.contains(LogicalKeyboardKey.arrowLeft) ||
+        _keysDown.contains(LogicalKeyboardKey.keyA)) {
+      keyboardDx -= 1.0;
+    }
+    if (_keysDown.contains(LogicalKeyboardKey.arrowRight) ||
+        _keysDown.contains(LogicalKeyboardKey.keyD)) {
+      keyboardDx += 1.0;
+    }
+    if (_keysDown.contains(LogicalKeyboardKey.arrowUp) ||
+        _keysDown.contains(LogicalKeyboardKey.keyW)) {
+      keyboardDy -= 1.0;
+    }
+    if (_keysDown.contains(LogicalKeyboardKey.arrowDown) ||
+        _keysDown.contains(LogicalKeyboardKey.keyS)) {
+      keyboardDy += 1.0;
+    }
+    final keyboardVector = Offset(keyboardDx, keyboardDy);
 
-  @override
-  void onRemovedFromWorld() {
-    _pointerMoveSubscription?.cancel();
-    super.onRemovedFromWorld();
+    // 2. Determine final input vector (joystick takes precedence)
+    var finalVector =
+        _joystickVector.distance > 0 ? _joystickVector : keyboardVector;
+
+    // 3. Normalize the vector if its magnitude is greater than 1
+    final distance = finalVector.distance;
+    if (distance > 1.0) {
+      finalVector = finalVector / distance;
+    }
+
+    // 4. Send to server only if it has changed
+    if (finalVector != _lastSentVector) {
+      // --- FIX: Fire the correct, game-specific event ---
+      world.eventBus
+          .fire(SendDirectionalInputEvent(finalVector.dx, finalVector.dy));
+      _lastSentVector = finalVector;
+    }
   }
 }

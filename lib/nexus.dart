@@ -15,6 +15,7 @@ export 'src/core/assemblers/entity_assembler.dart';
 export 'src/core/logic/logic_function.dart';
 export 'src/core/utils/equatable_mixin.dart';
 export 'src/core/storage/storage_adapter.dart';
+export 'src/core/utils/frequency.dart';
 
 // --- GPU Compute API ---
 export 'src/compute/gpu_buffer.dart';
@@ -30,6 +31,10 @@ export 'src/core/serialization/serializable_component.dart';
 export 'src/core/serialization/component_factory.dart';
 export 'src/core/serialization/world_serializer.dart';
 export 'src/core/render_packet.dart';
+export 'src/core/serialization/binary_component.dart';
+export 'src/core/serialization/binary_component_factory.dart';
+export 'src/core/serialization/binary_reader_writer.dart';
+export 'src/core/serialization/binary_world_serializer.dart';
 
 // --- Events ---
 export 'src/events/app_lifecycle_event.dart';
@@ -42,6 +47,7 @@ export 'src/events/pointer_events.dart';
 export 'src/events/history_events.dart';
 export 'src/events/theme_events.dart';
 export 'src/events/responsive_events.dart';
+export 'src/events/ui_events.dart'; // <-- FIX: Export the new UI events
 
 // --- Components ---
 export 'src/components/animation_component.dart';
@@ -66,7 +72,7 @@ export 'src/components/keyboard_input_component.dart';
 export 'src/components/link_component.dart';
 export 'src/components/list_components.dart';
 export 'src/components/lifecycle_component.dart';
-export 'src/components/lifecycle_policy_component.dart'; // New export
+export 'src/components/lifecycle_policy_component.dart';
 export 'src/components/morphing_component.dart';
 export 'src/components/parent_component.dart';
 export 'src/components/particle_component.dart';
@@ -101,7 +107,7 @@ export 'src/systems/damage_system.dart';
 export 'src/systems/decoration_animation_system.dart';
 export 'src/systems/effect_system.dart';
 export 'src/systems/flutter_rendering_system.dart';
-export 'src/systems/garbage_collector_system.dart'; // New export
+export 'src/systems/garbage_collector_system.dart';
 export 'src/systems/hardware_input_system.dart';
 export 'src/systems/history_system.dart';
 export 'src/systems/input_system.dart';

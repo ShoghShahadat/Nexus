@@ -1,7 +1,4 @@
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/core/serialization/binary_component.dart';
-import 'package:nexus/src/core/serialization/binary_reader_writer.dart';
-import 'package:nexus/src/core/utils/frequency.dart';
 
 // --- Spawning ---
 
@@ -27,11 +24,27 @@ class SpawnerComponent extends Component {
 
 // --- Targeting & Movement ---
 
-class TargetingComponent extends Component with SerializableComponent {
-  final EntityId targetId;
-  final double turnSpeed;
+class TargetingComponent extends Component
+    with SerializableComponent, BinaryComponent {
+  EntityId targetId;
+  double turnSpeed;
 
   TargetingComponent({required this.targetId, this.turnSpeed = 2.0});
+
+  @override
+  int get typeId => 10;
+
+  @override
+  void fromBinary(BinaryReader reader) {
+    targetId = reader.readInt32();
+    turnSpeed = reader.readDouble();
+  }
+
+  @override
+  void toBinary(BinaryWriter writer) {
+    writer.writeInt32(targetId);
+    writer.writeDouble(turnSpeed);
+  }
 
   factory TargetingComponent.fromJson(Map<String, dynamic> json) {
     return TargetingComponent(
@@ -52,11 +65,12 @@ class TargetingComponent extends Component with SerializableComponent {
 
 enum CollisionShape { circle }
 
-class CollisionComponent extends Component with SerializableComponent {
-  final CollisionShape shape;
-  final double radius;
-  final Set<String> collidesWith;
-  final String tag;
+class CollisionComponent extends Component
+    with SerializableComponent, BinaryComponent {
+  CollisionShape shape;
+  double radius;
+  Set<String> collidesWith;
+  String tag;
 
   CollisionComponent({
     required this.tag,
@@ -64,6 +78,32 @@ class CollisionComponent extends Component with SerializableComponent {
     this.radius = 10.0,
     Set<String>? collidesWith,
   }) : collidesWith = collidesWith ?? {};
+
+  @override
+  int get typeId => 8;
+
+  @override
+  void fromBinary(BinaryReader reader) {
+    tag = reader.readString();
+    shape = CollisionShape.values[reader.readInt32()];
+    radius = reader.readDouble();
+    final count = reader.readInt32();
+    collidesWith.clear();
+    for (int i = 0; i < count; i++) {
+      collidesWith.add(reader.readString());
+    }
+  }
+
+  @override
+  void toBinary(BinaryWriter writer) {
+    writer.writeString(tag);
+    writer.writeInt32(shape.index);
+    writer.writeDouble(radius);
+    writer.writeInt32(collidesWith.length);
+    for (final tag in collidesWith) {
+      writer.writeString(tag);
+    }
+  }
 
   factory CollisionComponent.fromJson(Map<String, dynamic> json) {
     return CollisionComponent(
@@ -97,11 +137,12 @@ class HealthComponent extends Component
       : currentHealth = currentHealth ?? maxHealth;
 
   @override
-  int get typeId => 3; // Unique network ID
+  int get typeId => 3;
 
   @override
   void fromBinary(BinaryReader reader) {
     currentHealth = reader.readDouble();
+    // maxHealth is considered static and not sent over the network to save bandwidth
   }
 
   @override
@@ -124,10 +165,24 @@ class HealthComponent extends Component
   List<Object?> get props => [currentHealth, maxHealth];
 }
 
-class DamageComponent extends Component with SerializableComponent {
-  final double damage;
+class DamageComponent extends Component
+    with SerializableComponent, BinaryComponent {
+  double damage;
 
   DamageComponent(this.damage);
+
+  @override
+  int get typeId => 9;
+
+  @override
+  void fromBinary(BinaryReader reader) {
+    damage = reader.readDouble();
+  }
+
+  @override
+  void toBinary(BinaryWriter writer) {
+    writer.writeDouble(damage);
+  }
 
   factory DamageComponent.fromJson(Map<String, dynamic> json) {
     return DamageComponent((json['damage'] as num).toDouble());

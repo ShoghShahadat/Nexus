@@ -2,28 +2,28 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/core/serialization/binary_reader_writer.dart';
-import 'package:nexus/src/core/serialization/binary_world_serializer.dart';
 import '../components/network_components.dart';
 import '../events.dart';
 import '../network/mock_server.dart';
 
-/// Manages the client-side connection to the game server.
+/// Manages the client-side connection and state synchronization with the game server.
 class NetworkSystem extends System {
   final BinaryWorldSerializer _serializer;
   StreamSubscription? _serverSubscription;
   StreamController<Uint8List>? _toServerController;
   MockServer? _server;
 
+  final Map<int, Entity> _serverEntityMap = {};
+
   NetworkSystem(this._serializer);
 
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    // Get the server instance from the service locator.
     _server = world.services.get<MockServer>();
     _connect();
-    listen<SendInputEvent>(_onSendInput);
+    // --- FIX: Listen for the correct event to send to the server ---
+    listen<SendDirectionalInputEvent>(_onSendInput);
   }
 
   void _connect() {
@@ -45,25 +45,42 @@ class NetworkSystem extends System {
 
   void _onData(dynamic data) {
     if (data is Uint8List) {
-      // --- FIX: The deserializer now handles creating/removing entities ---
-      _serializer.deserialize(world, data);
+      final decodedWorld = _serializer.decode(data);
+      final receivedServerIds = decodedWorld.keys.toSet();
 
-      // After deserializing, find the local player and update the blackboard.
-      // This logic is now more robust as the entity is guaranteed to exist.
+      for (final serverId in receivedServerIds) {
+        final components = decodedWorld[serverId]!;
+        var clientEntity = _serverEntityMap[serverId];
+
+        if (clientEntity == null) {
+          clientEntity = Entity();
+          clientEntity.add(LifecyclePolicyComponent(isPersistent: true));
+          world.addEntity(clientEntity);
+          _serverEntityMap[serverId] = clientEntity;
+        }
+
+        clientEntity.addComponents(components);
+      }
+
+      final serverIdsToRemove =
+          _serverEntityMap.keys.toSet().difference(receivedServerIds);
+      for (final serverId in serverIdsToRemove) {
+        final clientEntity = _serverEntityMap.remove(serverId);
+        if (clientEntity != null) {
+          world.removeEntity(clientEntity.id);
+        }
+      }
+
       final localPlayerEntity = world.entities.values.firstWhereOrNull((e) {
         final playerComp = e.get<PlayerComponent>();
         return playerComp != null && playerComp.isLocalPlayer;
       });
 
       if (localPlayerEntity != null) {
-        final blackboard = world.rootEntity.get<BlackboardComponent>();
-        if (blackboard != null) {
-          blackboard.set('local_player_id', localPlayerEntity.id);
-          world.rootEntity.add(blackboard);
-        }
+        world.rootEntity
+            .get<BlackboardComponent>()
+            ?.set('local_player_id', localPlayerEntity.id);
 
-        // The server sets this flag to true only for the initial packet.
-        // We set it back to false on the client so it's not permanently marked.
         final playerComp = localPlayerEntity.get<PlayerComponent>()!;
         playerComp.isLocalPlayer = false;
         localPlayerEntity.add(playerComp);
@@ -71,12 +88,13 @@ class NetworkSystem extends System {
     }
   }
 
-  void _onSendInput(SendInputEvent event) {
+  // --- FIX: Method updated to handle the correct event type ---
+  void _onSendInput(SendDirectionalInputEvent event) {
     if (_toServerController != null && !_toServerController!.isClosed) {
       final writer = BinaryWriter();
-      writer.writeInt32(1); // Message Type: Player Input
-      writer.writeDouble(event.x);
-      writer.writeDouble(event.y);
+      writer.writeInt32(1); // Message Type: Directional Input
+      writer.writeDouble(event.dx);
+      writer.writeDouble(event.dy);
       _toServerController!.add(writer.toBytes());
     }
   }
@@ -89,11 +107,8 @@ class NetworkSystem extends System {
     _updateStatus(error ?? 'Disconnected.', isConnected: false);
     world.rootEntity.get<BlackboardComponent>()?.remove('local_player_id');
 
-    // Attempt to reconnect after a delay.
     Future.delayed(const Duration(seconds: 3), () {
-      if (world.systems.contains(this)) {
-        _connect();
-      }
+      if (world.systems.contains(this)) _connect();
     });
   }
 
@@ -112,6 +127,7 @@ class NetworkSystem extends System {
   void onRemovedFromWorld() {
     _serverSubscription?.cancel();
     _toServerController?.close();
+    _serverEntityMap.clear();
     super.onRemovedFromWorld();
   }
 }

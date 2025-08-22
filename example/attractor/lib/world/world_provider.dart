@@ -1,8 +1,5 @@
 import 'dart:math';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/core/serialization/binary_component_factory.dart';
-import 'package:nexus/src/core/serialization/binary_world_serializer.dart';
-import 'package:nexus/src/core/utils/frequency.dart';
 import '../components/debug_info_component.dart';
 import '../components/health_orb_component.dart';
 import '../components/meteor_component.dart';
@@ -127,10 +124,9 @@ NexusWorld provideServerWorld() {
     BlackboardComponent({'score': 0, 'is_game_over': false, 'game_time': 0.0}),
   ]);
 
-  // Server-side spawners with Lifecycle Policies
   world.addEntity(Entity()
     ..add(TagsComponent({'meteor_spawner'}))
-    ..add(LifecyclePolicyComponent(isPersistent: true)) // Fix warning
+    ..add(LifecyclePolicyComponent(isPersistent: true))
     ..add(SpawnerComponent(
         prefab: () => createMeteorPrefab(world),
         frequency: const Frequency.perSecond(2.0),
@@ -138,7 +134,7 @@ NexusWorld provideServerWorld() {
 
   world.addEntity(Entity()
     ..add(TagsComponent({'health_orb_spawner'}))
-    ..add(LifecyclePolicyComponent(isPersistent: true)) // Fix warning
+    ..add(LifecyclePolicyComponent(isPersistent: true))
     ..add(SpawnerComponent(
         prefab: () => createHealthOrbPrefab(world),
         frequency: Frequency.every(const Duration(seconds: 15)),
@@ -160,6 +156,7 @@ NexusWorld provideAttractorWorld() {
     ResponsivenessSystem(),
     DebugSystem(),
     NetworkSystem(serializer),
+    // --- FIX: Add the new PlayerControlSystem ---
     PlayerControlSystem(),
   ]);
 

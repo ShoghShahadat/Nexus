@@ -1,10 +1,14 @@
+import 'package:attractor_example/components/health_orb_component.dart';
+import 'package:attractor_example/components/meteor_component.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/core/serialization/binary_component_factory.dart';
 import 'components/debug_info_component.dart';
 import 'components/network_components.dart';
+import 'events.dart';
 import 'network/mock_server.dart';
 import 'particle_painter.dart';
+import 'widgets/joystick.dart';
 import 'world/world_provider.dart';
 
 void registerAttractorJsonComponents() {
@@ -20,6 +24,13 @@ void registerNetworkComponents() {
   factory.register(2, () => PlayerComponent());
   factory.register(3, () => HealthComponent(maxHealth: 100));
   factory.register(4, () => VelocityComponent());
+  factory.register(5, () => TagsComponent({}));
+  // --- FIX: Register all new gameplay components ---
+  factory.register(6, () => MeteorComponent());
+  factory.register(7, () => HealthOrbComponent());
+  factory.register(8, () => CollisionComponent(tag: ''));
+  factory.register(9, () => DamageComponent(0));
+  factory.register(10, () => TargetingComponent(targetId: -1));
 }
 
 void main() {
@@ -94,6 +105,10 @@ class _MyAppState extends State<MyApp> {
           final isGameOver =
               localPlayerHealth != null && localPlayerHealth.currentHealth <= 0;
 
+          final isTouchDevice = kIsWeb ||
+              defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.iOS;
+
           return Column(
             children: [
               if (networkState != null && !networkState.isConnected)
@@ -126,6 +141,16 @@ class _MyAppState extends State<MyApp> {
                     if (isGameOver && localPlayerId != null)
                       const Center(
                         child: _GameOverMessage(),
+                      ),
+                    if (isTouchDevice)
+                      Positioned(
+                        bottom: 40,
+                        left: 40,
+                        child: Joystick(
+                          onChanged: (vector) {
+                            manager.send(JoystickUpdateEvent(vector));
+                          },
+                        ),
                       ),
                   ],
                 ),
@@ -166,7 +191,7 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-// UI Helper Widgets
+// UI Helper Widgets (unchanged)
 class _GameOverMessage extends StatelessWidget {
   const _GameOverMessage();
   @override

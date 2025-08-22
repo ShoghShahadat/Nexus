@@ -1,23 +1,18 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:attractor_example/components/network_components.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/core/serialization/binary_component.dart'; // <-- FIX: Added this missing import
-import 'package:nexus/src/core/serialization/binary_reader_writer.dart';
-import 'package:nexus/src/core/serialization/binary_world_serializer.dart';
-import '../components/network_components.dart';
 
 class _Player {
   final int sessionId;
   final Entity entity;
-  // The stream that sends data from the server TO this client.
   final StreamController<Uint8List> toClientController;
 
   _Player(this.sessionId, this.entity, this.toClientController);
 }
 
 /// A mock WebSocket server that runs in-process and communicates via streams.
-/// This version is web-compatible as it does not use dart:io.
 class MockServer {
   final NexusWorld _world;
   final BinaryWorldSerializer _serializer;
@@ -25,8 +20,8 @@ class MockServer {
   int _nextSessionId = 1;
   Timer? _gameLoopTimer;
   final _stopwatch = Stopwatch();
+  final double _playerMoveSpeed = 300.0;
 
-  // A stream for messages coming FROM all clients TO the server.
   final _fromClientsController =
       StreamController<({int sessionId, Uint8List data})>.broadcast();
 
@@ -43,15 +38,12 @@ class MockServer {
         Timer.periodic(const Duration(milliseconds: 16), _gameLoop);
   }
 
-  // Called by the NetworkSystem to establish a "connection".
   Stream<Uint8List> connectClient(Stream<Uint8List> fromClient) {
     final sessionId = _nextSessionId++;
     print('[SERVER] Player connected with session ID: $sessionId');
 
     final toClientController = StreamController<Uint8List>.broadcast();
 
-    // Listen to messages from this specific client and forward them to the
-    // central server stream with their session ID.
     fromClient.listen((data) {
       _fromClientsController.add((sessionId: sessionId, data: data));
     }, onDone: () => _handleDisconnect(sessionId));
@@ -79,48 +71,40 @@ class MockServer {
     playerEntity.add(TagsComponent({'player'}));
     playerEntity.add(CollisionComponent(
         tag: 'player', radius: 10, collidesWith: {'meteor', 'health_orb'}));
-    playerEntity
-        .add(LifecyclePolicyComponent(isPersistent: true)); // Add policy
+    playerEntity.add(LifecyclePolicyComponent(isPersistent: true));
     _world.addEntity(playerEntity);
     return playerEntity;
   }
 
   void _sendInitialState(_Player player) {
-    // --- FIX: Temporarily set the isLocalPlayer flag for the initial packet ---
-    // This allows the client to identify which entity it controls.
     final playerComponent = player.entity.get<PlayerComponent>()!;
     playerComponent.isLocalPlayer = true;
-    player.entity.add(playerComponent); // Re-add to mark as dirty
+    player.entity.add(playerComponent);
 
-    // Serialize the entire world state for the new player.
     final packet = _serializer.serialize(_world.entities.values.toList());
     player.toClientController.add(packet);
 
-    // --- FIX: Immediately reset the flag on the server after sending ---
-    // This ensures subsequent world state broadcasts don't mark this player
-    // as "local" for other clients.
     playerComponent.isLocalPlayer = false;
-    player.entity.add(playerComponent); // Re-add to mark as dirty
+    player.entity.add(playerComponent);
   }
 
   void _handleMessage(({int sessionId, Uint8List data}) message) {
     final reader = BinaryReader(message.data);
     final messageType = reader.readInt32();
 
+    // --- FIX: Handle new directional input message type ---
     if (messageType == 1) {
-      // Player Input
-      final x = reader.readDouble();
-      final y = reader.readDouble();
+      // Now message type 1 is directional input
+      final dx = reader.readDouble();
+      final dy = reader.readDouble();
       final playerEntity = _players[message.sessionId]?.entity;
       final health = playerEntity?.get<HealthComponent>();
+
       if (playerEntity != null && (health?.currentHealth ?? 0) > 0) {
-        final pos = playerEntity.get<PositionComponent>()!;
-        // --- FIX: Directly update the target position ---
-        // The server's physics system will handle smoothing or velocity changes.
-        // For this example, direct setting is fine.
-        pos.x = x;
-        pos.y = y;
-        playerEntity.add(pos);
+        final vel = playerEntity.get<VelocityComponent>()!;
+        vel.x = dx * _playerMoveSpeed;
+        vel.y = dy * _playerMoveSpeed;
+        playerEntity.add(vel);
       }
     }
   }
@@ -147,8 +131,6 @@ class MockServer {
   void _broadcastGameState() {
     if (_players.isEmpty) return;
 
-    // --- FIX: Only serialize entities that have binary components ---
-    // This prevents sending client-only or server-only entities over the network.
     final entitiesToSync = _world.entities.values
         .where((e) => e.allComponents.any((c) => c is BinaryComponent))
         .toList();
