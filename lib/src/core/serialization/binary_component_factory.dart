@@ -1,44 +1,37 @@
 import 'package:nexus/nexus.dart';
+import 'binary_component.dart';
 import 'binary_reader_writer.dart';
 
-/// A function signature for a factory that creates a [Component] from a
-/// binary data stream using a [BinaryReader].
-typedef BinaryComponentFactoryFunc = Component Function(BinaryReader reader);
+/// A function signature for a factory that creates an empty instance of a
+/// [BinaryComponent].
+typedef BinaryComponentCreator = BinaryComponent Function();
 
-/// A registry for mapping component type IDs to their binary deserialization factories.
-///
-/// This is a crucial part of the networking layer, allowing the system to
-/// efficiently reconstruct components from a compact binary payload received
-
-/// from the network.
+/// A registry for mapping component type IDs to their binary creator functions.
 class BinaryComponentFactory {
-  final Map<int, BinaryComponentFactoryFunc> _factories = {};
+  final Map<int, BinaryComponentCreator> _creators = {};
 
-  // Singleton instance for global access.
   static final BinaryComponentFactory I = BinaryComponentFactory._internal();
-
   BinaryComponentFactory._internal();
 
-  /// Registers a single binary component factory.
-  ///
-  /// This method is typically called by an auto-generated function that
-  /// registers all `@NetComponent` annotated components.
-  void register(int typeId, BinaryComponentFactoryFunc factory) {
-    if (_factories.containsKey(typeId)) {
+  /// Registers a component creator for a given type ID.
+  /// This is called once at startup for each network-enabled component.
+  void register(int typeId, BinaryComponentCreator creator) {
+    if (_creators.containsKey(typeId)) {
       print(
-          'WARNING: A binary component factory for typeId $typeId is already registered. Overwriting.');
+          'WARNING: A binary component creator for typeId $typeId is already registered. Overwriting.');
     }
-    _factories[typeId] = factory;
+    _creators[typeId] = creator;
   }
 
-  /// Creates a component instance from a binary reader by looking up its type ID.
-  Component create(int typeId, BinaryReader reader) {
-    final factory = _factories[typeId];
-    if (factory == null) {
+  /// Creates an empty component instance from its type ID.
+  BinaryComponent create(int typeId) {
+    final creator = _creators[typeId];
+    if (creator == null) {
       throw Exception(
-          'No binary factory registered for component type ID "$typeId". '
-          'Ensure your generated `registerBinaryComponents()` function is called at startup.');
+          'No binary creator registered for component type ID "$typeId". '
+          'Ensure you call BinaryComponentFactory.I.register() for all '
+          'BinaryComponent types at the start of your application.');
     }
-    return factory(reader);
+    return creator();
   }
 }
