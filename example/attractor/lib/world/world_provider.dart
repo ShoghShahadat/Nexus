@@ -1,19 +1,17 @@
 import 'dart:math';
-import 'dart:typed_data';
-import 'package:attractor_example/gpu/attractor_gpu_system.dart';
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
 import 'package:nexus/src/core/utils/frequency.dart';
 import '../components/debug_info_component.dart';
 import '../components/health_orb_component.dart';
 import '../components/meteor_component.dart';
+import '../components/particle_render_data_component.dart';
+import '../systems/attractor_system.dart';
 import '../systems/debug_system.dart';
 import '../systems/game_systems.dart';
 import '../systems/health_orb_system.dart';
 import '../systems/healing_system.dart';
 import '../systems/meteor_burn_system.dart';
-import '../systems/gpu_bridge_system.dart';
-import '../components/gpu_particle_render_component.dart';
 
 // --- Prefab for Health Orbs ---
 Entity createHealthOrbPrefab(NexusWorld world) {
@@ -118,6 +116,7 @@ Entity createMeteorPrefab(NexusWorld world) {
 NexusWorld provideAttractorWorld() {
   final world = NexusWorld();
 
+  // --- MODIFIED: Replaced GPU systems with the new CPU-based AttractorSystem ---
   world.addSystems([
     GarbageCollectorSystem(),
     AnimationSystem(),
@@ -125,8 +124,7 @@ NexusWorld provideAttractorWorld() {
     PhysicsSystem(),
     ResponsivenessSystem(),
     ParticleLifecycleSystem(),
-    AttractorGpuSystem(),
-    GpuBridgeSystem(),
+    AttractorSystem(), // New CPU-based system
     DebugSystem(),
     SpawnerSystem(),
     TargetingSystem(),
@@ -197,18 +195,12 @@ NexusWorld provideAttractorWorld() {
   ]);
   world.addEntity(healthOrbSpawner);
 
+  // --- MODIFIED: Removed GPU-specific components from the root entity ---
   world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),
     BlackboardComponent({'score': 0, 'is_game_over': false, 'game_time': 0.0}),
-    GpuParticleRenderComponent(Float32List(0)),
-    // --- CRITICAL FIX: Removed the obsolete GpuUniformsComponent ---
-    // This component was deleted in the refactor to a dynamic transpiler system.
-    // The uniform data is now passed directly to the `compute` method.
-    // --- اصلاح حیاتی: حذف GpuUniformsComponent منسوخ شده ---
-    // این کامپوننت در بازسازی به سیستم ترنسپایلر پویا حذف شد.
-    // داده‌های یونیفرم اکنون مستقیماً به متد `compute` ارسال می‌شوند.
+    ParticleRenderDataComponent([]), // Add the new component
     DebugInfoComponent(),
-    GpuTimeComponent(0),
   ]);
 
   return world;

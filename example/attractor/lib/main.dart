@@ -6,10 +6,10 @@ import 'components/debug_info_component.dart';
 import 'components/explosion_component.dart';
 import 'components/health_orb_component.dart';
 import 'components/meteor_component.dart';
+import 'components/particle_render_data_component.dart';
 import 'events.dart';
 import 'particle_painter.dart';
 import 'world/world_provider.dart';
-import 'components/gpu_particle_render_component.dart';
 
 /// A dedicated function to register all custom components for this example.
 void registerAttractorComponents() {
@@ -26,10 +26,9 @@ void registerAttractorComponents() {
     'CollisionComponent': (json) => CollisionComponent.fromJson(json),
     'DamageComponent': (json) => DamageComponent.fromJson(json),
     'TargetingComponent': (json) => TargetingComponent.fromJson(json),
-    'GpuParticleRenderComponent': (json) =>
-        GpuParticleRenderComponent.fromJson(json),
+    'ParticleRenderDataComponent': (json) =>
+        ParticleRenderDataComponent.fromJson(json),
     'DebugInfoComponent': (json) => DebugInfoComponent.fromJson(json),
-    'GpuTimeComponent': (json) => GpuTimeComponent.fromJson(json),
   };
   ComponentFactoryRegistry.I.registerAll(customComponents);
 }
@@ -66,8 +65,9 @@ class _MyAppState extends State<MyApp> {
 
           final blackboard = controller.get<BlackboardComponent>(rootId);
           final health = controller.get<HealthComponent>(attractorId);
-          final gpuRenderData =
-              controller.get<GpuParticleRenderComponent>(rootId);
+          // --- MODIFIED: Get CPU particle data instead of GPU data ---
+          final particleData =
+              controller.get<ParticleRenderDataComponent>(rootId);
           final debugInfo = controller.get<DebugInfoComponent>(rootId);
 
           final score = blackboard?.get<num>('score') ?? 0;
@@ -76,12 +76,6 @@ class _MyAppState extends State<MyApp> {
           final isGameOver = blackboard?.get<bool>('is_game_over') ?? false;
           final countdown = blackboard?.get<double>('restart_countdown') ?? 0.0;
 
-          // --- PERFORMANCE OPTIMIZATION: Pre-fetch all render data here ---
-          // Instead of fetching inside the painter, we extract all necessary
-          // positions once, creating efficient, flat lists for the painter.
-          // بهینه‌سازی عملکرد: تمام داده‌های رندر را اینجا پیش-واکشی می‌کنیم.
-          // به جای واکشی درون نقاش، تمام موقعیت‌های لازم را یکجا استخراج کرده
-          // و لیست‌های مسطح و کارآمد برای نقاش ایجاد می‌کنیم.
           final meteorPositions = controller
               .getAllIdsWithTag('meteor')
               .map((id) => controller.get<PositionComponent>(id))
@@ -113,10 +107,9 @@ class _MyAppState extends State<MyApp> {
                   children: [
                     RepaintBoundary(
                       child: CustomPaint(
-                        // Pass the optimized, pre-fetched data to the painter.
-                        // داده‌های بهینه و پیش-واکشی شده را به نقاش پاس می‌دهیم.
+                        // --- MODIFIED: Pass CPU particle data to the painter ---
                         painter: ParticlePainter(
-                          gpuParticleData: gpuRenderData?.particleData,
+                          particles: particleData?.particles ?? [],
                           meteorPositions: meteorPositions,
                           attractorPosition: attractorPos != null
                               ? Offset(attractorPos.x, attractorPos.y)
@@ -161,6 +154,7 @@ class _MyAppState extends State<MyApp> {
                   ],
                 ),
               ),
+              // --- MODIFIED: Simplified debug info display ---
               if (debugInfo != null)
                 Container(
                   padding:
@@ -179,12 +173,10 @@ class _MyAppState extends State<MyApp> {
                       _DebugStat(
                           label: 'Entities',
                           value: debugInfo.entityCount.toString()),
-                      _DebugStat(
+                      const _DebugStat(
                           label: 'Mode',
-                          value: debugInfo.gpuMode,
-                          valueColor: debugInfo.gpuMode == 'GPU'
-                              ? Colors.greenAccent
-                              : Colors.orangeAccent),
+                          value: 'CPU',
+                          valueColor: Colors.orangeAccent),
                     ],
                   ),
                 ),
@@ -212,7 +204,7 @@ class _MyAppState extends State<MyApp> {
       home: Scaffold(
         backgroundColor: const Color(0xFF1a1a1a),
         appBar: AppBar(
-          title: const Text('Nexus Attractor: GPU Edition'),
+          title: const Text('Nexus Attractor: CPU Edition'),
           backgroundColor: Colors.grey.shade900,
           foregroundColor: Colors.white,
         ),

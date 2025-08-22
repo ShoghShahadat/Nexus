@@ -1,6 +1,4 @@
 import 'dart:collection';
-import 'package:attractor_example/gpu/attractor_gpu_system.dart';
-import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 import '../components/debug_info_component.dart';
 
@@ -23,24 +21,19 @@ class DebugSystem extends System {
     }
 
     final totalFrameTime = _frameTimes.fold<double>(0, (prev, t) => prev + t);
-    final averageFrameTime = totalFrameTime / _frameTimes.length;
+    final averageFrameTime =
+        _frameTimes.isNotEmpty ? totalFrameTime / _frameTimes.length : 0;
 
-    // --- FIX: More accurate FPS calculation ---
-    // FPS is the reciprocal of the average frame time in seconds.
-    // If averageFrameTime is 0, FPS is effectively infinite, but we cap it for display.
     final double fps = (averageFrameTime > 0) ? 1.0 / averageFrameTime : 0.0;
 
     final entityCount = world.entities.length;
-    final gpuSystem = world.systems.whereType<AttractorGpuSystem>().firstOrNull;
-    final gpuMode = gpuSystem?.mode.toString().split('.').last ?? 'N/A';
 
+    // --- MODIFIED: Removed GPU mode logic ---
     entity.add(DebugInfoComponent(
-      // Display the newly calculated, more accurate FPS.
       fps: fps,
-      // Display the average frame time in milliseconds.
       frameTime: averageFrameTime * 1000,
       entityCount: entityCount,
-      gpuMode: gpuMode.toUpperCase(),
+      gpuMode: 'CPU', // Always CPU now
     ));
   }
 }
