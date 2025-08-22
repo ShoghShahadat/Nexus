@@ -14,7 +14,7 @@ class Vec2 with EquatableMixin {
   List<Object?> get props => [x, y];
 }
 
-// 1. Define the data structure for a single particle.
+// The data structure for a single particle.
 class ParticleData {
   final Vec2 position;
   final Vec2 velocity;
@@ -55,32 +55,23 @@ class GpuUniformsComponent extends Component {
 class AttractorGpuSystem extends GpuSystem<ParticleData> {
   final int particleCount;
   final Random _random = Random();
-  // This list is now correctly managed by the base class's _cpuData.
-  // We keep a reference for easy access.
   late List<ParticleData> _particleObjects;
 
-  AttractorGpuSystem({this.particleCount = 500});
+  AttractorGpuSystem({this.particleCount = 50000});
 
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    listen<ResetSimulationEvent>((_) => _resetSimulation());
-  }
-
-  void _resetSimulation() {
-    // --- CRITICAL FIX: Call the new base class method ---
-    // This ensures the correct data list (_cpuData) is updated.
-    reinitializeData();
+    listen<ResetSimulationEvent>((_) => reinitializeData());
   }
 
   @override
   List<ParticleData> initializeData() {
-    // This method now correctly populates the base class's _cpuData list.
     _particleObjects = List.generate(particleCount, (i) {
       final screenInfo = world.rootEntity.get<ScreenInfoComponent>();
       final w = screenInfo?.width ?? 400;
       final h = screenInfo?.height ?? 800;
-      return _createParticle(w / 2, h * 0.8); // Start near the player
+      return _createParticle(w / 2, h * 0.8);
     });
     return _particleObjects;
   }
@@ -97,46 +88,21 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
     );
   }
 
+  // --- FIX: All logic is now on the GPU. This is no longer used. ---
   @override
   void gpuLogic(ParticleData p, GpuKernelContext ctx) {
-    final uniforms = world.rootEntity.get<GpuUniformsComponent>()!;
-    final dx = uniforms.attractorX - p.position.x;
-    final dy = uniforms.attractorY - p.position.y;
-    final distSq = dx * dx + dy * dy;
-
-    if (distSq > 25) {
-      final force = (uniforms.attractorStrength * 45000) / distSq;
-      final angle = atan2(dy, dx);
-      p.velocity.x += cos(angle) * force * ctx.deltaTime;
-      p.velocity.y += sin(angle) * force * ctx.deltaTime;
-    }
-    p.position.x += p.velocity.x * ctx.deltaTime;
-    p.position.y += p.velocity.y * ctx.deltaTime;
-
-    p.age += ctx.deltaTime;
-    if (p.age >= p.maxAge) {
-      // --- CRITICAL FIX: Reset particles at the attractor's current position ---
-      _resetParticle(p, uniforms.attractorX, uniforms.attractorY);
-    }
-  }
-
-  void _resetParticle(ParticleData p, double x, double y) {
-    p.age = 0.0;
-    p.position.x = x;
-    p.position.y = y;
-    final angle = _random.nextDouble() * 2 * pi;
-    final speed = _random.nextDouble() * 150 + 50;
-    p.velocity.x = cos(angle) * speed;
-    p.velocity.y = sin(angle) * speed;
+    // This method is now only required for the CPU fallback mode.
+    // The main GPU logic resides entirely in the shader.
   }
 
   @override
   Float32List flattenData(List<ParticleData> data) {
     if (data.isEmpty) return Float32List(0);
-    final list = Float32List(data.length * 7);
+    // --- FIX: Stride is now 8 to account for memory padding in the shader ---
+    final list = Float32List(data.length * 8);
     for (int i = 0; i < data.length; i++) {
       final p = data[i];
-      final baseIndex = i * 7;
+      final baseIndex = i * 8;
       list[baseIndex + 0] = p.position.x;
       list[baseIndex + 1] = p.position.y;
       list[baseIndex + 2] = p.velocity.x;
@@ -144,6 +110,7 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
       list[baseIndex + 4] = p.age;
       list[baseIndex + 5] = p.maxAge;
       list[baseIndex + 6] = p.initialSize;
+      list[baseIndex + 7] = 0.0; // Padding
     }
     return list;
   }

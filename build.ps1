@@ -81,7 +81,7 @@ if ($Target -eq "windows") {
     Invoke-Build-Command "cargo" "build --release"
 
     # 3. Copy the compiled DLL
-    $DestDir = Join-Path $ProjectRoot "rust_lib"
+    $DestDir = Join-Path $ProjectRoot "example\attractor\rust_lib"
     if (-not (Test-Path $DestDir)) {
         New-Item -ItemType Directory -Path $DestDir | Out-Null
     }

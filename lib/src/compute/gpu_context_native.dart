@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:nexus/src/compute/gpu_buffer_native.dart';
 import 'package:path/path.dart' as path;
+import 'dart:typed_data';
 
 // FFI Signatures for the Rust core library
 typedef InitGpuC = Pointer<Void> Function(
@@ -13,11 +14,17 @@ typedef InitGpuDart = Pointer<Void> Function(
 typedef ReleaseGpuC = Void Function(Pointer<Void> context);
 typedef ReleaseGpuDart = void Function(Pointer<Void> context);
 
-typedef GpuSimC = Uint64 Function(Pointer<Void> context, Float delta_time);
-typedef GpuSimDart = int Function(Pointer<Void> context, double delta_time);
+// --- FIX: Signature now correctly matches the Rust function with all 5 parameters ---
+typedef GpuSimC = Uint64 Function(Pointer<Void> context, Float delta_time,
+    Float attractor_x, Float attractor_y, Float attractor_strength);
+typedef GpuSimDart = int Function(Pointer<Void> context, double delta_time,
+    double attractor_x, double attractor_y, double attractor_strength);
 
-/// A singleton class that manages the low-level communication with the GPU
-/// via the Rust FFI bridge. This class is for internal framework use.
+typedef ReadGpuC = Void Function(
+    Pointer<Void> context, Pointer<Float> output, Int32 len);
+typedef ReadGpuDart = void Function(
+    Pointer<Void> context, Pointer<Float> output, int len);
+
 class GpuContext {
   static final GpuContext _instance = GpuContext._internal();
   factory GpuContext() => _instance;
@@ -26,6 +33,7 @@ class GpuContext {
   late final InitGpuDart _initGpu;
   late final ReleaseGpuDart _releaseGpu;
   late final GpuSimDart _runGpuSimulation;
+  late final ReadGpuDart _readGpuBuffer;
 
   Pointer<Void>? _context;
   bool _isInitialized = false;
@@ -45,6 +53,8 @@ class GpuContext {
       _runGpuSimulation = _lib
           .lookup<NativeFunction<GpuSimC>>('run_gpu_simulation')
           .asFunction();
+      _readGpuBuffer =
+          _lib.lookup<NativeFunction<ReadGpuC>>('read_gpu_buffer').asFunction();
     } catch (e) {
       throw Exception('Failed to load GPU native library or functions: $e');
     }
@@ -52,26 +62,34 @@ class GpuContext {
 
   void initialize(GpuBuffer<Float> buffer) {
     if (_isInitialized) return;
-
     _loadLibrary();
-
     _context = _initGpu(buffer.pointer, buffer.length);
-
     if (_context == nullptr) {
       throw Exception(
-          'Failed to initialize GPU context. The native code returned a null pointer. This might happen if a compatible GPU is not available.');
+          'Failed to initialize GPU context. The native code returned a null pointer.');
     }
     _isInitialized = true;
   }
 
-  // --- FIX: Unify the method signature with the web version to be async ---
-  Future<int> runSimulation(double deltaTime) async {
+  Future<int> runSimulation(double deltaTime, double attractorX,
+      double attractorY, double attractorStrength) async {
     if (!_isInitialized || _context == null) {
       throw StateError(
           'GpuContext is not initialized. Call initialize() first.');
     }
-    // The FFI call itself is synchronous/blocking, so we wrap the result in a Future.
-    return Future.value(_runGpuSimulation(_context!, deltaTime));
+    return Future.value(_runGpuSimulation(
+        _context!, deltaTime, attractorX, attractorY, attractorStrength));
+  }
+
+  Float32List readBuffer(int length) {
+    if (!_isInitialized || _context == null) {
+      throw StateError('GpuContext is not initialized.');
+    }
+    final buffer = malloc.allocate<Float>(sizeOf<Float>() * length);
+    _readGpuBuffer(_context!, buffer, length);
+    final list = buffer.asTypedList(length);
+    malloc.free(buffer);
+    return list;
   }
 
   void dispose() {

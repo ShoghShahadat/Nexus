@@ -32,10 +32,16 @@ abstract class GpuSystem<T> extends System {
     _cpuData = initializeData();
   }
 
-  Future<int> compute(double deltaTime) async {
+  // --- FIX: Method now accepts uniforms to pass to the GPU ---
+  Future<int> compute(
+    double deltaTime, {
+    double attractorX = 0.0,
+    double attractorY = 0.0,
+    double attractorStrength = 0.0,
+  }) async {
     if (_mode == GpuMode.gpu) {
-      // --- FIX: No longer need a dynamic cast as the API is now unified ---
-      return await _gpu.runSimulation(deltaTime);
+      return await (_gpu as dynamic)
+          .runSimulation(deltaTime, attractorX, attractorY, attractorStrength);
     } else if (_mode == GpuMode.cpuFallback) {
       final stopwatch = Stopwatch()..start();
       final ctx = GpuKernelContext(deltaTime: deltaTime);
@@ -61,7 +67,6 @@ abstract class GpuSystem<T> extends System {
     final flatData = flattenData(_cpuData);
 
     try {
-      // The dynamic cast is still needed for initialize because the parameter types differ.
       if (kIsWeb) {
         await (_gpu as dynamic).initialize(flatData);
       } else {
@@ -70,14 +75,12 @@ abstract class GpuSystem<T> extends System {
       }
 
       _mode = GpuMode.gpu;
-      debugPrint(
-          '[Nexus GpuSystem] Successfully initialized in GPU mode. All computations will be offloaded.');
+      debugPrint('[Nexus GpuSystem] Successfully initialized in GPU mode.');
     } catch (e) {
       _mode = GpuMode.cpuFallback;
       debugPrint(
           '[Nexus GpuSystem] WARNING: Failed to initialize GPU context. Reason: $e');
-      debugPrint(
-          '[Nexus GpuSystem] Switched to CPU Fallback mode. Performance may be degraded.');
+      debugPrint('[Nexus GpuSystem] Switched to CPU Fallback mode.');
     }
   }
 

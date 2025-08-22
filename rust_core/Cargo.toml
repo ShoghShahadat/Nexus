@@ -3,23 +3,20 @@ name = "rust_core"
 version = "0.1.0"
 edition = "2021"
 
-# This section creates the native binary (.dll, .so, etc.)
 [lib]
-crate-type = ["cdylib"] 
+crate-type = ["cdylib"] # Compile to a C-style dynamic library
 
 [dependencies]
-# --- FINAL FIX: Using the latest stable wgpu version ---
-# This aligns the project with modern WebGPU specifications and is crucial
-# for resolving compatibility errors with the browser/driver.
-wgpu = "0.20.1" 
+# The core WebGPU implementation
+wgpu = "0.19"
+# For running async code synchronously in the FFI function
 pollster = "0.3"
+# For logging wgpu errors and info
 env_logger = "0.11"
+# For safe type casting
 bytemuck = { version = "1.14", features = ["derive"] }
+# For async channels
 futures-intrusive = "0.5"
+# *** FIX: Added the missing dependency for logging macros ***
+# *** اصلاح: وابستگی فراموش شده برای ماکروهای لاگ اضافه شد ***
 log = "0.4"
-
-# These dependencies are only used when compiling for the web.
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2"
-web-sys = { version = "0.3", features = ["console"] }
-wasm-bindgen-futures = "0.4"
