@@ -6,13 +6,14 @@ import 'package:nexus/nexus.dart';
 import '../events.dart';
 
 // The Dart data structure for a single particle.
-// The GpuSystem will use this to understand the data layout.
 class ParticleData {
   final Vec2 position;
   final Vec2 velocity;
   double age;
   final double maxAge;
   final double initialSize;
+  // Add a seed property for randomness in the shader
+  double seed;
 
   ParticleData({
     required this.position,
@@ -20,6 +21,7 @@ class ParticleData {
     this.age = 0.0,
     required this.maxAge,
     required this.initialSize,
+    this.seed = 0.0,
   });
 }
 
@@ -31,54 +33,144 @@ class Vec2 with EquatableMixin {
   List<Object?> get props => [x, y];
 }
 
+// A class to represent the parameters passed to the shader.
+class SimParams {
+  final double deltaTime;
+  final double attractorX;
+  final double attractorY;
+  final double attractorStrength;
+
+  SimParams(
+      {required this.deltaTime,
+      required this.attractorX,
+      required this.attractorY,
+      required this.attractorStrength});
+}
+
 class AttractorGpuSystem extends GpuSystem<ParticleData> {
   final int particleCount;
   final Random _random = Random();
   late List<ParticleData> _particleObjects;
 
-  // --- THE NEW ARCHITECTURE ---
-  // Instead of a pre-compiled shader, we define the GPU logic
-  // right here in Dart! The GpuSystem will transpile this.
-  // --- معماری جدید ---
-  // به جای یک شیدر از پیش کامپایل شده، ما منطق GPU را
-  // دقیقاً اینجا در Dart تعریف می‌کنیم! GpuSystem این را ترجمه خواهد کرد.
+  // =======================================================================
+  // --- USER'S CODE: THE FINAL VISION ---
+  // The user writes their logic in a pure Dart function like this.
+  // They don't need to know about WGSL or strings.
+  // --- کد کاربر: چشم‌انداز نهایی ---
+  // کاربر منطق خود را در یک تابع خالص Dart مانند این می‌نویسد.
+  // نیازی به دانستن WGSL یا رشته‌ها نیست.
+  // =======================================================================
+  void gpuLogic(ParticleData p, SimParams params) {
+    // This Dart code is the "source of truth". The build_runner would
+    // analyze this function to generate the WGSL code below.
+    // Note: This function is NOT executed by the CPU. It's only for transpilation.
+
+    if (p.age >= p.maxAge) {
+      p.position.x = params.attractorX;
+      p.position.y = params.attractorY;
+
+      // Pseudo-random logic using seed
+      final seed = p.seed + (params.deltaTime * 1000.0);
+      final angle = (sin(seed) * 43758.5453).abs() % (2 * 3.14159);
+      final speed = 50.0 + (sin(seed * 2.0) * 43758.5453).abs() % 100.0;
+      p.velocity.x = cos(angle) * speed;
+      p.velocity.y = sin(angle) * speed;
+      p.age = 0.0;
+      p.seed += 1.0;
+    }
+
+    final dirX = params.attractorX - p.position.x;
+    final dirY = params.attractorY - p.position.y;
+    final distSq = (dirX * dirX) + (dirY * dirY);
+
+    if (distSq > 1.0) {
+      final dist = sqrt(distSq);
+      final force = params.attractorStrength * 1000.0 / distSq;
+      p.velocity.x += (dirX / dist) * force * params.deltaTime;
+      p.velocity.y += (dirY / dist) * force * params.deltaTime;
+    }
+
+    // Drag
+    p.velocity.x *= (1.0 - (0.1 * params.deltaTime));
+    p.velocity.y *= (1.0 - (0.1 * params.deltaTime));
+
+    p.position.x += p.velocity.x * params.deltaTime;
+    p.position.y += p.velocity.y * params.deltaTime;
+    p.age += params.deltaTime;
+  }
+
+  // =======================================================================
+  // --- GENERATED CODE (The Magic Behind the Scenes) ---
+  // In a real project, a build tool would generate the content of this
+  // getter from the `gpuLogic` function above. The user never touches this.
+  // --- کد تولید شده (جادوی پشت صحنه) ---
+  // در یک پروژه واقعی، یک ابزار ساخت، محتوای این getter را از تابع
+  // `gpuLogic` بالا تولید می‌کند. کاربر هرگز به این دست نمی‌زند.
+  // =======================================================================
   @override
-  String get gpuLogicSourceCode => '''
-    void gpuLogic(Particle p, SimParams params) {
-      if (p.age >= p.max_age) {
-          p.pos.x = params.attractor_x;
-          p.pos.y = params.attractor_y;
-          
-          let seed = p.seed + (params.delta_time * 1000.0);
-          let angle = hash(seed) * 2.0 * 3.14159;
-          let speed = 50.0 + hash(seed * 2.0) * 100.0;
-          p.vel.x = cos(angle) * speed;
-          p.vel.y = sin(angle) * speed;
-          p.age = 0.0;
-          p.seed = p.seed + 1.0; // Change seed for next respawn
-      }
+  String get wgslSourceCode => '''
+    struct Particle {
+        pos: vec2<f32>,
+        vel: vec2<f32>,
+        age: f32,
+        max_age: f32,
+        initial_size: f32,
+        seed: f32,
+    };
 
-      let attractor_pos_x = params.attractor_x;
-      let attractor_pos_y = params.attractor_y;
-      
-      let dir_x = attractor_pos_x - p.pos.x;
-      let dir_y = attractor_pos_y - p.pos.y;
-      
-      let dist_sq = (dir_x * dir_x) + (dir_y * dir_y);
+    struct SimParams {
+        delta_time: f32,
+        attractor_x: f32,
+        attractor_y: f32,
+        attractor_strength: f32,
+    };
 
-      if (dist_sq > 1.0) {
-          let dist = sqrt(dist_sq);
-          let force = params.attractor_strength * 1000.0 / dist_sq;
-          p.vel.x = p.vel.x + (dir_x / dist) * force * params.delta_time;
-          p.vel.y = p.vel.y + (dir_y / dist) * force * params.delta_time;
-      }
-      
-      p.pos.x = p.pos.x + p.vel.x * params.delta_time;
-      p.pos.y = p.pos.y + p.vel.y * params.delta_time;
-      p.age = p.age + params.delta_time;
+    @group(0) @binding(1)
+    var<uniform> params: SimParams;
+
+    @group(0) @binding(0)
+    var<storage, read_write> particles: array<Particle>;
+
+    fn hash(n: f32) -> f32 {
+        return fract(sin(n) * 43758.5453123);
+    }
+
+    @compute @workgroup_size(256)
+    fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+        let index = global_id.x;
+        let array_len = arrayLength(&particles);
+        if (index >= array_len) { return; }
+        var p = particles[index];
+
+        if (p.age >= p.max_age) {
+            p.pos = vec2<f32>(params.attractor_x, params.attractor_y);
+            let seed = p.seed + (params.delta_time * 1000.0);
+            let angle = hash(seed) * 2.0 * 3.14159;
+            let speed = 50.0 + hash(seed * 2.0) * 100.0;
+            p.vel = vec2<f32>(cos(angle) * speed, sin(angle) * speed);
+            p.age = 0.0;
+            p.seed = p.seed + 1.0;
+        }
+
+        let attractor_pos = vec2<f32>(params.attractor_x, params.attractor_y);
+        let dir = attractor_pos - p.pos;
+        let dist_sq = dot(dir, dir);
+
+        if (dist_sq > 1.0) {
+            let dist = sqrt(dist_sq);
+            let force = params.attractor_strength * 1000.0 / dist_sq;
+            p.vel = p.vel + (dir / dist) * force * params.delta_time;
+        }
+        
+        p.vel = p.vel * (1.0 - (0.1 * params.delta_time));
+        p.pos = p.pos + p.vel * params.delta_time;
+        p.age = p.age + params.delta_time;
+
+        particles[index] = p;
     }
   ''';
 
+  // --- System Implementation Details ---
   AttractorGpuSystem({this.particleCount = 500});
 
   @override
@@ -107,13 +199,13 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
       age: 0.0,
       maxAge: _random.nextDouble() * 3 + 2,
       initialSize: _random.nextDouble() * 2.0 + 1.0,
+      seed: _random.nextDouble() * 1000.0,
     );
   }
 
   @override
   Float32List flattenData(List<ParticleData> data) {
     if (data.isEmpty) return Float32List(0);
-    // Stride is now 8: pos(2), vel(2), age(1), max_age(1), initial_size(1), seed(1)
     final list = Float32List(data.length * 8);
     for (int i = 0; i < data.length; i++) {
       final p = data[i];
@@ -125,7 +217,7 @@ class AttractorGpuSystem extends GpuSystem<ParticleData> {
       list[baseIndex + 4] = p.age;
       list[baseIndex + 5] = p.maxAge;
       list[baseIndex + 6] = p.initialSize;
-      list[baseIndex + 7] = _random.nextDouble() * 1000.0; // Initial seed
+      list[baseIndex + 7] = p.seed;
     }
     return list;
   }
