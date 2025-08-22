@@ -26,10 +26,13 @@ class SpawnerComponent extends Component {
 
 class TargetingComponent extends Component
     with SerializableComponent, BinaryComponent {
-  EntityId targetId;
-  double turnSpeed;
+  late EntityId targetId;
+  late double turnSpeed;
 
-  TargetingComponent({required this.targetId, this.turnSpeed = 2.0});
+  // FIX: Added a default constructor for the factory
+  TargetingComponent({EntityId? targetId, double? turnSpeed})
+      : targetId = targetId ?? -1,
+        turnSpeed = turnSpeed ?? 2.0;
 
   @override
   int get typeId => 10;
@@ -67,17 +70,21 @@ enum CollisionShape { circle }
 
 class CollisionComponent extends Component
     with SerializableComponent, BinaryComponent {
-  CollisionShape shape;
-  double radius;
-  Set<String> collidesWith;
-  String tag;
+  late CollisionShape shape;
+  late double radius;
+  late Set<String> collidesWith;
+  late String tag;
 
-  CollisionComponent({
-    required this.tag,
-    this.shape = CollisionShape.circle,
-    this.radius = 10.0,
-    Set<String>? collidesWith,
-  }) : collidesWith = collidesWith ?? {};
+  // FIX: Added a default constructor for the factory
+  CollisionComponent(
+      {String? tag,
+      CollisionShape? shape,
+      double? radius,
+      Set<String>? collidesWith})
+      : tag = tag ?? '',
+        shape = shape ?? CollisionShape.circle,
+        radius = radius ?? 10.0,
+        collidesWith = collidesWith ?? {};
 
   @override
   int get typeId => 8;
@@ -130,11 +137,13 @@ class CollisionComponent extends Component
 
 class HealthComponent extends Component
     with SerializableComponent, BinaryComponent {
-  double currentHealth;
-  final double maxHealth;
+  late double currentHealth;
+  late double maxHealth;
 
-  HealthComponent({required this.maxHealth, double? currentHealth})
-      : currentHealth = currentHealth ?? maxHealth;
+  // FIX: Added a default constructor for the factory
+  HealthComponent({double? maxHealth, double? currentHealth})
+      : maxHealth = maxHealth ?? 100.0,
+        currentHealth = currentHealth ?? maxHealth ?? 100.0;
 
   @override
   int get typeId => 3;
@@ -167,9 +176,10 @@ class HealthComponent extends Component
 
 class DamageComponent extends Component
     with SerializableComponent, BinaryComponent {
-  double damage;
+  late double damage;
 
-  DamageComponent(this.damage);
+  // FIX: Added a default constructor for the factory
+  DamageComponent([this.damage = 0.0]);
 
   @override
   int get typeId => 9;

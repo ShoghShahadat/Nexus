@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:attractor_example/components/network_components.dart';
 import 'package:nexus/nexus.dart';
+import '../components/network_components.dart';
 
 class _Player {
   final int sessionId;
@@ -14,13 +14,15 @@ class _Player {
 
 /// A mock WebSocket server that runs in-process and communicates via streams.
 class MockServer {
+  // --- FIX: Expose player move speed as a public constant ---
+  static const double playerMoveSpeed = 300.0;
+
   final NexusWorld _world;
   final BinaryWorldSerializer _serializer;
   final Map<int, _Player> _players = {};
   int _nextSessionId = 1;
   Timer? _gameLoopTimer;
   final _stopwatch = Stopwatch();
-  final double _playerMoveSpeed = 300.0;
 
   final _fromClientsController =
       StreamController<({int sessionId, Uint8List data})>.broadcast();
@@ -92,9 +94,7 @@ class MockServer {
     final reader = BinaryReader(message.data);
     final messageType = reader.readInt32();
 
-    // --- FIX: Handle new directional input message type ---
     if (messageType == 1) {
-      // Now message type 1 is directional input
       final dx = reader.readDouble();
       final dy = reader.readDouble();
       final playerEntity = _players[message.sessionId]?.entity;
@@ -102,8 +102,8 @@ class MockServer {
 
       if (playerEntity != null && (health?.currentHealth ?? 0) > 0) {
         final vel = playerEntity.get<VelocityComponent>()!;
-        vel.x = dx * _playerMoveSpeed;
-        vel.y = dy * _playerMoveSpeed;
+        vel.x = dx * playerMoveSpeed;
+        vel.y = dy * playerMoveSpeed;
         playerEntity.add(vel);
       }
     }

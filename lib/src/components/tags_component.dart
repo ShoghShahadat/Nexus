@@ -1,7 +1,4 @@
-import 'package:nexus/src/core/component.dart';
-import 'package:nexus/src/core/serialization/binary_component.dart';
-import 'package:nexus/src/core/serialization/binary_reader_writer.dart';
-import 'package:nexus/src/core/serialization/serializable_component.dart';
+import 'package:nexus/nexus.dart';
 
 /// A component that holds a list of simple string tags.
 /// Now supports both JSON and Binary serialization.
@@ -9,7 +6,8 @@ class TagsComponent extends Component
     with SerializableComponent, BinaryComponent {
   final Set<String> tags;
 
-  TagsComponent(this.tags);
+  // FIX: Added a default constructor for the factory
+  TagsComponent([Set<String>? tags]) : tags = tags ?? {};
 
   // --- SerializableComponent (JSON) ---
 

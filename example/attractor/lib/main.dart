@@ -1,42 +1,16 @@
-import 'package:attractor_example/components/health_orb_component.dart';
-import 'package:attractor_example/components/meteor_component.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
+import 'component_registration.dart';
 import 'components/debug_info_component.dart';
 import 'components/network_components.dart';
-import 'events.dart';
 import 'network/mock_server.dart';
 import 'particle_painter.dart';
 import 'widgets/joystick.dart';
 import 'world/world_provider.dart';
 
-void registerAttractorJsonComponents() {
-  final customComponents = <String, ComponentFactory>{
-    'DebugInfoComponent': (json) => DebugInfoComponent.fromJson(json),
-  };
-  ComponentFactoryRegistry.I.registerAll(customComponents);
-}
-
-void registerNetworkComponents() {
-  final factory = BinaryComponentFactory.I;
-  factory.register(1, () => PositionComponent());
-  factory.register(2, () => PlayerComponent());
-  factory.register(3, () => HealthComponent(maxHealth: 100));
-  factory.register(4, () => VelocityComponent());
-  factory.register(5, () => TagsComponent({}));
-  // --- FIX: Register all new gameplay components ---
-  factory.register(6, () => MeteorComponent());
-  factory.register(7, () => HealthOrbComponent());
-  factory.register(8, () => CollisionComponent(tag: ''));
-  factory.register(9, () => DamageComponent(0));
-  factory.register(10, () => TargetingComponent(targetId: -1));
-}
-
 void main() {
-  registerCoreComponents();
-  registerAttractorJsonComponents();
-  registerNetworkComponents();
+  // Registration is now handled by the world providers, so main is clean.
   runApp(const MyApp());
 }
 
@@ -73,35 +47,15 @@ class _MyAppState extends State<MyApp> {
           final blackboard = controller.get<BlackboardComponent>(rootId);
           final localPlayerId = blackboard?.get<EntityId>('local_player_id');
 
-          final allPlayerPositions = controller
-              .getAllIdsWithTag('player')
-              .map((id) => controller.get<PositionComponent>(id))
-              .whereType<PositionComponent>()
-              .map((p) => Offset(p.x, p.y))
-              .toList();
+          // --- FIX: Get all entity IDs from the controller ---
+          final allPlayerIds = controller.getAllIdsWithTag('player');
+          final meteorIds = controller.getAllIdsWithTag('meteor');
+          final healthOrbIds = controller.getAllIdsWithTag('health_orb');
 
-          final localPlayerPos = localPlayerId != null
-              ? controller.get<PositionComponent>(localPlayerId)
-              : null;
+          final debugInfo = controller.get<DebugInfoComponent>(rootId);
           final localPlayerHealth = localPlayerId != null
               ? controller.get<HealthComponent>(localPlayerId)
               : null;
-
-          final meteorPositions = controller
-              .getAllIdsWithTag('meteor')
-              .map((id) => controller.get<PositionComponent>(id))
-              .whereType<PositionComponent>()
-              .map((p) => Offset(p.x, p.y))
-              .toList();
-
-          final healthOrbPositions = controller
-              .getAllIdsWithTag('health_orb')
-              .map((id) => controller.get<PositionComponent>(id))
-              .whereType<PositionComponent>()
-              .map((p) => Offset(p.x, p.y))
-              .toList();
-
-          final debugInfo = controller.get<DebugInfoComponent>(rootId);
           final isGameOver =
               localPlayerHealth != null && localPlayerHealth.currentHealth <= 0;
 
@@ -127,13 +81,13 @@ class _MyAppState extends State<MyApp> {
                   children: [
                     RepaintBoundary(
                       child: CustomPaint(
+                        // --- FIX: Pass entity IDs and controller to the painter ---
                         painter: ParticlePainter(
-                          meteorPositions: meteorPositions,
-                          healthOrbPositions: healthOrbPositions,
-                          allPlayerPositions: allPlayerPositions,
-                          localPlayerPosition: localPlayerPos != null
-                              ? Offset(localPlayerPos.x, localPlayerPos.y)
-                              : null,
+                          allPlayerIds: allPlayerIds,
+                          meteorIds: meteorIds,
+                          healthOrbIds: healthOrbIds,
+                          localPlayerId: localPlayerId,
+                          controller: controller,
                         ),
                         child: const SizedBox.expand(),
                       ),
@@ -191,7 +145,7 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-// UI Helper Widgets (unchanged)
+// UI Helper Widgets
 class _GameOverMessage extends StatelessWidget {
   const _GameOverMessage();
   @override

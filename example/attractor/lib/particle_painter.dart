@@ -1,66 +1,117 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'components/particle_render_data_component.dart';
+import 'package:nexus/nexus.dart';
 
-/// A custom painter to efficiently render all game entities in the multiplayer world.
+/// A custom painter to efficiently render all game entities.
+/// This version includes health bars for players and lifetime indicators for health orbs.
 class ParticlePainter extends CustomPainter {
-  // This painter is now simplified, as most logic is driven by server data.
-  // We just need to know where all the different types of entities are.
-  final List<Offset> meteorPositions;
-  final List<Offset> healthOrbPositions;
-  final List<Offset> allPlayerPositions;
-  final Offset? localPlayerPosition;
+  final List<EntityId> allPlayerIds;
+  final List<EntityId> meteorIds;
+  final List<EntityId> healthOrbIds;
+  final EntityId? localPlayerId;
+  final FlutterRenderingSystem controller;
 
   ParticlePainter({
-    required this.meteorPositions,
-    required this.healthOrbPositions,
-    required this.allPlayerPositions,
-    this.localPlayerPosition,
+    required this.allPlayerIds,
+    required this.meteorIds,
+    required this.healthOrbIds,
+    required this.controller,
+    this.localPlayerId,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     // --- Meteor Rendering ---
     final meteorPaint = Paint();
-    for (final pos in meteorPositions) {
-      final rect = Rect.fromCircle(center: pos, radius: 12);
+    for (final id in meteorIds) {
+      final pos = controller.get<PositionComponent>(id);
+      if (pos == null) continue;
+
+      final rect =
+          Rect.fromCircle(center: Offset(pos.x, pos.y), radius: pos.width / 2);
       meteorPaint.shader = const RadialGradient(
         colors: [Colors.white, Colors.orangeAccent, Colors.transparent],
         stops: [0.0, 0.4, 1.0],
       ).createShader(rect);
-      canvas.drawCircle(pos, 12, meteorPaint);
+      canvas.drawCircle(Offset(pos.x, pos.y), pos.width / 2, meteorPaint);
     }
 
-    // --- Health Orb Rendering ---
+    // --- Health Orb Rendering with Lifetime Indicator ---
     final healthOrbPaint = Paint()..color = Colors.greenAccent.shade400;
-    for (final pos in healthOrbPositions) {
-      canvas.drawCircle(pos, 6, healthOrbPaint);
+    final healthOrbArcPaint = Paint()
+      ..color = Colors.green.shade800
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+
+    for (final id in healthOrbIds) {
+      final pos = controller.get<PositionComponent>(id);
+      final health = controller.get<HealthComponent>(id);
+      if (pos == null || health == null) continue;
+
+      final offset = Offset(pos.x, pos.y);
+      canvas.drawCircle(offset, 6, healthOrbPaint);
+
+      // Draw the depleting arc
+      final healthRatio =
+          (health.currentHealth / health.maxHealth).clamp(0.0, 1.0);
+      canvas.drawArc(
+        Rect.fromCircle(center: offset, radius: 9),
+        -pi / 2, // Start from the top
+        2 * pi * healthRatio,
+        false,
+        healthOrbArcPaint,
+      );
     }
 
-    // --- Other Player Rendering ---
+    // --- Player Rendering with Health Bars ---
     final otherPlayerPaint = Paint()
       ..color = Colors.lightBlueAccent.withOpacity(0.8);
-    for (final pos in allPlayerPositions) {
-      // Don't draw the local player in this loop
-      if (pos == localPlayerPosition) continue;
-      canvas.drawCircle(
-        pos,
-        10,
-        otherPlayerPaint,
-      );
-    }
+    final localPlayerPaint = Paint()..color = Colors.yellowAccent;
+    final localPlayerGlow = Paint()
+      ..color = Colors.yellowAccent.withOpacity(0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
+    final healthBarBackgroundPaint = Paint()..color = Colors.red.shade900;
+    final healthBarForegroundPaint = Paint()
+      ..color = Colors.greenAccent.shade400;
 
-    // --- Local Player Rendering (highlighted) ---
-    if (localPlayerPosition != null) {
-      final localPlayerPaint = Paint()..color = Colors.yellowAccent;
-      final localPlayerGlow = Paint()
-        ..color = Colors.yellowAccent.withOpacity(0.3)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
-      canvas.drawCircle(localPlayerPosition!, 12, localPlayerGlow);
-      canvas.drawCircle(
-        localPlayerPosition!,
-        10,
-        localPlayerPaint,
-      );
+    for (final id in allPlayerIds) {
+      final pos = controller.get<PositionComponent>(id);
+      final health = controller.get<HealthComponent>(id);
+      if (pos == null) continue;
+
+      final offset = Offset(pos.x, pos.y);
+      final isLocal = id == localPlayerId;
+
+      // Draw player body
+      if (isLocal) {
+        canvas.drawCircle(offset, 12, localPlayerGlow);
+        canvas.drawCircle(offset, 10, localPlayerPaint);
+      } else {
+        canvas.drawCircle(offset, 10, otherPlayerPaint);
+      }
+
+      // Draw health bar above the player
+      if (health != null) {
+        final healthRatio =
+            (health.currentHealth / health.maxHealth).clamp(0.0, 1.0);
+        const barWidth = 30.0;
+        const barHeight = 5.0;
+        final barOffset = Offset(offset.dx - barWidth / 2, offset.dy - 25);
+
+        // Background
+        canvas.drawRRect(
+            RRect.fromRectAndRadius(
+                Rect.fromLTWH(barOffset.dx, barOffset.dy, barWidth, barHeight),
+                const Radius.circular(2)),
+            healthBarBackgroundPaint);
+        // Foreground
+        canvas.drawRRect(
+            RRect.fromRectAndRadius(
+                Rect.fromLTWH(barOffset.dx, barOffset.dy,
+                    barWidth * healthRatio, barHeight),
+                const Radius.circular(2)),
+            healthBarForegroundPaint);
+      }
     }
   }
 

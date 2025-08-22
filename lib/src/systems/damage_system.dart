@@ -1,19 +1,15 @@
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/gameplay_components.dart';
-import 'package:nexus/src/events/gameplay_events.dart';
+import '../components/meteor_component.dart';
 
 /// A system that processes `CollisionEvent`s to apply damage to entities
-/// with a `HealthComponent`.
-/// This version uses the new `listen` helper for automatic subscription management.
+/// with a `HealthComponent`. It also handles special collision cases,
+/// like meteor-on-meteor destruction.
 class DamageSystem extends System {
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    // Use the new, safer `listen` method. No need to manage the subscription manually.
     listen<CollisionEvent>(_onCollision);
   }
-
-  // No need for onRemovedFromWorld anymore, the base class handles it!
 
   void _onCollision(CollisionEvent event) {
     final entityA = world.entities[event.entityA];
@@ -21,6 +17,19 @@ class DamageSystem extends System {
 
     if (entityA == null || entityB == null) return;
 
+    // --- FIX: Handle meteor-on-meteor collision ---
+    final isAMeteor = entityA.has<MeteorComponent>();
+    final isBMeteor = entityB.has<MeteorComponent>();
+
+    if (isAMeteor && isBMeteor) {
+      // Both are meteors, destroy them both.
+      // Setting health to 0 will trigger their respective destruction logic.
+      entityA.add(HealthComponent(maxHealth: 1, currentHealth: 0));
+      entityB.add(HealthComponent(maxHealth: 1, currentHealth: 0));
+      return; // Stop further processing for this pair
+    }
+
+    // Standard damage logic
     _applyDamage(entityA, entityB);
     _applyDamage(entityB, entityA);
   }
@@ -30,6 +39,9 @@ class DamageSystem extends System {
     final damage = source.get<DamageComponent>();
 
     if (health == null || damage == null) return;
+
+    // Avoid applying damage if the target is already defeated
+    if (health.currentHealth <= 0) return;
 
     final newHealth = health.currentHealth - damage.damage;
 

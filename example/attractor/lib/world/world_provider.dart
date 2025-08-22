@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:nexus/nexus.dart';
-import '../components/debug_info_component.dart';
+import '../component_registration.dart';
 import '../components/health_orb_component.dart';
 import '../components/meteor_component.dart';
 import '../components/network_components.dart';
@@ -12,8 +12,6 @@ import '../systems/meteor_burn_system.dart';
 import '../systems/network_system.dart';
 import '../systems/player_control_system.dart';
 import '../systems/server_systems.dart';
-
-// Prefabs remain the same.
 
 Entity createHealthOrbPrefab(NexusWorld world) {
   final orb = Entity();
@@ -30,7 +28,8 @@ Entity createHealthOrbPrefab(NexusWorld world) {
     HealthComponent(maxHealth: 100),
     CollisionComponent(tag: 'health_orb', radius: 6, collidesWith: {'player'}),
     LifecyclePolicyComponent(
-      destructionCondition: (e) => e.get<HealthComponent>()!.currentHealth <= 0,
+      destructionCondition: (e) =>
+          (e.get<HealthComponent>()?.currentHealth ?? 0) <= 0,
     ),
   ]);
   return orb;
@@ -43,7 +42,10 @@ Entity createMeteorPrefab(NexusWorld world) {
   final gameTime =
       root.get<BlackboardComponent>()?.get<double>('game_time') ?? 0.0;
   final size = (25 + (gameTime / 30.0) * 25).clamp(25.0, 50.0);
-  final speed = (100 + (gameTime / 30.0) * 200).clamp(100.0, 300.0);
+
+  // --- FIX: Meteor speed is now 5x player speed ---
+  final speed = MockServer.playerMoveSpeed * 5;
+
   final startEdge = random.nextInt(4);
   double startX, startY;
   final screenInfo = root.get<ScreenInfoComponent>();
@@ -69,8 +71,9 @@ Entity createMeteorPrefab(NexusWorld world) {
   }
   meteor.addComponents([
     PositionComponent(x: startX, y: startY, width: size, height: size),
+    // --- FIX: Meteors now collide with each other ---
     CollisionComponent(
-        tag: 'meteor', radius: size / 2, collidesWith: {'player'}),
+        tag: 'meteor', radius: size / 2, collidesWith: {'player', 'meteor'}),
     MeteorComponent(),
     TagsComponent({'meteor'}),
     HealthComponent(maxHealth: 20),
@@ -78,7 +81,8 @@ Entity createMeteorPrefab(NexusWorld world) {
     DamageComponent(25),
     LifecyclePolicyComponent(
       destructionCondition: (e) {
-        final pos = e.get<PositionComponent>()!;
+        final pos = e.get<PositionComponent>();
+        if (pos == null) return true;
         return pos.y >
             (world.rootEntity.get<ScreenInfoComponent>()?.height ?? 600) + 100;
       },
@@ -89,14 +93,16 @@ Entity createMeteorPrefab(NexusWorld world) {
       world.entities.values.where((e) => e.has<PlayerComponent>()).toList();
   if (players.isNotEmpty) {
     final targetPlayer = players[random.nextInt(players.length)];
-    meteor.add(TargetingComponent(targetId: targetPlayer.id, turnSpeed: 1.0));
-    final vel = meteor.get<VelocityComponent>()!;
-    final pos = meteor.get<PositionComponent>()!;
-    final targetPos = targetPlayer.get<PositionComponent>()!;
-    final angle = atan2(targetPos.y - pos.y, targetPos.x - pos.x);
-    vel.x = cos(angle) * speed;
-    vel.y = sin(angle) * speed;
-    meteor.add(vel);
+    final targetPos = targetPlayer.get<PositionComponent>();
+    if (targetPos != null) {
+      meteor.add(TargetingComponent(targetId: targetPlayer.id, turnSpeed: 1.0));
+      final vel = meteor.get<VelocityComponent>()!;
+      final pos = meteor.get<PositionComponent>()!;
+      final angle = atan2(targetPos.y - pos.y, targetPos.x - pos.x);
+      vel.x = cos(angle) * speed;
+      vel.y = sin(angle) * speed;
+      meteor.add(vel);
+    }
   }
   return meteor;
 }
@@ -104,6 +110,9 @@ Entity createMeteorPrefab(NexusWorld world) {
 // --- SERVER WORLD PROVIDER ---
 
 NexusWorld provideServerWorld() {
+  registerCoreComponents();
+  registerAllComponents();
+
   final world = NexusWorld();
   world.addSystems([
     GarbageCollectorSystem(),
@@ -127,6 +136,7 @@ NexusWorld provideServerWorld() {
   world.addEntity(Entity()
     ..add(TagsComponent({'meteor_spawner'}))
     ..add(LifecyclePolicyComponent(isPersistent: true))
+    ..add(PositionComponent())
     ..add(SpawnerComponent(
         prefab: () => createMeteorPrefab(world),
         frequency: const Frequency.perSecond(2.0),
@@ -135,6 +145,7 @@ NexusWorld provideServerWorld() {
   world.addEntity(Entity()
     ..add(TagsComponent({'health_orb_spawner'}))
     ..add(LifecyclePolicyComponent(isPersistent: true))
+    ..add(PositionComponent())
     ..add(SpawnerComponent(
         prefab: () => createHealthOrbPrefab(world),
         frequency: Frequency.every(const Duration(seconds: 15)),
@@ -146,6 +157,9 @@ NexusWorld provideServerWorld() {
 // --- CLIENT WORLD PROVIDER ---
 
 NexusWorld provideAttractorWorld() {
+  registerCoreComponents();
+  registerAllComponents();
+
   final world = NexusWorld();
   final serializer = BinaryWorldSerializer(BinaryComponentFactory.I);
 
@@ -156,14 +170,12 @@ NexusWorld provideAttractorWorld() {
     ResponsivenessSystem(),
     DebugSystem(),
     NetworkSystem(serializer),
-    // --- FIX: Add the new PlayerControlSystem ---
     PlayerControlSystem(),
   ]);
 
   world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),
     BlackboardComponent({'score': 0, 'local_player_id': null}),
-    DebugInfoComponent(),
     NetworkStateComponent(),
   ]);
 

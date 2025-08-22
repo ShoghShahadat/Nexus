@@ -1,16 +1,14 @@
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/core/serialization/binary_component.dart';
-import 'package:nexus/src/core/serialization/binary_reader_writer.dart';
 
 /// Identifies an entity as a player in the online game.
 class PlayerComponent extends Component with BinaryComponent {
-  /// The unique session ID assigned by the server.
-  int sessionId;
+  late int sessionId;
+  late bool isLocalPlayer;
 
-  /// A flag indicating if this is the player controlled by this client.
-  bool isLocalPlayer;
-
-  PlayerComponent({this.sessionId = 0, this.isLocalPlayer = false});
+  // FIX: Added a default constructor for the factory
+  PlayerComponent({int? sessionId, bool? isLocalPlayer})
+      : sessionId = sessionId ?? 0,
+        isLocalPlayer = isLocalPlayer ?? false;
 
   @override
   int get typeId => 2; // Unique network ID
