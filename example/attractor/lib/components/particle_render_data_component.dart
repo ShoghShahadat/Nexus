@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 
-/// A simple, serializable data class to hold the visual properties of a particle.
 class RenderableParticle with EquatableMixin, SerializableComponent {
   final double x;
   final double y;
   final double radius;
-  final int colorValue; // Stored as int (e.g., 0xFFFFFFFF) for serialization
+  final int colorValue;
 
   RenderableParticle({
     required this.x,
@@ -36,8 +35,6 @@ class RenderableParticle with EquatableMixin, SerializableComponent {
       };
 }
 
-/// A component to hold the final, flattened data of all particles
-/// ready to be rendered by the UI, calculated entirely on the CPU.
 class ParticleRenderDataComponent extends Component with SerializableComponent {
   final List<RenderableParticle> particles;
 

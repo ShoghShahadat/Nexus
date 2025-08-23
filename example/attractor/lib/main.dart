@@ -1,15 +1,3 @@
-// ==============================================================================
-// File: lib/main.dart
-// Author: Your Intelligent Assistant
-// Version: 2.0
-// Description: Main application entry point and UI construction.
-// Changes:
-// - UI REWORK: Added a new `_Scoreboard` widget to the UI stack.
-// - The scoreboard is positioned on the top-right of the screen.
-// - It gets all entities with a `PlayerComponent` and displays their
-//   `sessionId` and `score` from the new `ScoreComponent`.
-// ==============================================================================
-
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +5,8 @@ import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
 import 'components/debug_info_component.dart';
 import 'components/network_components.dart';
-import 'components/score_component.dart'; // Import the new component
+import 'components/particle_render_data_component.dart';
+import 'components/score_component.dart';
 import 'events.dart';
 import 'network/i_web_socket_client.dart';
 import 'network/socket_io_client_adapter.dart';
@@ -66,19 +55,17 @@ class _MyAppState extends State<MyApp> {
           final networkState = controller.get<NetworkStateComponent>(rootId);
           final blackboard = controller.get<BlackboardComponent>(rootId);
           final localPlayerId = blackboard?.get<EntityId>('local_player_id');
-
           final allPlayerIds = controller.getAllIdsWithTag('player');
-          // --- CHANGE: Meteors are now local, so we get them directly ---
           final meteorIds = controller.getAllIdsWithTag('meteor');
           final healthOrbIds = controller.getAllIdsWithTag('health_orb');
-
+          final particleData =
+              controller.get<ParticleRenderDataComponent>(rootId);
           final debugInfo = controller.get<DebugInfoComponent>(rootId);
           final localPlayerHealth = localPlayerId != null
               ? controller.get<HealthComponent>(localPlayerId)
               : null;
           final isGameOver =
               localPlayerHealth != null && localPlayerHealth.currentHealth <= 0;
-
           final isTouchDevice = kIsWeb ||
               defaultTargetPlatform == TargetPlatform.android ||
               defaultTargetPlatform == TargetPlatform.iOS;
@@ -102,6 +89,7 @@ class _MyAppState extends State<MyApp> {
                     RepaintBoundary(
                       child: CustomPaint(
                         painter: ParticlePainter(
+                          particles: particleData?.particles ?? [],
                           allPlayerIds: allPlayerIds,
                           meteorIds: meteorIds,
                           healthOrbIds: healthOrbIds,
@@ -112,10 +100,7 @@ class _MyAppState extends State<MyApp> {
                       ),
                     ),
                     if (isGameOver && localPlayerId != null)
-                      const Center(
-                        child: _GameOverMessage(),
-                      ),
-                    // --- NEW: Add the Scoreboard to the UI ---
+                      const Center(child: _GameOverMessage()),
                     Positioned(
                       top: 16,
                       right: 16,
@@ -168,13 +153,10 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-// --- NEW WIDGET: Scoreboard ---
 class _Scoreboard extends StatelessWidget {
   final List<EntityId> playerIds;
   final FlutterRenderingSystem controller;
-
   const _Scoreboard({required this.playerIds, required this.controller});
-
   @override
   Widget build(BuildContext context) {
     final List<({String name, int score})> players = [];
@@ -185,10 +167,7 @@ class _Scoreboard extends StatelessWidget {
         players.add((name: playerComp.sessionId, score: scoreComp.score));
       }
     }
-
-    // Sort players by score in descending order
     players.sort((a, b) => b.score.compareTo(a.score));
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
@@ -199,47 +178,31 @@ class _Scoreboard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'SCOREBOARD',
-            style: TextStyle(
-              color: Colors.yellowAccent,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              letterSpacing: 1.2,
-            ),
-          ),
+          const Text('SCOREBOARD',
+              style: TextStyle(
+                  color: Colors.yellowAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  letterSpacing: 1.2)),
           const SizedBox(height: 8),
-          ...players.map(
-            (p) => Padding(
+          ...players.map((p) => Padding(
               padding: const EdgeInsets.only(bottom: 4.0),
-              child: Row(
-                children: [
-                  Text(
-                    '${p.name}: ',
+              child: Row(children: [
+                Text('${p.name}: ',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 13,
-                    ),
-                  ),
-                  Text(
-                    p.score.toString(),
+                        color: Colors.white.withOpacity(0.8), fontSize: 13)),
+                Text(p.score.toString(),
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14))
+              ]))),
         ],
       ),
     );
   }
 }
 
-// UI Helper Widgets (unchanged)
 class _GameOverMessage extends StatelessWidget {
   const _GameOverMessage();
   @override
@@ -316,19 +279,15 @@ class _DebugStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          label,
-          style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 10,
-              fontWeight: FontWeight.w600),
-        ),
+        Text(label,
+            style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 10,
+                fontWeight: FontWeight.w600)),
         const SizedBox(height: 2),
-        Text(
-          value,
-          style: TextStyle(
-              color: valueColor, fontSize: 13, fontWeight: FontWeight.bold),
-        ),
+        Text(value,
+            style: TextStyle(
+                color: valueColor, fontSize: 13, fontWeight: FontWeight.bold)),
       ],
     );
   }
