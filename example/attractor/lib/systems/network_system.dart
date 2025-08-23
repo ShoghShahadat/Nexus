@@ -1,12 +1,11 @@
 // ==============================================================================
 // File: lib/systems/network_system.dart
 // Author: Your Intelligent Assistant
-// Version: 4.0
+// Version: 7.0
 // Description: Manages client-side connection and state synchronization.
 // Changes:
-// - REFACTORED: Now populates a NetworkSyncComponent instead of directly
-//   modifying PositionComponent and VelocityComponent to support interpolation.
-// - ADDED: Creates an initial PositionComponent for new entities.
+// - MODIFIED: Now correctly adds the TargetingComponent to entities when
+//   received from the server, enabling client-side prediction for AI.
 // ==============================================================================
 
 import 'dart:async';
@@ -14,6 +13,7 @@ import 'dart:typed_data';
 import 'package:nexus/nexus.dart';
 import '../components/interpolation_component.dart';
 import '../components/network_components.dart';
+import '../components/reconciliation_component.dart';
 import '../events.dart';
 import '../network/i_web_socket_client.dart';
 
@@ -26,14 +26,13 @@ class NetworkSystem extends System {
   StreamSubscription? _connectionStateSubscription;
 
   final Map<int, EntityId> _serverEntityMap = {};
-  final Stopwatch _stopwatch = Stopwatch();
+  EntityId? _localPlayerId;
 
   NetworkSystem(this._serializer, {required this.serverUrl});
 
   @override
   Future<void> init() async {
     super.init();
-    _stopwatch.start();
     _webSocketClient = services.get<IWebSocketClient>();
     _messageSubscription = _webSocketClient.onMessage.listen(_onData);
     _connectionStateSubscription = _webSocketClient.onConnectionStateChange
@@ -56,21 +55,20 @@ class NetworkSystem extends System {
         world.removeEntity(clientEntityId);
       }
       _serverEntityMap.clear();
-      world.rootEntity.get<BlackboardComponent>()?.remove('local_player_id');
+      _localPlayerId = null;
+      world.rootEntity.get<BlackboardComponent>()?.set('local_player_id', null);
     }
   }
 
   void _onData(Uint8List data) {
     final reader = BinaryReader(data);
-    final double timestamp = _stopwatch.elapsedMicroseconds / 1000000.0;
 
     final updatedCount = reader.readInt32();
     for (int i = 0; i < updatedCount; i++) {
       final serverId = reader.readInt32();
       final componentCount = reader.readInt32();
-      final otherComponents = <Component>[];
+      final components = <Component>[];
       PositionComponent? posFromServer;
-      VelocityComponent? velFromServer;
 
       for (int j = 0; j < componentCount; j++) {
         final typeId = reader.readInt32();
@@ -79,43 +77,50 @@ class NetworkSystem extends System {
           component.fromBinary(reader);
           if (component is PositionComponent) {
             posFromServer = component;
-          } else if (component is VelocityComponent) {
-            velFromServer = component;
           } else {
-            otherComponents.add(component);
+            // This will now correctly add VelocityComponent, TargetingComponent, etc.
+            components.add(component);
           }
         }
       }
 
-      if (posFromServer != null) {
-        final syncComponent = NetworkSyncComponent(
-          targetX: posFromServer.x,
-          targetY: posFromServer.y,
-          velocityX: velFromServer?.x ?? 0.0,
-          velocityY: velFromServer?.y ?? 0.0,
-          timestamp: timestamp,
-        );
-        otherComponents.add(syncComponent);
-      }
+      final clientEntityId = _serverEntityMap[serverId];
+      Entity? clientEntity;
 
-      if (_serverEntityMap.containsKey(serverId)) {
-        final clientEntityId = _serverEntityMap[serverId]!;
-        final clientEntity = world.entities[clientEntityId];
-        clientEntity?.addComponents(otherComponents);
+      if (clientEntityId != null) {
+        clientEntity = world.entities[clientEntityId];
       } else {
-        final newEntity = Entity();
-        newEntity.add(LifecyclePolicyComponent(isPersistent: true));
+        clientEntity = Entity();
+        clientEntity.add(LifecyclePolicyComponent(isPersistent: true));
         if (posFromServer != null) {
-          newEntity.add(PositionComponent(
+          clientEntity.add(PositionComponent(
               x: posFromServer.x,
               y: posFromServer.y,
               width: posFromServer.width,
               height: posFromServer.height));
         }
-        newEntity.addComponents(otherComponents);
-        world.addEntity(newEntity);
-        _serverEntityMap[serverId] = newEntity.id;
+        world.addEntity(clientEntity);
+        _serverEntityMap[serverId] = clientEntity.id;
       }
+
+      if (clientEntity == null) continue;
+
+      if (clientEntity.id == _localPlayerId) {
+        if (posFromServer != null) {
+          clientEntity.add(ReconciliationComponent(
+            serverX: posFromServer.x,
+            serverY: posFromServer.y,
+          ));
+        }
+      } else {
+        if (posFromServer != null) {
+          clientEntity.add(NetworkSyncComponent(
+            targetX: posFromServer.x,
+            targetY: posFromServer.y,
+          ));
+        }
+      }
+      clientEntity.addComponents(components);
     }
 
     final deletedCount = reader.readInt32();
@@ -123,6 +128,7 @@ class NetworkSystem extends System {
       final serverId = reader.readInt32();
       if (_serverEntityMap.containsKey(serverId)) {
         final clientEntityId = _serverEntityMap.remove(serverId)!;
+        if (clientEntityId == _localPlayerId) _localPlayerId = null;
         world.removeEntity(clientEntityId);
       }
     }
@@ -131,23 +137,21 @@ class NetworkSystem extends System {
   }
 
   void _updateLocalPlayerReference() {
-    Entity? localPlayerEntity;
+    if (_localPlayerId != null) return;
+
     for (final entityId in _serverEntityMap.values) {
       final entity = world.entities[entityId];
       final playerComp = entity?.get<PlayerComponent>();
       if (playerComp != null && playerComp.isLocalPlayer) {
-        localPlayerEntity = entity;
+        _localPlayerId = entity!.id;
+        world.rootEntity
+            .get<BlackboardComponent>()
+            ?.set('local_player_id', _localPlayerId);
+        entity.add(ControlledPlayerComponent());
+        playerComp.isLocalPlayer = false;
+        entity.add(playerComp);
         break;
       }
-    }
-
-    if (localPlayerEntity != null) {
-      world.rootEntity
-          .get<BlackboardComponent>()
-          ?.set('local_player_id', localPlayerEntity.id);
-      final playerComp = localPlayerEntity.get<PlayerComponent>()!;
-      playerComp.isLocalPlayer = false;
-      localPlayerEntity.add(playerComp);
     }
   }
 
@@ -176,7 +180,6 @@ class NetworkSystem extends System {
     _connectionStateSubscription?.cancel();
     _webSocketClient.disconnect();
     _serverEntityMap.clear();
-    _stopwatch.stop();
     super.onRemovedFromWorld();
   }
 }

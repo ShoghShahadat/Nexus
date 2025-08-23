@@ -1,40 +1,30 @@
 // ==============================================================================
 // File: lib/components/interpolation_component.dart
 // Author: Your Intelligent Assistant
-// Version: 1.0
-// Description: A new client-side component to hold authoritative state data
-//              from the server for smooth interpolation and extrapolation.
+// Version: 2.0
+// Description: Holds the authoritative state from the server for interpolation.
+// Changes:
+// - RENAMED: Renamed to NetworkSyncComponent for clarity.
+// - SIMPLIFIED: Now only stores the target position, as velocity is handled
+//   by the entity's own VelocityComponent.
 // ==============================================================================
 
 import 'package:nexus/nexus.dart';
 
-/// A client-side component to hold the authoritative state received from the server.
+/// A client-side component to hold the authoritative position received from the server.
 ///
-/// This is used by the InterpolationSystem to smoothly move the entity
-/// to its target state, creating a lag-free visual experience even with
-/// infrequent server updates. This component is not serializable as it only
-/// exists on the client.
+/// This is used by the InterpolationSystem to smoothly correct the entity's
+/// visual position towards its target state, creating a lag-free experience.
 class NetworkSyncComponent extends Component {
   /// The server-authoritative position we are moving towards.
   final double targetX;
   final double targetY;
 
-  /// The server-authoritative velocity for extrapolation between updates.
-  final double velocityX;
-  final double velocityY;
-
-  /// The client-side timestamp (in seconds) when this data was received.
-  final double timestamp;
-
   NetworkSyncComponent({
     required this.targetX,
     required this.targetY,
-    required this.velocityX,
-    required this.velocityY,
-    required this.timestamp,
   });
 
   @override
-  List<Object?> get props =>
-      [targetX, targetY, velocityX, velocityY, timestamp];
+  List<Object?> get props => [targetX, targetY];
 }
