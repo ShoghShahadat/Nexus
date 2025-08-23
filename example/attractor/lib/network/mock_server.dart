@@ -5,7 +5,9 @@ import '../components/network_components.dart';
 import '../logic/game_logic.dart';
 
 class _PlayerConnection {
-  final int sessionId;
+  // --- FIX: Changed sessionId from int to String. ---
+  // --- اصلاح: نوع sessionId از int به String تغییر کرد. ---
+  final String sessionId;
   final Entity entity;
   final StreamController<Uint8List> toClientController;
 
@@ -21,13 +23,17 @@ class MockServer {
   final GameLogic
       _gameLogic; // The server now HAS a game logic, it IS NOT the game logic.
   final BinaryWorldSerializer _serializer;
-  final Map<int, _PlayerConnection> _connections = {};
+  // --- FIX: Changed the map key from int to String. ---
+  // --- اصلاح: کلید نقشه از int به String تغییر کرد. ---
+  final Map<String, _PlayerConnection> _connections = {};
   int _nextSessionId = 1;
   Timer? _gameLoopTimer;
   final _stopwatch = Stopwatch();
 
+  // --- FIX: Changed sessionId in the stream tuple from int to String. ---
+  // --- اصلاح: نوع sessionId در تاپل استریم از int به String تغییر کرد. ---
   final _fromClientsController =
-      StreamController<({int sessionId, Uint8List data})>.broadcast();
+      StreamController<({String sessionId, Uint8List data})>.broadcast();
 
   MockServer(this._gameLogic, this._serializer) {
     _fromClientsController.stream.listen(_handleMessage);
@@ -42,7 +48,9 @@ class MockServer {
   }
 
   Stream<Uint8List> connectClient(Stream<Uint8List> fromClient) {
-    final sessionId = _nextSessionId++;
+    // --- FIX: Convert the integer ID to a string to align with the real server. ---
+    // --- اصلاح: شناسه عددی به رشته تبدیل شد تا با سرور واقعی هماهنگ باشد. ---
+    final sessionId = (_nextSessionId++).toString();
     print('[SERVER] Player connected with session ID: $sessionId');
 
     final toClientController = StreamController<Uint8List>.broadcast();
@@ -74,7 +82,9 @@ class MockServer {
     connection.entity.add(playerComponent);
   }
 
-  void _handleMessage(({int sessionId, Uint8List data}) message) {
+  // --- FIX: Changed sessionId in the message tuple from int to String. ---
+  // --- اصلاح: نوع sessionId در تاپل پیام از int به String تغییر کرد. ---
+  void _handleMessage(({String sessionId, Uint8List data}) message) {
     final reader = BinaryReader(message.data);
     final messageType = reader.readInt32();
 
@@ -86,7 +96,9 @@ class MockServer {
     }
   }
 
-  void _handleDisconnect(int sessionId) {
+  // --- FIX: Changed sessionId parameter from int to String. ---
+  // --- اصلاح: پارامتر sessionId از int به String تغییر کرد. ---
+  void _handleDisconnect(String sessionId) {
     print('[SERVER] Player disconnected: $sessionId');
     final connection = _connections.remove(sessionId);
     if (connection != null) {

@@ -2,12 +2,15 @@ import 'package:nexus/nexus.dart';
 
 /// Identifies an entity as a player in the online game.
 class PlayerComponent extends Component with BinaryComponent {
-  late int sessionId;
+  // --- FIX: Changed sessionId from int to String to match the server. ---
+  // --- اصلاح: نوع sessionId از int به String تغییر کرد تا با سرور مطابقت داشته باشد. ---
+  late String sessionId;
   late bool isLocalPlayer;
 
-  // FIX: Added a default constructor for the factory
-  PlayerComponent({int? sessionId, bool? isLocalPlayer})
-      : sessionId = sessionId ?? 0,
+  // --- FIX: Updated the constructor to handle a String sessionId. ---
+  // --- اصلاح: سازنده برای مدیریت sessionId از نوع String به‌روزرسانی شد. ---
+  PlayerComponent({String? sessionId, bool? isLocalPlayer})
+      : sessionId = sessionId ?? '',
         isLocalPlayer = isLocalPlayer ?? false;
 
   @override
@@ -15,13 +18,17 @@ class PlayerComponent extends Component with BinaryComponent {
 
   @override
   void fromBinary(BinaryReader reader) {
-    sessionId = reader.readInt32();
+    // --- FIX: Now correctly reads a string from the binary stream. ---
+    // --- اصلاح: اکنون به درستی یک رشته را از جریان باینری می‌خواند. ---
+    sessionId = reader.readString();
     isLocalPlayer = reader.readBool();
   }
 
   @override
   void toBinary(BinaryWriter writer) {
-    writer.writeInt32(sessionId);
+    // --- FIX: Now correctly writes the string to the binary stream. ---
+    // --- اصلاح: اکنون به درستی رشته را در جریان باینری می‌نویسد. ---
+    writer.writeString(sessionId);
     writer.writeBool(isLocalPlayer);
   }
 

@@ -8,7 +8,9 @@ import '../network/mock_server.dart';
 /// It holds the server's world and all game logic systems.
 class GameLogic {
   final NexusWorld world;
-  final Map<int, Entity> _players = {}; // Map<SessionID, PlayerEntity>
+  // --- FIX: Changed the map key from int to String to match the component. ---
+  // --- اصلاح: کلید نقشه از int به String تغییر کرد تا با کامپوننت مطابقت داشته باشد. ---
+  final Map<String, Entity> _players = {}; // Map<SessionID, PlayerEntity>
 
   GameLogic(NexusWorld Function() worldProvider) : world = worldProvider();
 
@@ -24,20 +26,26 @@ class GameLogic {
       .where((e) => e.allComponents.any((c) => c is BinaryComponent))
       .toList();
 
-  Entity onPlayerConnected(int sessionId) {
+  // --- FIX: Changed sessionId parameter from int to String. ---
+  // --- اصلاح: پارامتر sessionId از int به String تغییر کرد. ---
+  Entity onPlayerConnected(String sessionId) {
     final playerEntity = _createPlayerEntity(sessionId);
     _players[sessionId] = playerEntity;
     return playerEntity;
   }
 
-  void onPlayerDisconnected(int sessionId) {
+  // --- FIX: Changed sessionId parameter from int to String. ---
+  // --- اصلاح: پارامتر sessionId از int به String تغییر کرد. ---
+  void onPlayerDisconnected(String sessionId) {
     final playerEntity = _players.remove(sessionId);
     if (playerEntity != null) {
       world.removeEntity(playerEntity.id);
     }
   }
 
-  void handlePlayerInput(int sessionId, double dx, double dy) {
+  // --- FIX: Changed sessionId parameter from int to String. ---
+  // --- اصلاح: پارامتر sessionId از int به String تغییر کرد. ---
+  void handlePlayerInput(String sessionId, double dx, double dy) {
     final playerEntity = _players[sessionId];
     if (playerEntity == null) return;
 
@@ -50,7 +58,9 @@ class GameLogic {
     }
   }
 
-  Entity _createPlayerEntity(int sessionId) {
+  // --- FIX: Changed sessionId parameter from int to String. ---
+  // --- اصلاح: پارامتر sessionId از int به String تغییر کرد. ---
+  Entity _createPlayerEntity(String sessionId) {
     final playerEntity = Entity();
     final screenInfo = world.rootEntity.get<ScreenInfoComponent>();
     final startX = Random().nextDouble() * (screenInfo?.width ?? 800);
@@ -63,6 +73,8 @@ class GameLogic {
         height: MockServer.playerBaseSize));
     playerEntity.add(VelocityComponent());
     playerEntity.add(HealthComponent(maxHealth: 100));
+    // --- FIX: The sessionId is now correctly passed as a String. ---
+    // --- اصلاح: اکنون sessionId به درستی به عنوان یک String پاس داده می‌شود. ---
     playerEntity.add(PlayerComponent(sessionId: sessionId));
     playerEntity.add(TagsComponent({'player'}));
     playerEntity.add(CollisionComponent(
