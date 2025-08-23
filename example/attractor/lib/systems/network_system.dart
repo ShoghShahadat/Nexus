@@ -1,25 +1,28 @@
 // ==============================================================================
 // File: lib/systems/network_system.dart
 // Author: Your Intelligent Assistant
-// Version: 13.0
+// Version: 24.0
 // Description: Manages client-side connection and state synchronization.
 // Changes:
-// - CRITICAL FIX: Now uses Base64 encoding/decoding for all binary data transfer.
-//   This is the standard and robust solution to prevent data corruption over
-//   Socket.IO, resolving the deserialization crash on the second client.
-// - FIX: Added LifecyclePolicyComponent to created meteors to remove warnings.
-// - STYLE: Removed redundant 'as dynamic' cast for clarity.
+// - SEMI-ONLINE MODEL: Meteors are now fully local. The `OwnedComponent` is
+//   no longer added to them in `_createMeteorPrefab`, so their state is never
+//   sent over the network.
+// - The `_onData` logic now only expects to receive player data from other
+//   clients, simplifying the synchronization process.
 // ==============================================================================
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math';
+import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart' hide SpawnerComponent, LifecycleComponent;
 import '../components/interpolation_component.dart';
+import '../components/meteor_component.dart';
 import '../components/network_components.dart';
 import '../components/server_logic_components.dart';
 import '../network/i_web_socket_client.dart';
+import 'player_control_system.dart';
 
 class NetworkSystem extends System {
   final String serverUrl;
@@ -29,7 +32,7 @@ class NetworkSystem extends System {
   StreamSubscription? _messageSubscription;
   StreamSubscription? _connectionStateSubscription;
 
-  final Map<String, EntityId> _remoteClientMap = {};
+  final Map<String, Map<EntityId, EntityId>> _remoteEntityIdMap = {};
   double _timeSinceLastSend = 0.0;
   static const double sendInterval = 1.0 / 30.0;
 
@@ -48,8 +51,9 @@ class NetworkSystem extends System {
   void _onConnectionStateChanged(bool isConnected) {
     if (isConnected) {
       _updateStatus('Connected!', isConnected: true);
-      if (world.entities.values.where((e) => e.has<PlayerComponent>()).length <=
-          1) {
+      final hasSpawner = world.entities.values.any(
+          (e) => e.get<TagsComponent>()?.hasTag('meteor_spawner') ?? false);
+      if (!hasSpawner) {
         final spawner = Entity()
           ..add(TagsComponent({'meteor_spawner'}))
           ..add(SpawnerComponent(prefab: _createMeteorPrefab));
@@ -57,8 +61,10 @@ class NetworkSystem extends System {
       }
     } else {
       _updateStatus('Connecting to $serverUrl...', isConnected: false);
-      _remoteClientMap.values.forEach(world.removeEntity);
-      _remoteClientMap.clear();
+      _remoteEntityIdMap.values.forEach((entityMap) {
+        entityMap.values.forEach(world.removeEntity);
+      });
+      _remoteEntityIdMap.clear();
     }
   }
 
@@ -69,52 +75,72 @@ class NetworkSystem extends System {
     if (message['event'] == 'state_broadcast') {
       final senderId = message['data']['sender_id'] as String;
       final payload = base64Decode(message['data']['payload'] as String);
+      final decodedEntities = _serializer.decode(payload);
 
-      final decoded = _serializer.decode(payload);
+      _remoteEntityIdMap.putIfAbsent(senderId, () => {});
+      final senderEntityMap = _remoteEntityIdMap[senderId]!;
 
-      EntityId remoteEntityId;
-      if (_remoteClientMap.containsKey(senderId)) {
-        remoteEntityId = _remoteClientMap[senderId]!;
-      } else {
-        final newEntity = Entity()
-          ..add(LifecyclePolicyComponent(isPersistent: true))
-          ..add(TagsComponent({'player'}))
-          ..add(PositionComponent(width: 20, height: 20));
-        world.addEntity(newEntity);
-        _remoteClientMap[senderId] = newEntity.id;
-        remoteEntityId = newEntity.id;
-      }
+      // In the new model, we only expect player entities from the network.
+      decodedEntities.forEach((remoteEntityId, components) {
+        if (!components.any((c) => c is PlayerComponent)) return;
 
-      final entity = world.entities[remoteEntityId];
-      if (entity != null && decoded.isNotEmpty) {
-        final components = decoded.values.first;
-        entity.addComponents(components);
-      }
+        EntityId? localEntityId = senderEntityMap[remoteEntityId];
+        Entity? localEntity =
+            localEntityId != null ? world.entities[localEntityId] : null;
+
+        if (localEntity == null) {
+          final newEntity = Entity();
+          world.addEntity(newEntity);
+          localEntityId = newEntity.id;
+          localEntity = newEntity;
+          senderEntityMap[remoteEntityId] = localEntityId;
+
+          newEntity.add(TagsComponent({'player'}));
+          newEntity.add(LifecyclePolicyComponent(isPersistent: true));
+          localEntity.addComponents(components);
+        } else {
+          final posComponent =
+              components.firstWhereOrNull((c) => c is PositionComponent)
+                  as PositionComponent?;
+
+          if (posComponent != null) {
+            localEntity.add(NetworkSyncComponent(
+              targetX: posComponent.x,
+              targetY: posComponent.y,
+              targetWidth: posComponent.width,
+              targetHeight: posComponent.height,
+            ));
+            components.remove(posComponent);
+          }
+          localEntity.addComponents(components);
+        }
+      });
     } else if (message['event'] == 'client_left') {
       final leftClientId = message['data']['id'] as String;
-      final localEntityId = _remoteClientMap.remove(leftClientId);
-      if (localEntityId != null) {
-        world.removeEntity(localEntityId);
+      final senderEntityMap = _remoteEntityIdMap.remove(leftClientId);
+      if (senderEntityMap != null) {
+        senderEntityMap.values.forEach(world.removeEntity);
       }
     }
   }
 
   @override
-  bool matches(Entity entity) => entity.has<OwnedComponent>();
+  bool matches(Entity entity) =>
+      entity.get<TagsComponent>()?.hasTag('root') ?? false;
 
   @override
   void update(Entity entity, double dt) {
     _timeSinceLastSend += dt;
-    if (_timeSinceLastSend >= sendInterval) {
-      _timeSinceLastSend = 0;
+    if (_timeSinceLastSend < sendInterval) return;
+    _timeSinceLastSend = 0;
 
-      final ownedEntities =
-          world.entities.values.where((e) => e.has<OwnedComponent>()).toList();
+    final ownedEntities =
+        world.entities.values.where((e) => e.has<OwnedComponent>()).toList();
 
-      if (ownedEntities.isNotEmpty) {
-        final packet = _serializer.serialize(ownedEntities);
+    if (ownedEntities.isNotEmpty) {
+      final packet = _serializer.serialize(ownedEntities);
+      if (packet.isNotEmpty) {
         final base64Packet = base64Encode(packet);
-        // --- STYLE: Removed redundant cast ---
         _webSocketClient.send(base64Packet);
       }
     }
@@ -122,25 +148,38 @@ class NetworkSystem extends System {
 
   Entity _createMeteorPrefab() {
     final random = Random();
-    final initialSpeed = random.nextDouble() * 100 + 150;
-    return Entity()
-      ..add(OwnedComponent())
-      ..add(PositionComponent(
-          x: random.nextDouble() * 800, y: -50, width: 30, height: 30))
-      ..add(
-          VelocityComponent(x: random.nextDouble() * 100 - 50, y: initialSpeed))
-      ..add(TagsComponent({'meteor'}))
-      ..add(DamageComponent(25))
-      ..add(TargetingComponent(turnSpeed: 1.5))
-      ..add(LifecycleComponent(
-          maxAge: 5.0,
+    final allPlayers =
+        world.entities.values.where((e) => e.has<PlayerComponent>()).toList();
+
+    if (allPlayers.isEmpty) return Entity();
+
+    final targetPlayer = allPlayers[random.nextInt(allPlayers.length)];
+    final targetPlayerId = targetPlayer.id;
+
+    final initialSpeed = PlayerControlSystem.playerSpeed * 3.0;
+    final meteor = Entity();
+
+    // --- CHANGE: Meteors are now local ONLY. No OwnedComponent is added. ---
+
+    meteor.addComponents([
+      PositionComponent(
+          x: random.nextDouble() * 800, y: -50, width: 30, height: 30),
+      VelocityComponent(x: random.nextDouble() * 100 - 50, y: initialSpeed),
+      TagsComponent({'meteor'}),
+      DamageComponent(20),
+      TargetingComponent(targetId: targetPlayerId, turnSpeed: 1.5),
+      LifecycleComponent(
+          maxAge: 4.0,
           initialSpeed: initialSpeed,
           initialWidth: 30,
-          initialHeight: 30))
-      ..add(LifecyclePolicyComponent(
+          initialHeight: 30),
+      LifecyclePolicyComponent(
           destructionCondition: (e) =>
               (e.get<LifecycleComponent>()?.age ?? 0) >=
-              (e.get<LifecycleComponent>()?.maxAge ?? 999)));
+              (e.get<LifecycleComponent>()?.maxAge ?? 999))
+    ]);
+
+    return meteor;
   }
 
   void _updateStatus(String message, {bool isConnected = false}) {

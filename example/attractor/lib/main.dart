@@ -1,3 +1,15 @@
+// ==============================================================================
+// File: lib/main.dart
+// Author: Your Intelligent Assistant
+// Version: 2.0
+// Description: Main application entry point and UI construction.
+// Changes:
+// - UI REWORK: Added a new `_Scoreboard` widget to the UI stack.
+// - The scoreboard is positioned on the top-right of the screen.
+// - It gets all entities with a `PlayerComponent` and displays their
+//   `sessionId` and `score` from the new `ScoreComponent`.
+// ==============================================================================
+
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -5,10 +17,9 @@ import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
 import 'components/debug_info_component.dart';
 import 'components/network_components.dart';
+import 'components/score_component.dart'; // Import the new component
 import 'events.dart';
 import 'network/i_web_socket_client.dart';
-// --- MODIFIED: Import the new adapter with the correct class name ---
-// --- ویرایش: ایمپورت آداپتور جدید با نام کلاس صحیح ---
 import 'network/socket_io_client_adapter.dart';
 import 'particle_painter.dart';
 import 'widgets/joystick.dart';
@@ -23,10 +34,7 @@ class MyHttpOverrides extends HttpOverrides {
   }
 }
 
-// --- Isolate Initializer Function ---
 Future<void> isolateInitializer() async {
-  // --- MODIFIED: Register the correctly named SocketIOClientAdapter ---
-  // --- ویرایش: ثبت SocketIOClientAdapter با نام صحیح ---
   GetIt.I.registerSingleton<IWebSocketClient>(SocketIOClientAdapter());
 }
 
@@ -60,6 +68,7 @@ class _MyAppState extends State<MyApp> {
           final localPlayerId = blackboard?.get<EntityId>('local_player_id');
 
           final allPlayerIds = controller.getAllIdsWithTag('player');
+          // --- CHANGE: Meteors are now local, so we get them directly ---
           final meteorIds = controller.getAllIdsWithTag('meteor');
           final healthOrbIds = controller.getAllIdsWithTag('health_orb');
 
@@ -106,6 +115,15 @@ class _MyAppState extends State<MyApp> {
                       const Center(
                         child: _GameOverMessage(),
                       ),
+                    // --- NEW: Add the Scoreboard to the UI ---
+                    Positioned(
+                      top: 16,
+                      right: 16,
+                      child: _Scoreboard(
+                        playerIds: allPlayerIds,
+                        controller: controller,
+                      ),
+                    ),
                     if (isTouchDevice)
                       Positioned(
                         bottom: 40,
@@ -130,18 +148,13 @@ class _MyAppState extends State<MyApp> {
   }
 
   @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         backgroundColor: const Color(0xFF1a1a1a),
         appBar: AppBar(
-          title: const Text('Nexus Attractor: Multiplayer (Socket.IO)'),
+          title: const Text('Nexus Attractor: Semi-Online'),
           backgroundColor: Colors.grey.shade900,
           foregroundColor: Colors.white,
         ),
@@ -150,6 +163,77 @@ class _MyAppState extends State<MyApp> {
           renderingSystem: renderingSystem,
           isolateInitializer: isolateInitializer,
         ),
+      ),
+    );
+  }
+}
+
+// --- NEW WIDGET: Scoreboard ---
+class _Scoreboard extends StatelessWidget {
+  final List<EntityId> playerIds;
+  final FlutterRenderingSystem controller;
+
+  const _Scoreboard({required this.playerIds, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final List<({String name, int score})> players = [];
+    for (final id in playerIds) {
+      final playerComp = controller.get<PlayerComponent>(id);
+      final scoreComp = controller.get<ScoreComponent>(id);
+      if (playerComp != null && scoreComp != null) {
+        players.add((name: playerComp.sessionId, score: scoreComp.score));
+      }
+    }
+
+    // Sort players by score in descending order
+    players.sort((a, b) => b.score.compareTo(a.score));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'SCOREBOARD',
+            style: TextStyle(
+              color: Colors.yellowAccent,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...players.map(
+            (p) => Padding(
+              padding: const EdgeInsets.only(bottom: 4.0),
+              child: Row(
+                children: [
+                  Text(
+                    '${p.name}: ',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    p.score.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -211,7 +295,9 @@ class _DebugInfoBar extends StatelessWidget {
           _DebugStat(
               label: 'Entities', value: debugInfo.entityCount.toString()),
           const _DebugStat(
-              label: 'Mode', value: 'Online', valueColor: Colors.cyanAccent),
+              label: 'Mode',
+              value: 'Semi-Online',
+              valueColor: Colors.cyanAccent),
         ],
       ),
     );

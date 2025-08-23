@@ -1,20 +1,22 @@
 // ==============================================================================
 // File: lib/systems/game_logic_systems.dart
 // Author: Your Intelligent Assistant
-// Version: 2.0
+// Version: 5.0
 // Description: Contains all game logic systems for the client-authoritative model.
 // Changes:
-// - FIX: Resolved ambiguous import errors by hiding conflicting component
-//   names from the main 'nexus' package import.
-// - FIX: Added explicit import for 'PlayerComponent' to resolve ambiguity.
+// - MeteorLifecycleSystem:
+//   - SCORING LOGIC: When a meteor's lifecycle ends (i.e., the player
+//     successfully survives it), the system now finds the targeted player and
+//     increments their `ScoreComponent` by 10 points.
 // ==============================================================================
 
 import 'dart:math';
 import 'package:collection/collection.dart';
-// --- FIX: Hide conflicting component names from the nexus package ---
 import 'package:nexus/nexus.dart' hide SpawnerComponent, LifecycleComponent;
-import '../components/network_components.dart'; // Explicitly import PlayerComponent
+import '../components/network_components.dart';
+import '../components/score_component.dart';
 import '../components/server_logic_components.dart';
+import 'player_control_system.dart';
 
 /// Client-side system that handles entity spawning.
 class ClientSpawnerSystem extends System {
@@ -30,11 +32,24 @@ class ClientSpawnerSystem extends System {
       spawner.cooldown -= dt;
     }
 
+    final playerCount =
+        world.entities.values.where((e) => e.has<PlayerComponent>()).length;
+    final meteorCount = world.entities.values
+        .where((e) => e.get<TagsComponent>()?.hasTag('meteor') ?? false)
+        .length;
+    final maxMeteors = playerCount * 3;
+
+    if (meteorCount >= maxMeteors || playerCount == 0) {
+      return;
+    }
+
     final bool conditionMet = spawner.condition?.call() ?? true;
 
     if (spawner.cooldown <= 0 && conditionMet) {
       final newEntity = spawner.prefab();
-      world.addEntity(newEntity);
+      if (newEntity.allComponents.isNotEmpty) {
+        world.addEntity(newEntity);
+      }
 
       if (spawner.frequency > 0) {
         spawner.cooldown = 1.0 / spawner.frequency;
@@ -47,8 +62,7 @@ class ClientSpawnerSystem extends System {
 
 /// Client-side system that manages meteor lifecycle: aging, shrinking, and speed increase.
 class MeteorLifecycleSystem extends System {
-  static const double playerBaseSpeed = 300.0;
-  static const double speedIncreaseDuration = 7.0;
+  static const double speedIncreaseDuration = 60.0;
 
   @override
   bool matches(Entity entity) {
@@ -66,6 +80,18 @@ class MeteorLifecycleSystem extends System {
     lifecycle.age += dt;
 
     if (lifecycle.age >= lifecycle.maxAge) {
+      // --- NEW: Award points for survival ---
+      final targeting = entity.get<TargetingComponent>();
+      if (targeting != null) {
+        final targetPlayer = world.entities[targeting.targetId];
+        if (targetPlayer != null) {
+          final scoreComp = targetPlayer.get<ScoreComponent>();
+          if (scoreComp != null) {
+            scoreComp.score += 10; // Award 10 points for surviving
+            targetPlayer.add(scoreComp);
+          }
+        }
+      }
       world.removeEntity(entity.id);
       return;
     }
@@ -74,7 +100,7 @@ class MeteorLifecycleSystem extends System {
     pos.width = lifecycle.initialWidth * lifeRatio;
     pos.height = lifecycle.initialHeight * lifeRatio;
 
-    const maxSpeed = playerBaseSpeed * 4.0;
+    const maxSpeed = PlayerControlSystem.playerSpeed * 9.0;
     final ageRatio = min(1.0, lifecycle.age / speedIncreaseDuration);
     final targetSpeed =
         lifecycle.initialSpeed + (maxSpeed - lifecycle.initialSpeed) * ageRatio;
@@ -109,7 +135,7 @@ class DynamicDifficultySystem extends System {
         world.entities.values.where((e) => e.has<PlayerComponent>()).length;
 
     if (playerCount > 0) {
-      final newSpawnRate = baseSpawnRate + (playerCount - 1) * ratePerPlayer;
+      final newSpawnRate = baseSpawnRate + (playerCount) * ratePerPlayer;
       spawner.frequency = newSpawnRate;
     }
   }
@@ -130,6 +156,7 @@ class GameRulesSystem extends System {
 
     _handlePlayerMeteorCollision(entityA, entityB);
     _handlePlayerMeteorCollision(entityB, entityA);
+    _handleMeteorMeteorCollision(entityA, entityB);
   }
 
   void _handlePlayerMeteorCollision(Entity entity1, Entity entity2) {
@@ -148,8 +175,18 @@ class GameRulesSystem extends System {
     }
   }
 
+  void _handleMeteorMeteorCollision(Entity entityA, Entity entityB) {
+    final isAMeteor = entityA.get<TagsComponent>()?.hasTag('meteor') ?? false;
+    final isBMeteor = entityB.get<TagsComponent>()?.hasTag('meteor') ?? false;
+
+    if (isAMeteor && isBMeteor) {
+      world.removeEntity(entityA.id);
+      world.removeEntity(entityB.id);
+    }
+  }
+
   @override
-  bool matches(Entity entity) => false; // Event driven
+  bool matches(Entity entity) => false;
 
   @override
   void update(Entity entity, double dt) {}
