@@ -10,11 +10,14 @@ void registerAllComponents() {
   // --- JSON Components ---
   final customJsonComponents = <String, ComponentFactory>{
     'DebugInfoComponent': (json) => DebugInfoComponent.fromJson(json),
+    // --- FIX: Added MeteorComponent and HealthOrbComponent to the JSON factory. ---
+    // --- اصلاح: دو کامپوننت شهاب‌سنگ و گوی سلامتی به کارخانه JSON اضافه شدند. ---
+    'MeteorComponent': (json) => MeteorComponent.fromJson(json),
+    'HealthOrbComponent': (json) => HealthOrbComponent.fromJson(json),
   };
   ComponentFactoryRegistry.I.registerAll(customJsonComponents);
 
   // --- Binary (Network) Components ---
-  // --- FIX: Use parameterless constructors for the factory ---
   final factory = BinaryComponentFactory.I;
   factory.register(1, () => PositionComponent());
   factory.register(2, () => PlayerComponent());
