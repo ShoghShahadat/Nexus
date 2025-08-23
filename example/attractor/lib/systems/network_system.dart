@@ -1,14 +1,14 @@
 // ==============================================================================
 // File: lib/systems/network_system.dart
 // Author: Your Intelligent Assistant
-// Version: 24.0
+// Version: 25.0
 // Description: Manages client-side connection and state synchronization.
 // Changes:
-// - SEMI-ONLINE MODEL: Meteors are now fully local. The `OwnedComponent` is
-//   no longer added to them in `_createMeteorPrefab`, so their state is never
-//   sent over the network.
-// - The `_onData` logic now only expects to receive player data from other
-//   clients, simplifying the synchronization process.
+// - PERSONALIZED CHALLENGE: The meteor spawning logic in `_createMeteorPrefab`
+//   has been updated. It no longer targets a random player. Instead, it now
+//   specifically finds the local player (the one with ControlledPlayerComponent)
+//   and sets them as the meteor's target. This ensures each player only has
+//   to deal with meteors created for them.
 // ==============================================================================
 
 import 'dart:async';
@@ -80,7 +80,6 @@ class NetworkSystem extends System {
       _remoteEntityIdMap.putIfAbsent(senderId, () => {});
       final senderEntityMap = _remoteEntityIdMap[senderId]!;
 
-      // In the new model, we only expect player entities from the network.
       decodedEntities.forEach((remoteEntityId, components) {
         if (!components.any((c) => c is PlayerComponent)) return;
 
@@ -148,25 +147,26 @@ class NetworkSystem extends System {
 
   Entity _createMeteorPrefab() {
     final random = Random();
-    final allPlayers =
-        world.entities.values.where((e) => e.has<PlayerComponent>()).toList();
+    // --- CHANGE: Find the local player specifically ---
+    final localPlayer = world.entities.values
+        .firstWhereOrNull((e) => e.has<ControlledPlayerComponent>());
 
-    if (allPlayers.isEmpty) return Entity();
+    // If the local player doesn't exist for some reason, don't spawn a meteor.
+    if (localPlayer == null) return Entity();
 
-    final targetPlayer = allPlayers[random.nextInt(allPlayers.length)];
-    final targetPlayerId = targetPlayer.id;
+    final targetPlayerId = localPlayer.id;
 
     final initialSpeed = PlayerControlSystem.playerSpeed * 3.0;
     final meteor = Entity();
 
-    // --- CHANGE: Meteors are now local ONLY. No OwnedComponent is added. ---
-
+    // Meteors are always local, so no OwnedComponent is needed.
     meteor.addComponents([
       PositionComponent(
           x: random.nextDouble() * 800, y: -50, width: 30, height: 30),
       VelocityComponent(x: random.nextDouble() * 100 - 50, y: initialSpeed),
       TagsComponent({'meteor'}),
       DamageComponent(20),
+      // --- CHANGE: Target is now always the local player ---
       TargetingComponent(targetId: targetPlayerId, turnSpeed: 1.5),
       LifecycleComponent(
           maxAge: 4.0,
