@@ -2,38 +2,39 @@ import 'package:nexus/nexus.dart';
 
 /// Identifies an entity as a player in the online game.
 class PlayerComponent extends Component with BinaryComponent {
-  // --- FIX: Changed sessionId from int to String to match the server. ---
-  // --- اصلاح: نوع sessionId از int به String تغییر کرد تا با سرور مطابقت داشته باشد. ---
   late String sessionId;
   late bool isLocalPlayer;
+  // --- NEW: Added isHost flag. ---
+  // --- جدید: فلگ isHost اضافه شد. ---
+  late bool isHost;
 
-  // --- FIX: Updated the constructor to handle a String sessionId. ---
-  // --- اصلاح: سازنده برای مدیریت sessionId از نوع String به‌روزرسانی شد. ---
-  PlayerComponent({String? sessionId, bool? isLocalPlayer})
-      : sessionId = sessionId ?? '',
-        isLocalPlayer = isLocalPlayer ?? false;
+  PlayerComponent({
+    String? sessionId,
+    bool? isLocalPlayer,
+    bool? isHost,
+  })  : sessionId = sessionId ?? '',
+        isLocalPlayer = isLocalPlayer ?? false,
+        isHost = isHost ?? false;
 
   @override
   int get typeId => 2; // Unique network ID
 
   @override
   void fromBinary(BinaryReader reader) {
-    // --- FIX: Now correctly reads a string from the binary stream. ---
-    // --- اصلاح: اکنون به درستی یک رشته را از جریان باینری می‌خواند. ---
     sessionId = reader.readString();
     isLocalPlayer = reader.readBool();
+    isHost = reader.readBool();
   }
 
   @override
   void toBinary(BinaryWriter writer) {
-    // --- FIX: Now correctly writes the string to the binary stream. ---
-    // --- اصلاح: اکنون به درستی رشته را در جریان باینری می‌نویسد. ---
     writer.writeString(sessionId);
     writer.writeBool(isLocalPlayer);
+    writer.writeBool(isHost);
   }
 
   @override
-  List<Object?> get props => [sessionId, isLocalPlayer];
+  List<Object?> get props => [sessionId, isLocalPlayer, isHost];
 }
 
 /// A marker component for the entity that is locally controlled.

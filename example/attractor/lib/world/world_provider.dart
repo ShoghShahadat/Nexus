@@ -1,11 +1,12 @@
+import 'package:attractor_example/components/network_components.dart';
 import 'package:nexus/nexus.dart';
 import '../component_registration.dart';
-import '../components/network_components.dart';
+import '../systems/client_logic_systems.dart';
+import '../systems/client_spawner_system.dart';
 import '../systems/debug_system.dart';
 import '../systems/network_system.dart';
+import '../systems/p2p_sync_system.dart'; // <-- Import the new system
 import '../systems/player_control_system.dart';
-
-// --- CLIENT WORLD PROVIDER ---
 
 NexusWorld provideAttractorWorld() {
   registerCoreComponents();
@@ -13,19 +14,33 @@ NexusWorld provideAttractorWorld() {
 
   final world = NexusWorld();
   final serializer = BinaryWorldSerializer(BinaryComponentFactory.I);
-
-  // --- CRITICAL FIX: Use the base HTTP URL for the Socket.IO client ---
-  // The socket_io_client library will handle the path and protocol upgrade automatically.
-  // --- اصلاح حیاتی: استفاده از URL پایه HTTP برای کلاینت Socket.IO ---
-  // کتابخانه socket_io_client مسیر و ارتقاء پروتکل را به صورت خودکار مدیریت می‌کند.
-  const serverUrl = 'http://127.0.0.1:5000';
+  const serverUrl = 'http://12.0.0.1:5000';
 
   world.addSystems([
+    // Core & UI Systems
     ResponsivenessSystem(),
     DebugSystem(),
+    PlayerControlSystem(),
     NetworkSystem(serializer, serverUrl: serverUrl),
-    PlayerControlSystem(), // Corrected typo from previous version
+
+    // P2P Game Logic Systems (run on all clients)
+    PhysicsSystem(), // Now generic and clean
+    P2pSyncSystem(), // New system for handling synchronization
+    CollisionSystem(),
+    DamageSystem(),
+    TargetingSystem(),
+
+    // Host-Only Systems
+    ClientGameLogicSystem(),
+    ClientSpawnerSystem(),
   ]);
+
+  // Create a spawner entity that the ClientSpawnerSystem will use if it's the host
+  world.createSpawner(
+    prefab: () => Entity(),
+    frequency: Frequency.perSecond(1.5),
+    tag: 'meteor_spawner',
+  );
 
   world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),

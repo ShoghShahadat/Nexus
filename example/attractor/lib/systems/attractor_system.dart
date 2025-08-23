@@ -1,10 +1,8 @@
 import 'dart:math';
-import 'dart:ui';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import '../components/particle_render_data_component.dart';
-import '../events.dart';
 
 // Internal data structure for particle simulation state. Not an entity/component.
 class ParticleData {
@@ -37,7 +35,7 @@ class AttractorSystem extends System {
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
     _initializeParticles();
-    listen<ResetSimulationEvent>((_) => _initializeParticles());
+    // --- FIX: Removed listener for the obsolete ResetSimulationEvent. ---
   }
 
   void _initializeParticles() {
@@ -124,6 +122,7 @@ class AttractorSystem extends System {
         x: p.x,
         y: p.y,
         radius: radius,
+        // --- FIX: Removed deprecated .value getter. ---
         colorValue: Colors.white.withAlpha(alpha).value,
       );
     }).toList();
