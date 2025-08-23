@@ -1,18 +1,24 @@
+// ==============================================================================
+// File: lib/network/socket_io_client_adapter.dart
+// Author: Your Intelligent Assistant
+// Version: 4.0
+// Description: A concrete implementation of IWebSocketClient using socket_io_client.
+// Changes:
+// - MODIFIED: The send method now expects a Base64 string, which is the
+//   standard way to send binary data reliably in this context.
+// ==============================================================================
+
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'i_web_socket_client.dart';
 
-/// A concrete implementation of [IWebSocketClient] using the `socket_io_client` package.
-/// This adapter translates Socket.IO events into the simple stream-based interface our app uses.
-/// یک پیاده‌سازی مشخص از [IWebSocketClient] با استفاده از پکیج `socket_io_client`.
-/// این آداپتور رویدادهای Socket.IO را به اینترفیس مبتنی بر استریم که برنامه ما استفاده می‌کند، ترجمه می‌کند.
 class SocketIOClientAdapter implements IWebSocketClient {
   IO.Socket? _socket;
   StreamController<Uint8List>? _messageController;
   StreamController<bool>? _connectionStateController;
-  String? _url;
 
   @override
   Stream<Uint8List> get onMessage =>
@@ -29,22 +35,18 @@ class SocketIOClientAdapter implements IWebSocketClient {
 
   @override
   Future<void> connect(String url) async {
-    _url = url;
     if (kDebugMode) {
-      print('[SocketIOClientAdapter] Attempting to connect to $_url...');
+      print('[SocketIOClientAdapter] Attempting to connect to $url...');
     }
 
-    // Configure the Socket.IO client.
-    // We explicitly use WebSocket transport and disable auto-connection.
     _socket = IO.io(url, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
     });
 
-    // --- Setup Event Listeners ---
     _socket!.onConnect((_) {
       if (kDebugMode) {
-        print('[SocketIOClientAdapter] Connection established successfully.');
+        print('[SocketIOClientAdapter] Connection established.');
       }
       _connectionStateController?.add(true);
     });
@@ -54,7 +56,6 @@ class SocketIOClientAdapter implements IWebSocketClient {
         print('[SocketIOClientAdapter] Disconnected.');
       }
       _connectionStateController?.add(false);
-      // The library handles reconnection logic automatically.
     });
 
     _socket!.onConnectError((data) {
@@ -64,30 +65,30 @@ class SocketIOClientAdapter implements IWebSocketClient {
       _connectionStateController?.add(false);
     });
 
-    _socket!.onError((data) {
-      if (kDebugMode) {
-        print('[SocketIOClientAdapter] Generic Error: $data');
-      }
+    _socket!.on('state_broadcast', (data) {
+      final message = {
+        'event': 'state_broadcast',
+        'data': data,
+      };
+      _messageController?.add(utf8.encode(jsonEncode(message)));
     });
 
-    // Listen for the 'message' event from the Python server.
-    _socket!.on('message', (data) {
-      if (data is List<int>) {
-        _messageController?.add(Uint8List.fromList(data));
-      } else if (data is Uint8List) {
-        _messageController?.add(data);
-      }
+    _socket!.on('client_left', (data) {
+      final message = {
+        'event': 'client_left',
+        'data': data,
+      };
+      _messageController?.add(utf8.encode(jsonEncode(message)));
     });
 
-    // Manually initiate the connection.
     _socket!.connect();
   }
 
   @override
-  void send(Uint8List data) {
+  void send(dynamic data) {
+    // The data is now expected to be a Base64 string.
     if (_socket?.connected ?? false) {
-      // Emit data on the 'message' event to the Python server.
-      _socket!.emit('message', data);
+      _socket!.emit('game_state_update', data);
     }
   }
 

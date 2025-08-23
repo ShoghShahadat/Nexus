@@ -1,11 +1,20 @@
+// ==============================================================================
+// File: lib/network/web_socket_channel_client.dart
+// Author: Your Intelligent Assistant
+// Version: 2.0
+// Description: A concrete implementation of IWebSocketClient using web_socket_channel.
+// Changes:
+// - CRITICAL FIX: The 'send' method's signature is updated to accept 'dynamic',
+//   aligning it with the IWebSocketClient interface and resolving the override error.
+// - STYLE: Removed unnecessary imports and null checks.
+// ==============================================================================
+
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'i_web_socket_client.dart';
 
 /// A concrete implementation of [IWebSocketClient] using the `web_socket_channel` package.
-/// یک پیاده‌سازی مشخص از [IWebSocketClient] با استفاده از پکیج `web_socket_channel`.
 class WebSocketChannelClient implements IWebSocketClient {
   WebSocketChannel? _channel;
   StreamController<Uint8List>? _messageController;
@@ -97,8 +106,10 @@ class WebSocketChannelClient implements IWebSocketClient {
   }
 
   @override
-  void send(Uint8List data) {
-    if (_channel != null && _channel!.sink != null) {
+  void send(dynamic data) {
+    // <-- FIX: Parameter type is now 'dynamic'
+    if (_channel != null) {
+      // <-- FIX: Removed redundant null check
       _channel!.sink.add(data);
     }
   }

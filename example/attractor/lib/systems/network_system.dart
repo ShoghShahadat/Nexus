@@ -1,20 +1,24 @@
 // ==============================================================================
 // File: lib/systems/network_system.dart
 // Author: Your Intelligent Assistant
-// Version: 9.0
+// Version: 13.0
 // Description: Manages client-side connection and state synchronization.
 // Changes:
-// - CRITICAL FIX: Now correctly passes the updated width and height from the
-//   server into the NetworkSyncComponent and ReconciliationComponent.
+// - CRITICAL FIX: Now uses Base64 encoding/decoding for all binary data transfer.
+//   This is the standard and robust solution to prevent data corruption over
+//   Socket.IO, resolving the deserialization crash on the second client.
+// - FIX: Added LifecyclePolicyComponent to created meteors to remove warnings.
+// - STYLE: Removed redundant 'as dynamic' cast for clarity.
 // ==============================================================================
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
-import 'package:nexus/nexus.dart';
+import 'dart:math';
+import 'package:nexus/nexus.dart' hide SpawnerComponent, LifecycleComponent;
 import '../components/interpolation_component.dart';
 import '../components/network_components.dart';
-import '../components/reconciliation_component.dart';
-import '../events.dart';
+import '../components/server_logic_components.dart';
 import '../network/i_web_socket_client.dart';
 
 class NetworkSystem extends System {
@@ -25,8 +29,9 @@ class NetworkSystem extends System {
   StreamSubscription? _messageSubscription;
   StreamSubscription? _connectionStateSubscription;
 
-  final Map<int, EntityId> _serverEntityMap = {};
-  EntityId? _localPlayerId;
+  final Map<String, EntityId> _remoteClientMap = {};
+  double _timeSinceLastSend = 0.0;
+  static const double sendInterval = 1.0 / 30.0;
 
   NetworkSystem(this._serializer, {required this.serverUrl});
 
@@ -40,138 +45,102 @@ class NetworkSystem extends System {
     await _webSocketClient.connect(serverUrl);
   }
 
-  @override
-  void onAddedToWorld(NexusWorld world) {
-    super.onAddedToWorld(world);
-    listen<SendDirectionalInputEvent>(_onSendInput);
-  }
-
   void _onConnectionStateChanged(bool isConnected) {
     if (isConnected) {
       _updateStatus('Connected!', isConnected: true);
+      if (world.entities.values.where((e) => e.has<PlayerComponent>()).length <=
+          1) {
+        final spawner = Entity()
+          ..add(TagsComponent({'meteor_spawner'}))
+          ..add(SpawnerComponent(prefab: _createMeteorPrefab));
+        world.addEntity(spawner);
+      }
     } else {
       _updateStatus('Connecting to $serverUrl...', isConnected: false);
-      for (final clientEntityId in _serverEntityMap.values) {
-        world.removeEntity(clientEntityId);
-      }
-      _serverEntityMap.clear();
-      _localPlayerId = null;
-      world.rootEntity.get<BlackboardComponent>()?.set('local_player_id', null);
+      _remoteClientMap.values.forEach(world.removeEntity);
+      _remoteClientMap.clear();
     }
   }
 
   void _onData(Uint8List data) {
-    final reader = BinaryReader(data);
+    final messageString = utf8.decode(data);
+    final message = jsonDecode(messageString);
 
-    final updatedCount = reader.readInt32();
-    for (int i = 0; i < updatedCount; i++) {
-      final serverId = reader.readInt32();
-      final componentCount = reader.readInt32();
-      final components = <Component>[];
-      PositionComponent? posFromServer;
+    if (message['event'] == 'state_broadcast') {
+      final senderId = message['data']['sender_id'] as String;
+      final payload = base64Decode(message['data']['payload'] as String);
 
-      for (int j = 0; j < componentCount; j++) {
-        final typeId = reader.readInt32();
-        final component = _serializer.factoryRegistry.create(typeId);
-        if (component is BinaryComponent) {
-          component.fromBinary(reader);
-          if (component is PositionComponent) {
-            posFromServer = component;
-          } else {
-            components.add(component);
-          }
-        }
-      }
+      final decoded = _serializer.decode(payload);
 
-      final clientEntityId = _serverEntityMap[serverId];
-      Entity? clientEntity;
-
-      if (clientEntityId != null) {
-        clientEntity = world.entities[clientEntityId];
+      EntityId remoteEntityId;
+      if (_remoteClientMap.containsKey(senderId)) {
+        remoteEntityId = _remoteClientMap[senderId]!;
       } else {
-        clientEntity = Entity();
-        clientEntity.add(LifecyclePolicyComponent(isPersistent: true));
-        if (posFromServer != null) {
-          clientEntity.add(PositionComponent(
-              x: posFromServer.x,
-              y: posFromServer.y,
-              width: posFromServer.width,
-              height: posFromServer.height));
-        }
-        world.addEntity(clientEntity);
-        _serverEntityMap[serverId] = clientEntity.id;
+        final newEntity = Entity()
+          ..add(LifecyclePolicyComponent(isPersistent: true))
+          ..add(TagsComponent({'player'}))
+          ..add(PositionComponent(width: 20, height: 20));
+        world.addEntity(newEntity);
+        _remoteClientMap[senderId] = newEntity.id;
+        remoteEntityId = newEntity.id;
       }
 
-      if (clientEntity == null) continue;
-
-      // --- CRITICAL FIX: Update local PositionComponent and Sync Components ---
-      if (posFromServer != null) {
-        // Always update the entity's own PositionComponent with the new size.
-        final localPos = clientEntity.get<PositionComponent>();
-        if (localPos != null) {
-          localPos.width = posFromServer.width;
-          localPos.height = posFromServer.height;
-          clientEntity.add(localPos);
-        }
-
-        if (clientEntity.id == _localPlayerId) {
-          // For our player, send state to the Reconciliation system.
-          clientEntity.add(ReconciliationComponent(
-            serverX: posFromServer.x,
-            serverY: posFromServer.y,
-          ));
-        } else {
-          // For others, send state to the Interpolation system.
-          clientEntity.add(NetworkSyncComponent(
-            targetX: posFromServer.x,
-            targetY: posFromServer.y,
-            targetWidth: posFromServer.width,
-            targetHeight: posFromServer.height,
-          ));
-        }
+      final entity = world.entities[remoteEntityId];
+      if (entity != null && decoded.isNotEmpty) {
+        final components = decoded.values.first;
+        entity.addComponents(components);
       }
-
-      clientEntity.addComponents(components);
-    }
-
-    final deletedCount = reader.readInt32();
-    for (int i = 0; i < deletedCount; i++) {
-      final serverId = reader.readInt32();
-      if (_serverEntityMap.containsKey(serverId)) {
-        final clientEntityId = _serverEntityMap.remove(serverId)!;
-        if (clientEntityId == _localPlayerId) _localPlayerId = null;
-        world.removeEntity(clientEntityId);
-      }
-    }
-
-    _updateLocalPlayerReference();
-  }
-
-  void _updateLocalPlayerReference() {
-    if (_localPlayerId != null) return;
-
-    for (final entityId in _serverEntityMap.values) {
-      final entity = world.entities[entityId];
-      final playerComp = entity?.get<PlayerComponent>();
-      if (playerComp != null && playerComp.isLocalPlayer) {
-        _localPlayerId = entity!.id;
-        world.rootEntity
-            .get<BlackboardComponent>()
-            ?.set('local_player_id', _localPlayerId);
-        entity.add(ControlledPlayerComponent());
-        playerComp.isLocalPlayer = false;
-        entity.add(playerComp);
-        break;
+    } else if (message['event'] == 'client_left') {
+      final leftClientId = message['data']['id'] as String;
+      final localEntityId = _remoteClientMap.remove(leftClientId);
+      if (localEntityId != null) {
+        world.removeEntity(localEntityId);
       }
     }
   }
 
-  void _onSendInput(SendDirectionalInputEvent event) {
-    final writer = BinaryWriter();
-    writer.writeInt32(1);
-    writer.writeDouble(event.dx);
-    writer.writeDouble(event.dy);
-    _webSocketClient.send(writer.toBytes());
+  @override
+  bool matches(Entity entity) => entity.has<OwnedComponent>();
+
+  @override
+  void update(Entity entity, double dt) {
+    _timeSinceLastSend += dt;
+    if (_timeSinceLastSend >= sendInterval) {
+      _timeSinceLastSend = 0;
+
+      final ownedEntities =
+          world.entities.values.where((e) => e.has<OwnedComponent>()).toList();
+
+      if (ownedEntities.isNotEmpty) {
+        final packet = _serializer.serialize(ownedEntities);
+        final base64Packet = base64Encode(packet);
+        // --- STYLE: Removed redundant cast ---
+        _webSocketClient.send(base64Packet);
+      }
+    }
+  }
+
+  Entity _createMeteorPrefab() {
+    final random = Random();
+    final initialSpeed = random.nextDouble() * 100 + 150;
+    return Entity()
+      ..add(OwnedComponent())
+      ..add(PositionComponent(
+          x: random.nextDouble() * 800, y: -50, width: 30, height: 30))
+      ..add(
+          VelocityComponent(x: random.nextDouble() * 100 - 50, y: initialSpeed))
+      ..add(TagsComponent({'meteor'}))
+      ..add(DamageComponent(25))
+      ..add(TargetingComponent(turnSpeed: 1.5))
+      ..add(LifecycleComponent(
+          maxAge: 5.0,
+          initialSpeed: initialSpeed,
+          initialWidth: 30,
+          initialHeight: 30))
+      ..add(LifecyclePolicyComponent(
+          destructionCondition: (e) =>
+              (e.get<LifecycleComponent>()?.age ?? 0) >=
+              (e.get<LifecycleComponent>()?.maxAge ?? 999)));
   }
 
   void _updateStatus(String message, {bool isConnected = false}) {
@@ -180,17 +149,10 @@ class NetworkSystem extends System {
   }
 
   @override
-  bool matches(Entity entity) => false;
-
-  @override
-  void update(Entity entity, double dt) {}
-
-  @override
   void onRemovedFromWorld() {
     _messageSubscription?.cancel();
     _connectionStateSubscription?.cancel();
     _webSocketClient.disconnect();
-    _serverEntityMap.clear();
     super.onRemovedFromWorld();
   }
 }

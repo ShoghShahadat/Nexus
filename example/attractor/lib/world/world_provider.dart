@@ -1,21 +1,22 @@
 // ==============================================================================
 // File: lib/world/world_provider.dart
 // Author: Your Intelligent Assistant
-// Version: 5.0
+// Version: 8.0
 // Description: Provides the configured NexusWorld for the client application.
 // Changes:
-// - ADDED: The new ClientTargetingSystem is now included to predict AI movement.
+// - FIX: Added the missing LifecyclePolicyComponent to the local player entity
+//   to remove the console warnings during startup.
 // ==============================================================================
 
-import 'package:nexus/nexus.dart';
+import 'package:nexus/nexus.dart' hide SpawnerComponent, LifecycleComponent;
 import '../component_registration.dart';
 import '../components/network_components.dart';
-import '../systems/client_targeting_system.dart'; // Import the new system
+import '../components/server_logic_components.dart';
 import '../systems/debug_system.dart';
-import '../systems/interpolation_system.dart';
+import '../systems/game_logic_systems.dart';
 import '../systems/network_system.dart';
 import '../systems/player_control_system.dart';
-import '../systems/reconciliation_system.dart';
+import '../systems/client_targeting_system.dart';
 
 /// Provides the configured NexusWorld for the client application.
 NexusWorld provideAttractorWorld() {
@@ -27,27 +28,46 @@ NexusWorld provideAttractorWorld() {
 
   const serverUrl = 'ws://127.0.0.1:5000';
 
+  // The client now runs the full simulation
   world.addSystems([
     // Core systems
     ResponsivenessSystem(),
     DebugSystem(),
 
-    // Client-side prediction for ALL moving entities
+    // Input and Player control
+    PlayerControlSystem(),
+
+    // All Game Logic now runs on the Client
+    ClientSpawnerSystem(),
+    DynamicDifficultySystem(),
+    MeteorLifecycleSystem(),
+    ClientTargetingSystem(),
     PhysicsSystem(),
-    ClientTargetingSystem(), // Predicts meteor movement
+    CollisionSystem(),
+    GameRulesSystem(),
 
-    // Networking and Input
+    // Networking
     NetworkSystem(serializer, serverUrl: serverUrl),
-    PlayerControlSystem(), // Predicts our own player's movement
-
-    // Visual smoothing and correction
-    InterpolationSystem(), // For other players and meteors
-    ReconciliationSystem(), // For our own player
   ]);
+
+  // Create the local player entity
+  final player = Entity()
+    ..add(OwnedComponent())
+    ..add(ControlledPlayerComponent())
+    ..add(TagsComponent({'player'}))
+    ..add(PositionComponent(x: 400, y: 500, width: 20, height: 20))
+    ..add(VelocityComponent())
+    ..add(HealthComponent(maxHealth: 100))
+    // --- FIX: Added LifecyclePolicyComponent to prevent warnings ---
+    ..add(LifecyclePolicyComponent(isPersistent: true));
+  world.addEntity(player);
 
   world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),
-    BlackboardComponent({'score': 0, 'local_player_id': null}),
+    BlackboardComponent({
+      'score': 0,
+      'local_player_id': player.id // Set local player ID immediately
+    }),
     NetworkStateComponent(),
   ]);
 
