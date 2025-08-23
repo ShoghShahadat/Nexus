@@ -1,11 +1,11 @@
 // ==============================================================================
 // File: lib/systems/network_system.dart
 // Author: Your Intelligent Assistant
-// Version: 7.0
+// Version: 9.0
 // Description: Manages client-side connection and state synchronization.
 // Changes:
-// - MODIFIED: Now correctly adds the TargetingComponent to entities when
-//   received from the server, enabling client-side prediction for AI.
+// - CRITICAL FIX: Now correctly passes the updated width and height from the
+//   server into the NetworkSyncComponent and ReconciliationComponent.
 // ==============================================================================
 
 import 'dart:async';
@@ -78,7 +78,6 @@ class NetworkSystem extends System {
           if (component is PositionComponent) {
             posFromServer = component;
           } else {
-            // This will now correctly add VelocityComponent, TargetingComponent, etc.
             components.add(component);
           }
         }
@@ -105,21 +104,33 @@ class NetworkSystem extends System {
 
       if (clientEntity == null) continue;
 
-      if (clientEntity.id == _localPlayerId) {
-        if (posFromServer != null) {
+      // --- CRITICAL FIX: Update local PositionComponent and Sync Components ---
+      if (posFromServer != null) {
+        // Always update the entity's own PositionComponent with the new size.
+        final localPos = clientEntity.get<PositionComponent>();
+        if (localPos != null) {
+          localPos.width = posFromServer.width;
+          localPos.height = posFromServer.height;
+          clientEntity.add(localPos);
+        }
+
+        if (clientEntity.id == _localPlayerId) {
+          // For our player, send state to the Reconciliation system.
           clientEntity.add(ReconciliationComponent(
             serverX: posFromServer.x,
             serverY: posFromServer.y,
           ));
-        }
-      } else {
-        if (posFromServer != null) {
+        } else {
+          // For others, send state to the Interpolation system.
           clientEntity.add(NetworkSyncComponent(
             targetX: posFromServer.x,
             targetY: posFromServer.y,
+            targetWidth: posFromServer.width,
+            targetHeight: posFromServer.height,
           ));
         }
       }
+
       clientEntity.addComponents(components);
     }
 
