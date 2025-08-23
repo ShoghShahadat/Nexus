@@ -36,7 +36,6 @@ class NexusWorld {
       TagsComponent({'root'}),
       ScreenInfoComponent(
           width: 0, height: 0, orientation: ScreenOrientation.portrait),
-      // The root entity is always persistent.
       LifecyclePolicyComponent(isPersistent: true),
     ]);
     addEntity(rootEntity);
@@ -68,10 +67,7 @@ class NexusWorld {
       debugPrint(
           '[NexusWorld] WARNING: Entity ID ${entity.id} was added without a LifecyclePolicyComponent. This is highly discouraged.');
     }
-    // --- FIX: Ensure we don't overwrite an existing entity with the same ID ---
     if (_entities.containsKey(entity.id)) {
-      // This can happen with hot reload or complex logic.
-      // It's safer to merge components or log a warning than to silently overwrite.
       if (kDebugMode) {
         print(
             '[NexusWorld] WARNING: An entity with ID ${entity.id} already exists. Overwriting.');
@@ -155,13 +151,16 @@ class NexusWorld {
       condition: condition,
     ));
 
+    // --- FIX: Automatically add a persistent lifecycle policy to all spawners. ---
+    // --- اصلاح: یک خط مشی چرخه عمر دائمی به صورت خودکار به همه spawnerها اضافه می‌شود. ---
+    components.add(LifecyclePolicyComponent(isPersistent: true));
+
     spawnerEntity.addComponents(components);
     addEntity(spawnerEntity);
     return spawnerEntity;
   }
 
   void update(double dt) {
-    // Run the garbage collector first.
     _gc?.runGc(dt);
 
     final entitiesList = List<Entity>.from(_entities.values);

@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 import '../components/network_components.dart';
+import '../components/network_id_component.dart';
 import '../events.dart';
 
 /// A project-specific system to handle P2P state synchronization.
@@ -9,44 +10,37 @@ import '../events.dart';
 class P2pSyncSystem extends System {
   @override
   bool matches(Entity entity) {
-    // This system runs on any entity that has a position and might need syncing.
-    return entity.has<PositionComponent>();
+    // This system runs on any entity that is part of the network.
+    return entity.has<NetworkIdComponent>();
   }
 
   @override
   void update(Entity entity, double dt) {
-    // Find the local player to determine our role (host or client).
+    // --- CRITICAL FIX: Only process entities that have actual changes. ---
+    // --- اصلاح حیاتی: فقط موجودیت‌هایی پردازش می‌شوند که واقعاً تغییری داشته‌اند. ---
+    if (entity.dirtyComponents.isEmpty) return;
+
     final localPlayer = world.entities.values.firstWhereOrNull(
         (e) => e.get<PlayerComponent>()?.isLocalPlayer ?? false);
     if (localPlayer == null) return;
 
+    final networkIdComp = entity.get<NetworkIdComponent>()!;
     final isHost = localPlayer.get<PlayerComponent>()!.isHost;
-    final isOurPlayer = entity.id == localPlayer.id;
+    // --- FIX: Correctly identify the local player entity using its NetworkIdComponent ---
+    final isOurPlayer = networkIdComp.networkId ==
+        localPlayer.get<NetworkIdComponent>()!.networkId;
     final isMeteor = entity.get<TagsComponent>()?.hasTag('meteor') ?? false;
-
-    // An entity's state should only be broadcast if it has changed.
-    if (entity.dirtyComponents.isEmpty) return;
 
     // --- Data Ownership Rules ---
     // 1. Each client is the authority for their own player's state.
     // 2. The Host is the authority for all non-player objects (e.g., meteors).
-
-    if (isOurPlayer) {
-      // If it's our player, broadcast any changed binary components.
-      for (final component in entity.dirtyComponents) {
-        final compInstance = entity.getByType(component);
+    if (isOurPlayer || (isHost && isMeteor)) {
+      // --- FIX: Iterate only over components that have changed this frame. ---
+      for (final componentType in entity.dirtyComponents) {
+        final compInstance = entity.getByType(componentType);
         if (compInstance is BinaryComponent) {
-          world.eventBus
-              .fire(RelayComponentStateEvent(entity.id, compInstance));
-        }
-      }
-    } else if (isHost && isMeteor) {
-      // If we are the host and this is a meteor, broadcast its changes.
-      for (final component in entity.dirtyComponents) {
-        final compInstance = entity.getByType(component);
-        if (compInstance is BinaryComponent) {
-          world.eventBus
-              .fire(RelayComponentStateEvent(entity.id, compInstance));
+          world.eventBus.fire(
+              RelayComponentStateEvent(networkIdComp.networkId, compInstance));
         }
       }
     }

@@ -1,6 +1,4 @@
-import 'package:collection/collection.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
 import 'package:nexus/nexus.dart';
 import '../components/network_components.dart';
 import '../events.dart';
@@ -58,9 +56,9 @@ class PlayerControlSystem extends System {
     if (vel.x != newVelX || vel.y != newVelY) {
       vel.x = newVelX;
       vel.y = newVelY;
+      // --- CRITICAL FIX: Simply update the component. P2pSyncSystem will handle the broadcast. ---
+      // --- اصلاح حیاتی: فقط کامپوننت به‌روز می‌شود. سیستم همگام‌سازی وظیفه ارسال را بر عهده دارد. ---
       entity.add(vel);
-      // --- P2P: Broadcast the new velocity to other clients ---
-      world.eventBus.fire(RelayComponentStateEvent(entity.id, vel));
     }
   }
 }

@@ -5,7 +5,7 @@ import '../systems/client_logic_systems.dart';
 import '../systems/client_spawner_system.dart';
 import '../systems/debug_system.dart';
 import '../systems/network_system.dart';
-import '../systems/p2p_sync_system.dart'; // <-- Import the new system
+import '../systems/p2p_sync_system.dart';
 import '../systems/player_control_system.dart';
 
 NexusWorld provideAttractorWorld() {
@@ -14,7 +14,7 @@ NexusWorld provideAttractorWorld() {
 
   final world = NexusWorld();
   final serializer = BinaryWorldSerializer(BinaryComponentFactory.I);
-  const serverUrl = 'http://12.0.0.1:5000';
+  const serverUrl = 'ws://127.0.0.1:5000';
 
   world.addSystems([
     // Core & UI Systems
@@ -24,8 +24,8 @@ NexusWorld provideAttractorWorld() {
     NetworkSystem(serializer, serverUrl: serverUrl),
 
     // P2P Game Logic Systems (run on all clients)
-    PhysicsSystem(), // Now generic and clean
-    P2pSyncSystem(), // New system for handling synchronization
+    PhysicsSystem(),
+    P2pSyncSystem(),
     CollisionSystem(),
     DamageSystem(),
     TargetingSystem(),
@@ -35,7 +35,8 @@ NexusWorld provideAttractorWorld() {
     ClientSpawnerSystem(),
   ]);
 
-  // Create a spawner entity that the ClientSpawnerSystem will use if it's the host
+  // --- CLEANUP: The LifecyclePolicyComponent is now added automatically by createSpawner. ---
+  // --- پاکسازی: کامپوننت LifecyclePolicy اکنون به صورت خودکار توسط createSpawner اضافه می‌شود. ---
   world.createSpawner(
     prefab: () => Entity(),
     frequency: Frequency.perSecond(1.5),

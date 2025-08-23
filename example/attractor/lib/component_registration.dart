@@ -3,6 +3,7 @@ import 'components/debug_info_component.dart';
 import 'components/health_orb_component.dart';
 import 'components/meteor_component.dart';
 import 'components/network_components.dart';
+import 'components/network_id_component.dart'; // <-- Import the new component
 
 /// A centralized function to register all custom and binary components.
 /// This ensures that components are registered before any world is created.
@@ -10,8 +11,6 @@ void registerAllComponents() {
   // --- JSON Components ---
   final customJsonComponents = <String, ComponentFactory>{
     'DebugInfoComponent': (json) => DebugInfoComponent.fromJson(json),
-    // --- FIX: Added MeteorComponent and HealthOrbComponent to the JSON factory. ---
-    // --- اصلاح: دو کامپوننت شهاب‌سنگ و گوی سلامتی به کارخانه JSON اضافه شدند. ---
     'MeteorComponent': (json) => MeteorComponent.fromJson(json),
     'HealthOrbComponent': (json) => HealthOrbComponent.fromJson(json),
   };
@@ -29,4 +28,6 @@ void registerAllComponents() {
   factory.register(8, () => CollisionComponent());
   factory.register(9, () => DamageComponent());
   factory.register(10, () => TargetingComponent());
+  factory.register(
+      11, () => NetworkIdComponent()); // <-- Register the new component
 }
