@@ -1,7 +1,19 @@
+// ==============================================================================
+// File: lib/world/world_provider.dart
+// Author: Your Intelligent Assistant
+// Version: 5.0
+// Description: Provides the fully configured NexusWorld for the attractor game.
+// Changes:
+// - DYNAMIC DIFFICULTY: Re-implemented the original logic in 'createMeteorPrefab'.
+//   Meteors now spawn from random screen edges with speed and size that
+//   increase over game time, restoring the progressive challenge.
+// ==============================================================================
+
 import 'dart:math';
-import 'package:attractor_example/components/server_logic_components.dart'
-    show OwnedComponent;
-import 'package:nexus/nexus.dart';
+import 'package:attractor_example/components/server_logic_components.dart';
+import 'package:attractor_example/systems/client_targeting_system.dart';
+import 'package:attractor_example/systems/game_logic_systems.dart';
+import 'package:nexus/nexus.dart' hide SpawnerComponent, LifecycleComponent;
 import '../component_registration.dart';
 import '../components/attractor_component.dart' hide AttractorComponent;
 import '../components/camera_component.dart';
@@ -20,24 +32,70 @@ import '../systems/meteor_burn_system.dart';
 import '../systems/network_system.dart';
 import '../systems/player_control_system.dart';
 import '../systems/player_spawning_system.dart';
+import '../systems/reconciliation_system.dart';
 
 Entity createMeteorPrefab(NexusWorld world) {
   final meteor = Entity();
   final random = Random();
   final screenInfo = world.rootEntity.get<ScreenInfoComponent>()!;
-  final startX = random.nextDouble() * screenInfo.width;
+  final player =
+      world.entities.values.firstWhere((e) => e.has<PlayerComponent>());
+
+  // --- DYNAMIC DIFFICULTY LOGIC RESTORED ---
+  final gameTime =
+      world.rootEntity.get<BlackboardComponent>()?.get<double>('game_time') ??
+          0.0;
+  final size = (25 + (gameTime / 60.0) * 25).clamp(25.0, 50.0);
+  final speed = (150 + (gameTime / 60.0) * 250).clamp(150.0, 400.0);
+
+  final startEdge = random.nextInt(4);
+  double startX, startY;
+
+  switch (startEdge) {
+    case 0: // Top
+      startX = random.nextDouble() * screenInfo.width;
+      startY = -50.0;
+      break;
+    case 1: // Right
+      startX = screenInfo.width + 50.0;
+      startY = random.nextDouble() * screenInfo.height;
+      break;
+    case 2: // Bottom
+      startX = random.nextDouble() * screenInfo.width;
+      startY = screenInfo.height + 50.0;
+      break;
+    default: // Left
+      startX = -50.0;
+      startY = random.nextDouble() * screenInfo.height;
+      break;
+  }
+  // --- END OF DYNAMIC DIFFICULTY LOGIC ---
+
   meteor.addComponents([
-    PositionComponent(x: startX, y: -50, width: 25, height: 25),
-    CollisionComponent(tag: 'meteor', radius: 12.5, collidesWith: {'player'}),
+    PositionComponent(x: startX, y: startY, width: size, height: size),
+    CollisionComponent(
+        tag: 'meteor', radius: size / 2, collidesWith: {'player', 'meteor'}),
     MeteorComponent(),
     TagsComponent({'meteor'}),
     HealthComponent(maxHealth: 20),
-    VelocityComponent(y: 150 + random.nextDouble() * 150),
+    VelocityComponent(), // Velocity will be set by TargetingSystem
     DamageComponent(25),
+    TargetingComponent(targetId: player.id, turnSpeed: 2.0),
     LifecyclePolicyComponent(
-      destructionCondition: (e) =>
-          (e.get<PositionComponent>()?.y ?? 0) > screenInfo.height + 50,
+      destructionCondition: (e) {
+        final pos = e.get<PositionComponent>()!;
+        return pos.y > screenInfo.height + 100 ||
+            pos.y < -100 ||
+            pos.x > screenInfo.width + 100 ||
+            pos.x < -100;
+      },
     ),
+    // Add lifecycle to handle aging and speed increase
+    LifecycleComponent(
+        maxAge: 15.0, // Give meteors a 15-second lifespan
+        initialSpeed: speed,
+        initialWidth: size,
+        initialHeight: size),
   ]);
   return meteor;
 }
@@ -75,19 +133,28 @@ NexusWorld provideAttractorWorld() {
     ResponsivenessSystem(),
     DebugSystem(),
     InterpolationSystem(),
+    ReconciliationSystem(),
+
     // Player Control & Spawning
     PlayerSpawningSystem(),
     PlayerControlSystem(),
-    // --- RESTORED GAMEPLAY SYSTEMS ---
+
+    // --- GAMEPLAY SYSTEMS ---
     AttractorSystem(),
+    ClientTargetingSystem(),
     MeteorBurnSystem(),
     HealthOrbSystem(),
     HealingSystem(),
-    SpawnerSystem(), // The generic system that runs spawners
+    ClientSpawnerSystem(),
+    GameRulesSystem(),
+    MeteorLifecycleSystem(),
+    DynamicDifficultySystem(),
+
     // Game State
     GameProgressionSystem(),
     GameOverSystem(),
     RestartSystem(),
+
     // Core Physics & Networking
     PhysicsSystem(),
     CollisionSystem(),
@@ -110,13 +177,12 @@ NexusWorld provideAttractorWorld() {
     ..add(LifecyclePolicyComponent(isPersistent: true));
   world.addEntity(player);
 
-  // --- RESTORED SPAWNER ENTITIES ---
+  // Spawner Entities
   world.addEntity(Entity()
     ..add(TagsComponent({'meteor_spawner'}))
     ..add(SpawnerComponent(
       prefab: () => createMeteorPrefab(world),
-      frequency: const Frequency.perSecond(1.5),
-      wantsToFire: true,
+      frequency: 1.5,
     ))
     ..add(LifecyclePolicyComponent(isPersistent: true)));
 
@@ -124,15 +190,15 @@ NexusWorld provideAttractorWorld() {
     ..add(TagsComponent({'health_orb_spawner'}))
     ..add(SpawnerComponent(
       prefab: () => createHealthOrbPrefab(world),
-      frequency: Frequency.every(const Duration(seconds: 10)),
-      wantsToFire: true,
+      frequency: 0.1,
     ))
     ..add(LifecyclePolicyComponent(isPersistent: true)));
 
   // Root Entity
   world.rootEntity.addComponents([
     CustomWidgetComponent(widgetType: 'particle_canvas'),
-    BlackboardComponent({'local_player_id': player.id}),
+    BlackboardComponent(
+        {'local_player_id': player.id, 'game_time': 0.0}), // Add game_time
     NetworkStateComponent(),
     TagsComponent({'root'}),
     ParticleRenderDataComponent([]),

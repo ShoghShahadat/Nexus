@@ -1,13 +1,13 @@
 // ==============================================================================
 // File: lib/systems/game_logic_systems.dart
 // Author: Your Intelligent Assistant
-// Version: 5.0
+// Version: 2.0
 // Description: Contains all game logic systems for the client-authoritative model.
 // Changes:
-// - MeteorLifecycleSystem:
-//   - SCORING LOGIC: When a meteor's lifecycle ends (i.e., the player
-//     successfully survives it), the system now finds the targeted player and
-//     increments their `ScoreComponent` by 10 points.
+// - REFINED COLLISION LOGIC: The 'GameRulesSystem' has been updated. Instead
+//   of directly removing entities on collision, it now sets their health to 0.
+//   This allows other systems (like MeteorBurnSystem) to handle the
+//   destruction effects, leading to a cleaner, more decoupled design.
 // ==============================================================================
 
 import 'dart:math';
@@ -37,7 +37,7 @@ class ClientSpawnerSystem extends System {
     final meteorCount = world.entities.values
         .where((e) => e.get<TagsComponent>()?.hasTag('meteor') ?? false)
         .length;
-    final maxMeteors = playerCount * 3;
+    final maxMeteors = playerCount * 10; // Allow more meteors
 
     if (meteorCount >= maxMeteors || playerCount == 0) {
       return;
@@ -80,14 +80,13 @@ class MeteorLifecycleSystem extends System {
     lifecycle.age += dt;
 
     if (lifecycle.age >= lifecycle.maxAge) {
-      // --- NEW: Award points for survival ---
       final targeting = entity.get<TargetingComponent>();
       if (targeting != null) {
         final targetPlayer = world.entities[targeting.targetId];
         if (targetPlayer != null) {
           final scoreComp = targetPlayer.get<ScoreComponent>();
           if (scoreComp != null) {
-            scoreComp.score += 10; // Award 10 points for surviving
+            scoreComp.score += 10;
             targetPlayer.add(scoreComp);
           }
         }
@@ -159,19 +158,20 @@ class GameRulesSystem extends System {
     _handleMeteorMeteorCollision(entityA, entityB);
   }
 
-  void _handlePlayerMeteorCollision(Entity entity1, Entity entity2) {
-    final is1Player = entity1.get<TagsComponent>()?.hasTag('player') ?? false;
-    final is2Meteor = entity2.get<TagsComponent>()?.hasTag('meteor') ?? false;
+  void _handlePlayerMeteorCollision(Entity player, Entity meteor) {
+    final isPlayer = player.get<TagsComponent>()?.hasTag('player') ?? false;
+    final isMeteor = meteor.get<TagsComponent>()?.hasTag('meteor') ?? false;
 
-    if (is1Player && is2Meteor) {
-      final health = entity1.get<HealthComponent>();
-      final damage = entity2.get<DamageComponent>();
+    if (isPlayer && isMeteor) {
+      final health = player.get<HealthComponent>();
+      final damage = meteor.get<DamageComponent>();
 
       if (health != null && damage != null) {
         health.currentHealth -= damage.damage;
-        entity1.add(health);
+        player.add(health);
       }
-      world.removeEntity(entity2.id);
+      // --- REFINED LOGIC: Set meteor health to 0 to be handled by MeteorBurnSystem ---
+      meteor.add(HealthComponent(maxHealth: 1, currentHealth: 0));
     }
   }
 
@@ -180,8 +180,9 @@ class GameRulesSystem extends System {
     final isBMeteor = entityB.get<TagsComponent>()?.hasTag('meteor') ?? false;
 
     if (isAMeteor && isBMeteor) {
-      world.removeEntity(entityA.id);
-      world.removeEntity(entityB.id);
+      // --- REFINED LOGIC: Set health to 0 for both meteors ---
+      entityA.add(HealthComponent(maxHealth: 1, currentHealth: 0));
+      entityB.add(HealthComponent(maxHealth: 1, currentHealth: 0));
     }
   }
 

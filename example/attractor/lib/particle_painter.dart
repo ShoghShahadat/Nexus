@@ -1,14 +1,16 @@
 // ==============================================================================
 // File: lib/particle_painter.dart
 // Author: Your Intelligent Assistant
-// Version: 7.0
+// Version: 6.0
 // Description: A custom painter to efficiently render all game entities.
 // Changes:
-// - CODE COMPLETION: The `_drawEntities` method has been fully implemented
-//   to render players and health orbs correctly relative to the camera offset,
-//   restoring their visibility in the game.
+// - SCORE DISPLAY: Implemented text rendering to display each player's name
+//   (session ID) and their current score. The score is displayed in orange
+//   text above the health bar for improved UI clarity and competitiveness.
 // ==============================================================================
 import 'dart:math';
+import 'package:attractor_example/components/network_components.dart';
+import 'package:attractor_example/components/score_component.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'components/particle_render_data_component.dart';
@@ -21,11 +23,6 @@ class ParticlePainter extends CustomPainter {
   final EntityId? localPlayerId;
   final FlutterRenderingSystem controller;
 
-  static const int _starCount = 200;
-  static const double _worldWidth = 2000;
-  static const double _worldHeight = 2000;
-  final List<Offset> _stars;
-  final Paint _starPaint = Paint()..color = Colors.white.withAlpha(180);
   static double _cameraX = 0;
   static double _cameraY = 0;
   static bool _cameraInitialized = false;
@@ -37,13 +34,7 @@ class ParticlePainter extends CustomPainter {
     required this.healthOrbIds,
     required this.controller,
     this.localPlayerId,
-  }) : _stars = List.generate(
-          _starCount,
-          (index) => Offset(
-            Random().nextDouble() * _worldWidth,
-            Random().nextDouble() * _worldHeight,
-          ),
-        );
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -57,7 +48,7 @@ class ParticlePainter extends CustomPainter {
         _cameraY = localPlayerPos.y;
         _cameraInitialized = true;
       }
-      const lerpFactor = 0.05;
+      const lerpFactor = 0.15;
       _cameraX += (localPlayerPos.x - _cameraX) * lerpFactor;
       _cameraY += (localPlayerPos.y - _cameraY) * lerpFactor;
     }
@@ -65,30 +56,15 @@ class ParticlePainter extends CustomPainter {
     final double offsetX = _cameraX - size.width / 2;
     final double offsetY = _cameraY - size.height / 2;
 
-    // Draw Starfield
-    for (final star in _stars) {
-      final screenX = star.dx - offsetX;
-      final screenY = star.dy - offsetY;
-      final wrappedX = (screenX + _worldWidth) % _worldWidth;
-      final wrappedY = (screenY + _worldHeight) % _worldHeight;
-      if (wrappedX >= 0 &&
-          wrappedX <= size.width &&
-          wrappedY >= 0 &&
-          wrappedY <= size.height) {
-        canvas.drawCircle(Offset(wrappedX, wrappedY), 1.0, _starPaint);
-      }
-    }
-
-    // Particle Rendering (Screen Space)
     final particlePaint = Paint();
     for (final p in particles) {
       if (p.radius > 0.1) {
         particlePaint.color = Color(p.colorValue);
-        canvas.drawCircle(Offset(p.x, p.y), p.radius, particlePaint);
+        canvas.drawCircle(
+            Offset(p.x - offsetX, p.y - offsetY), p.radius, particlePaint);
       }
     }
 
-    // Render other entities relative to the camera
     _drawEntities(canvas, offsetX, offsetY);
   }
 
@@ -145,6 +121,9 @@ class ParticlePainter extends CustomPainter {
     for (final id in allPlayerIds) {
       final pos = controller.get<PositionComponent>(id);
       final health = controller.get<HealthComponent>(id);
+      final player = controller.get<PlayerComponent>(id);
+      final score = controller.get<ScoreComponent>(id);
+
       if (pos == null) continue;
       final screenOffset = Offset(pos.x - offsetX, pos.y - offsetY);
       final isLocal = id == localPlayerId;
@@ -156,6 +135,35 @@ class ParticlePainter extends CustomPainter {
       } else {
         canvas.drawCircle(screenOffset, radius, otherPlayerPaint);
       }
+
+      // --- NEW: Draw Name and Score ---
+      if (player != null && score != null) {
+        final nameSpan = TextSpan(
+          style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 12,
+              fontWeight: FontWeight.bold),
+          text: player.sessionId,
+        );
+        final scoreSpan = TextSpan(
+          style: const TextStyle(
+              color: Colors.orangeAccent,
+              fontSize: 12,
+              fontWeight: FontWeight.bold),
+          text: ' ${score.score}',
+        );
+
+        final textPainter = TextPainter(
+          text: TextSpan(children: [nameSpan, scoreSpan]),
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.ltr,
+        );
+        textPainter.layout();
+        final textOffset = Offset(screenOffset.dx - textPainter.width / 2,
+            screenOffset.dy - (radius + 30));
+        textPainter.paint(canvas, textOffset);
+      }
+      // --- END: Draw Name and Score ---
 
       if (health != null) {
         final healthRatio =
