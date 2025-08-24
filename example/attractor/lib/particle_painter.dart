@@ -48,7 +48,7 @@ class ParticlePainter extends CustomPainter {
         _cameraY = localPlayerPos.y;
         _cameraInitialized = true;
       }
-      const lerpFactor = 0.15;
+      const lerpFactor = 0.011;
       _cameraX += (localPlayerPos.x - _cameraX) * lerpFactor;
       _cameraY += (localPlayerPos.y - _cameraY) * lerpFactor;
     }
@@ -58,7 +58,7 @@ class ParticlePainter extends CustomPainter {
 
     final particlePaint = Paint();
     for (final p in particles) {
-      if (p.radius > 0.1) {
+      if (p.radius > 0.01) {
         particlePaint.color = Color(p.colorValue);
         canvas.drawCircle(
             Offset(p.x - offsetX, p.y - offsetY), p.radius, particlePaint);
