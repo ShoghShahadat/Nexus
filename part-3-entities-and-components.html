@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۳: موجودیت‌ها و کامپوننت‌ها</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Prism JS for Syntax Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            line-height: 1.8;
+        }
+        .prose h2, .prose h3 {
+            border-bottom: 2px solid #e9d5ff;
+            padding-bottom: 8px;
+            margin-top: 2em;
+            margin-bottom: 1em;
+        }
+        .prose code {
+            font-family: 'Vazirmatn', monospace;
+            background-color: #f3e8ff;
+            color: #6b21a8;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        pre[class*="language-"] {
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .callout {
+            border-right: 4px solid;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 8px 0 0 8px;
+        }
+        .callout-info {
+            background-color: #f0f9ff;
+            border-color: #38bdf8;
+        }
+        .callout-deep-dive {
+            background-color: #faf5ff;
+            border-color: #9f7aea;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <!-- Header -->
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۳: موجودیت‌ها و کامپوننت‌ها</h1>
+            <p class="text-xl text-gray-500 mt-4">آشنایی با آجرهای سازنده معماری ECS: "چیزها" (Entities) و "داده‌هایشان" (Components).</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>تفکیک هویت از داده</h2>
+                <p>
+                    در دو بخش قبل، با تصویر کلی معماری ECS و نحوه برپایی `NexusWorld` آشنا شدیم. اکنون زمان آن رسیده که به دو جزء از سه جزء اصلی این معماری یعنی <strong>Entity</strong> و <strong>Component</strong> بپردازیم. درک صحیح این دو مفهوم، کلید تسلط بر فریم‌ورک Nexus است.
+                </p>
+
+                <h3>Entity: یک شناسه خالی</h3>
+                <p>
+                    یک <strong>Entity</strong> در ساده‌ترین حالت ممکن، فقط یک <strong>شناسه (ID)</strong> منحصربه‌فرد است. همین! یک موجودیت به خودی خود هیچ داده، رفتار یا هویتی ندارد. این یک بوم خالی است که ما می‌توانیم با افزودن کامپوننت‌ها، آن را به هر چیزی که می‌خواهیم تبدیل کنیم.
+                </p>
+                <p>
+                    موجودیت‌ها توسط کلاس `EntityProvider` در هر ماژول ساخته و به `NexusWorld` اضافه می‌شوند. بیایید به یک مثال از `AppBarModule` نگاه کنیم:
+                </p>
+                <pre><code class="language-dart">
+// File: lib/src/app_bar/app_bar_module.dart
+
+class AppBarEntityProvider extends EntityProvider {
+  @override
+  void createEntities(NexusWorld world) {
+    // 1. یک موجودیت جدید و خالی ساخته می‌شود
+    final appBarEntity = Entity()
+      // 2. به آن کامپوننت اضافه می‌کنیم تا هویت بگیرد
+      ..add(TagsComponent({'app_bar'}))
+      ..add(AppBarComponent(title: 'داشبورد')) // داده اولیه
+      ..add(LifecyclePolicyComponent(isPersistent: true));
+    
+    // 3. موجودیت را به دنیا اضافه می‌کنیم
+    world.addEntity(appBarEntity);
+  }
+}
+                </code></pre>
+
+                <h3>Component: داده خالص و بدون منطق</h3>
+                <p>
+                    اگر Entity یک بوم خالی است، <strong>Component</strong> رنگ و قلم‌مویی است که ما برای نقاشی روی آن بوم استفاده می‌کنیم. یک کامپوننت، یک کلاس داده خالص است. این یعنی فقط داده دارد و هیچ منطقی برای پردازش آن داده در خود ندارد.
+                </p>
+                
+                <div class="callout callout-deep-dive">
+                    <p class="font-bold text-lg">غواصی عمیق: `AppBarComponent`</p>
+                    <p>
+                        بیایید به یک مثال واقعی از پروژه نگاه کنیم. فایل `lib/src/app_bar/app_bar_module.dart` را باز کنید.
+                    </p>
+                    <pre class="mt-4"><code class="language-dart">
+// File: lib/src/app_bar/app_bar_module.dart
+
+class AppBarComponent extends Component with SerializableComponent {
+  final String title;
+
+  AppBarComponent({required this.title});
+
+  // متد برای تبدیل به JSON
+  @override
+  Map<String, dynamic> toJson() => {'title': title};
+
+  // کانستراکتور برای ساخت از JSON
+  factory AppBarComponent.fromJson(Map<String, dynamic> json) {
+    return AppBarComponent(title: json['title']);
+  }
+
+  // برای مقایسه و بهینه‌سازی (مهم!)
+  @override
+  List<Object?> get props => [title];
+}
+                    </code></pre>
+                    <p class="mt-4">
+                        همانطور که می‌بینید، این کلاس فقط یک پراپرتی `title` دارد. وظیفه آن فقط و فقط <strong>نگهداری داده</strong> است.
+                    </p>
+                </div>
+
+                <h3>قدرت `SerializableComponent` و `EquatableMixin`</h3>
+                <p>
+                    دو `mixin` مهم در تعریف کامپوننت بالا وجود دارد:
+                </p>
+                <ul class="list-disc list-inside space-y-3 mt-4 pr-4">
+                    <li>
+                        <strong>`SerializableComponent`</strong>: این mixin کامپوننت را موظف می‌کند تا متدهای `toJson` و `fromJson` را پیاده‌سازی کند. این قابلیت برای ارتباط بین ایزولیت‌ها و ذخیره‌سازی وضعیت برنامه حیاتی است.
+                    </li>
+                    <li>
+                        <strong>`EquatableMixin`</strong> (که در کلاس `Component` پایه وجود دارد): این mixin با استفاده از `props`، مقایسه دو نمونه از کامپوننت را بر اساس مقادیر داخلی‌شان ممکن می‌سازد، نه بر اساس آدرس حافظه. این برای بهینه‌سازی عملکرد UI بسیار مهم است، زیرا فریم‌ورک می‌تواند تشخیص دهد که آیا داده واقعاً تغییر کرده است یا خیر.
+                    </li>
+                </ul>
+
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">نگاهی دیگر: `NavigationStateComponent`</p>
+                    <p>
+                        در فایل `lib/src/drawer/drawer_module.dart`، کامپوننت `NavigationStateComponent` را پیدا کنید. این کامپوننت کمی پیچیده‌تر است و لیستی از آیتم‌های منو (`items`) و شناسه آیتم انتخاب شده (`selectedItemId`) را نگهداری می‌کند. این یک مثال عالی دیگر از این است که چگونه داده‌های مربوط به یک ویژگی، در یک کامپوننت کپسوله می‌شوند.
+                    </p>
+                </div>
+
+                <h3>جمع‌بندی</h3>
+                <p>
+                    تا اینجا یاد گرفتیم:
+                </p>
+                <ul class="list-disc list-inside space-y-2 mt-4 pr-4">
+                    <li><strong>Entity</strong> یک شناسه است که با `new Entity()` ساخته می‌شود.</li>
+                    <li><strong>Component</strong> داده‌های مربوط به یک شناسه است.</li>
+                    <li>یک Entity می‌تواند چندین Component داشته باشد و هویت آن از ترکیب کامپوننت‌هایش شکل می‌گیرد.</li>
+                </ul>
+                <p>
+                    اما سوال اصلی باقی می‌ماند: چه کسی این داده‌ها را می‌خواند، پردازش می‌کند و تغییر می‌دهد؟ پاسخ این سوال در بخش بعدی نهفته است: <strong>سیستم‌ها (Systems)</strong>، مغز متفکر معماری ما.
+                </p>
+
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

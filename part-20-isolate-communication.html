@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۲۰: موضوع پیشرفته - ارتباط بین ایزولیت‌ها</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #fecaca; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #fef2f2; border-color: #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۲۰: موضوع پیشرفته - ارتباط بین ایزولیت‌ها</h1>
+            <p class="text-xl text-gray-500 mt-4">نگاهی به مکانیزم داخلی Nexus برای اجرای منطق در یک ترد جداگانه و ارتباط با ترد UI.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>جادوی پشت پرده `NexusApp`</h2>
+                <p>
+                    یکی از بزرگترین وعده‌های Nexus، عملکرد بالاست. این عملکرد از طریق اجرای تمام منطق‌های سنگین در یک <strong>ایزولیت (Isolate)</strong> جداگانه به دست می‌آید. ایزولیت‌ها در دارت، مانند تردهای (Threads) مستقل با حافظه جداگانه عمل می‌کنند. این یعنی حلقه اصلی `NexusWorld` (که تمام سیستم‌ها را اجرا می‌کند) هرگز نمی‌تواند ترد UI را مسدود (block) کند و باعث افت فریم شود.
+                </p>
+                <p>
+                    اما این جدایی حافظه، ارتباط بین دو دنیا را پیچیده می‌کند. در این بخش، ما مکانیزم این ارتباط را کالبدشکافی می‌کنیم.
+                </p>
+
+                <h3>`NexusManager`: یک اینترفیس، دو پیاده‌سازی</h3>
+                <p>
+                    `NexusWidget` مستقیماً با `NexusWorld` صحبت نمی‌کند. در عوض، با یک اینترفیس به نام `NexusManager` تعامل دارد. این اینترفیس دو پیاده‌سازی اصلی دارد:
+                </p>
+                <ul class="list-disc list-inside space-y-3 mt-4 pr-4">
+                    <li>
+                        <strong>`NexusSingleThreadManager`</strong>: در این حالت، `NexusWorld` در <strong>همان ترد UI</strong> اجرا می‌شود. این حالت برای پلتفرم وب (که از ایزولیت‌ها به خوبی پشتیبانی نمی‌کند) و برای دیباگ کردن در محیط توسعه (که hot reload اهمیت دارد) استفاده می‌شود.
+                    </li>
+                    <li>
+                        <strong>`NexusIsolateManager`</strong>: این پیاده‌سازی، `NexusWorld` را در یک ایزولیت کاملاً جدید ایجاد و اجرا می‌کند. این حالت استاندارد برای اپلیکیشن‌های production موبایل و دسکتاپ است.
+                    </li>
+                </ul>
+                <p>
+                    `NexusWidget` به طور خودکار بر اساس محیط اجرا، پیاده‌سازی مناسب را انتخاب می‌کند.
+                </p>
+
+                <h3>جریان داده از UI به منطق</h3>
+                <p>
+                    این بخش ساده‌تر است. وقتی `NexusWidget` یک رویداد از UI دریافت می‌کند (مثلاً از طریق `onTap` یک دکمه)، متد `manager.send(event)` را فراخوانی می‌کند.
+                </p>
+                <ul class="list-disc list-inside space-y-2 mt-4 pr-4">
+                    <li>در `NexusSingleThreadManager`، این متد مستقیماً `world.eventBus.fire(event)` را فراخوانی می‌کند.</li>
+                    <li>در `NexusIsolateManager`، این متد رویداد را از طریق یک `SendPort` به ایزولیت منطق ارسال می‌کند، جایی که یک `ReceivePort` به آن گوش داده و سپس `world.eventBus.fire(event)` را فراخوانی می‌کند.</li>
+                </ul>
+
+                <h3>جریان داده از منطق به UI: `RenderPacket`</h3>
+                <p>
+                    این بخش پیچیده‌تر است. از آنجایی که نمی‌توانیم رفرنس مستقیم به کامپوننت‌ها را بین ایزولیت‌ها ارسال کنیم، باید آن‌ها را سریالایز کنیم.
+                </p>
+                <ol class="list-decimal list-inside space-y-4 mt-6 pr-4">
+                    <li><strong>تشخیص تغییرات:</strong> در پایان هر فریم در ایزولیت منطق، `NexusIsolateManager` تمام موجودیت‌ها را بررسی کرده و آن‌هایی را که کامپوننت‌هایشان "کثیف" (dirty) شده‌اند (یعنی تغییر کرده‌اند)، پیدا می‌کند.</li>
+                    <li><strong>ساخت `RenderPacket`:</strong> برای هر موجودیت تغییر یافته، یک `RenderPacket` ساخته می‌شود. این بسته حاوی شناسه موجودیت و یک نقشه از نام کامپوننت‌های تغییر یافته به داده‌های JSON آن‌هاست.</li>
+                    <li><strong>ارسال به UI:</strong> لیستی از این `RenderPacket`ها از طریق `SendPort` به ترد UI ارسال می‌شود.</li>
+                    <li><strong>دریافت و به‌روزرسانی:</strong> `NexusWidget` به این بسته‌ها گوش می‌دهد و آن‌ها را به `FlutterRenderingSystem` تحویل می‌دهد.</li>
+                    <li><strong>`updateFromPackets`:</strong> متد `updateFromPackets` در `FlutterRenderingSystem` فراخوانی می‌شود. این متد بسته‌ها را پیمایش کرده، داده‌های JSON را با استفاده از `ComponentFactoryRegistry` به نمونه‌های کامپوننت تبدیل کرده و کش داخلی خود را به‌روز می‌کند.</li>
+                    <li><strong>اطلاع‌رسانی:</strong> در نهایت، `FlutterRenderingSystem` به `EntityWidgetBuilder`های مربوطه اطلاع می‌دهد که داده‌هایشان تغییر کرده و زمان بازسازی فرا رسیده است.</li>
+                </ol>
+
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">چرا این همه پیچیدگی؟</p>
+                    <p>
+                        این خط لوله ارتباطی تضمین می‌کند که اپلیکیشن شما حتی تحت بارهای سنگین منطقی، همیشه روان و پاسخگو باقی بماند. با انجام محاسبات در پس‌زمینه و ارسال داده‌های سبک و سریالایز شده به UI، ما از پتانسیل کامل پردازنده‌های چند هسته‌ای مدرن استفاده می‌کنیم.
+                    </p>
+                </div>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-19-package-structure.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: ساختار پکیج Nexus
+                    </a>
+                    <a href="./part-21-serialization-deep-dive.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: غواصی در سریال‌سازی &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

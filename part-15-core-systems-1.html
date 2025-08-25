@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۱۵: سیستم‌های هسته‌ای (بخش اول)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #bae6fd; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #f0f9ff; border-color: #38bdf8; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۱۵: سیستم‌های هسته‌ای (۱ از ۲)</h1>
+            <p class="text-xl text-gray-500 mt-4">آشنایی با سیستم‌های بنیادی که دنیای Nexus را مدیریت و نگهداری می‌کنند.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>کارگران پشت صحنه</h2>
+                <p>
+                    علاوه بر سیستم‌هایی که منطق اصلی اپلیکیشن شما را پیاده‌سازی می‌کنند، پکیج `nexus` مجموعه‌ای از سیستم‌های هسته‌ای را ارائه می‌دهد که وظایف مدیریتی و زیرساختی را بر عهده دارند. این سیستم‌ها مانند کارگران پشت صحنه یک تئاتر هستند؛ شما آن‌ها را نمی‌بینید، اما بدون آن‌ها هیچ نمایشی اجرا نمی‌شود.
+                </p>
+                <p>
+                    در این بخش، به بررسی سیستم‌هایی می‌پردازیم که مسئولیت چرخه حیات، مدیریت حافظه و زمان‌بندی را بر عهده دارند.
+                </p>
+
+                <h3>`LifecycleSystem`: اجرای `onInit` و `onDispose`</h3>
+                <p>
+                    این سیستم بسیار ساده اما حیاتی است. وظیفه آن، اجرای متدهای `onInit` و `onDispose` از `LifecycleComponent` است.
+                </p>
+                <pre><code class="language-dart">
+// از پکیج nexus
+
+class LifecycleSystem extends System {
+  @override
+  bool matches(Entity entity) {
+    return entity.has<LifecycleComponent>();
+  }
+
+  // وقتی یک موجودیت منطبق به دنیا اضافه می‌شود، onInit را فراخوانی می‌کند
+  @override
+  void onEntityAdded(Entity entity) {
+    final lifecycle = entity.get<LifecycleComponent>()!;
+    lifecycle.onInit?.call(entity);
+  }
+
+  // وقتی یک موجودیت منطبق از دنیا حذف می‌شود، onDispose را فراخوانی می‌کند
+  @override
+  void onEntityRemoved(Entity entity) {
+    final lifecycle = entity.get<LifecycleComponent>()!;
+    lifecycle.onDispose?.call(entity);
+  }
+  // ...
+}
+                </code></pre>
+                <p class="mt-4">
+                    این سیستم به شما اجازه می‌دهد تا منطق راه‌اندازی و پاک‌سازی را به خود موجودیت‌ها متصل کنید، که باعث تمیزتر شدن کد می‌شود.
+                </p>
+
+                <h3>`GarbageCollectorSystem`: جلوگیری از نشت حافظه</h3>
+                <p>
+                    این سیستم، رفتگر دنیای Nexus است. این سیستم به صورت دوره‌ای (مثلاً هر ۲ ثانیه) تمام موجودیت‌ها را بررسی می‌کند و آن‌هایی را که `LifecyclePolicyComponent` دارند، ارزیابی می‌کند.
+                </p>
+                <pre><code class="language-dart">
+// از پکیج nexus
+
+class GarbageCollectorSystem extends System {
+  // ...
+  void runGc(double dt) {
+    // ...
+    for (final entity in entitiesToCheck) {
+      final policy = entity.get<LifecyclePolicyComponent>();
+      // ...
+      // اگر موجودیت دائمی نباشد و شرط حذف آن برقرار باشد...
+      if (!policy.isPersistent && policy.destructionCondition(entity)) {
+        // ... آن را برای حذف علامت‌گذاری می‌کند
+        entitiesToRemove.add(entity.id);
+      }
+    }
+    // ...
+  }
+}
+                </code></pre>
+                <p class="mt-4">
+                    استفاده صحیح از `LifecyclePolicyComponent` به همراه این سیستم تضمین می‌کند که موجودیت‌های موقتی (مانند افکت‌های بصری، گلوله‌ها در بازی، یا آیتم‌های موقت UI) پس از پایان عمرشان به طور خودکار از حافظه پاک می‌شوند.
+                </p>
+
+                <h3>`TimerSystem`: موتور زمان‌بندی</h3>
+                <p>
+                    این سیستم، منطق `TimerComponent` را پیاده‌سازی می‌کند. در هر فریم، `TimerSystem` تمام `TimerTask`های فعال را پیدا کرده و `elapsedTime` آن‌ها را به‌روز می‌کند.
+                </p>
+                <pre><code class="language-dart">
+// از پکیج nexus
+
+class TimerSystem extends System {
+  @override
+  bool matches(Entity entity) {
+    return entity.has<TimerComponent>();
+  }
+
+  @override
+  void update(Entity entity, double dt) {
+    final timerComponent = entity.get<TimerComponent>()!;
+    // ...
+    for (final task in timerComponent.tasks) {
+      task.elapsedTime += dt;
+
+      if (task.onTickEvent != null) {
+        world.eventBus.fire(task.onTickEvent);
+      }
+
+      if (task.elapsedTime >= task.duration) {
+        // وقتی زمان تمام شد، رویداد onComplete را منتشر می‌کند
+        world.eventBus.fire(task.onCompleteEvent);
+
+        if (task.repeats) {
+          task.elapsedTime -= task.duration; // ریست برای تکرار بعدی
+        } else {
+          tasksToRemove.add(task); // علامت‌گذاری برای حذف
+        }
+      }
+    }
+    // ...
+  }
+}
+                </code></pre>
+                <p class="mt-4">
+                    همانطور که در بخش ۱۲ دیدیم، این سیستم به همراه `TimerComponent` یک ابزار فوق‌العاده قدرتمند برای ساخت انیمیشن‌ها و منطق‌های چندمرحله‌ای و زمان‌بندی شده است.
+                </p>
+
+                <h3>`PersistenceSystem`: ذخیره و بازیابی خودکار</h3>
+                <p>
+                    این سیستم با `PersistenceComponent` کار می‌کند تا فرآیند ذخیره و بازیابی داده‌ها را خودکار کند.
+                </p>
+                <ul class="list-disc list-inside space-y-2 mt-4 pr-4">
+                    <li><strong>در زمان راه‌اندازی (`init`):</strong> سیستم تمام داده‌های ذخیره شده را از `StorageAdapter` (مثلاً `SharedPreferences`) می‌خواند و موجودیت‌ها و کامپوننت‌های مربوطه را بازسازی می‌کند.</li>
+                    <li><strong>در پاسخ به `SaveDataEvent`:</strong> سیستم تمام موجودیت‌هایی را که `PersistenceComponent` دارند پیدا کرده، کامپوننت‌های سریالایزبل آن‌ها را به JSON تبدیل کرده و در حافظه دائمی ذخیره می‌کند.</li>
+                </ul>
+                <p>
+                    این سیستم شما را از نوشتن کدهای تکراری برای ذخیره و بازیابی داده‌ها بی‌نیاز می‌کند و به شما اجازه می‌دهد تا با افزودن یک کامپوننت، ماندگاری را به هر موجودیتی اضافه کنید.
+                </p>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-14-core-components-2.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: کامپوننت‌های داده و وضعیت
+                    </a>
+                    <a href="./part-16-core-systems-2.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: سیستم‌های منطق و تعامل &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

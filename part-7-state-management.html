@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۷: الگوهای مدیریت وضعیت</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #c7d2fe; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #eff6ff; border-color: #60a5fa; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۷: الگوهای مدیریت وضعیت</h1>
+            <p class="text-xl text-gray-500 mt-4">بررسی الگوهای پیشرفته برای مدیریت وضعیت‌های پیچیده UI، با تمرکز بر صفحه پروفایل.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>فراتر از داده‌های ساده</h2>
+                <p>
+                    تا کنون، ما با کامپوننت‌هایی کار کرده‌ایم که داده‌های نسبتاً ساده‌ای را نگهداری می‌کردند (مانند یک `String` برای عنوان). اما در دنیای واقعی، وضعیت‌ها اغلب پیچیده‌تر هستند. یک صفحه ممکن است در حالت‌های مختلفی مانند "در حال بارگذاری"، "موفق"، "خطا" یا "بیکار" باشد. مدیریت این وضعیت‌ها به روشی تمیز و قابل پیش‌بینی، برای ساخت یک تجربه کاربری خوب ضروری است.
+                </p>
+                <p>
+                    در این بخش، ما به سراغ `ProfileModule` می‌رویم تا ببینیم چگونه Nexus این چالش را با استفاده از الگوی <strong>ماشین وضعیت (State Machine)</strong> حل می‌کند.
+                </p>
+
+                <h3>صفحه پروفایل: یک مثال عالی از ماشین وضعیت</h3>
+                <p>
+                    صفحه پروفایل در اپلیکیشن ما می‌تواند در چهار وضعیت مجزا قرار داشته باشد:
+                </p>
+                <ol class="list-decimal list-inside space-y-2 mt-4 pr-4">
+                    <li><strong>Idle (بیکار):</strong> حالت اولیه، که در آن یک دکمه برای شروع دریافت اطلاعات نمایش داده می‌شود.</li>
+                    <li><strong>Loading (در حال بارگذاری):</strong> پس از کلیک روی دکمه، یک نشانگر چرخان نمایش داده می‌شود.</li>
+                    <li><strong>Success (موفق):</strong> در صورت دریافت موفق اطلاعات، پروفایل کاربر نمایش داده می‌شود.</li>
+                    <li><strong>Error (خطا):</strong> در صورت بروز مشکل، یک پیام خطا به همراه دکمه تلاش مجدد نمایش داده می‌شود.</li>
+                </ol>
+                <p>
+                    برای مدل‌سازی این وضعیت‌ها، ما از یک کامپوننت داده به نام `ApiStatusComponent` استفاده می‌کنیم.
+                </p>
+                <pre><code class="language-dart">
+// File: lib/src/shared/shared_module.dart (بخشی از پکیج اصلی nexus)
+
+enum ApiStatus { idle, loading, success, error }
+
+class ApiStatusComponent extends Component with SerializableComponent {
+  final ApiStatus status;
+  final String? errorMessage;
+
+  // ... toJson, fromJson, props
+}
+                </code></pre>
+                <p class="mt-4">
+                    این کامپوننت به تنهایی وضعیت فعلی را توصیف می‌کند. یک موجودیت (`profile_page`) این کامپوننت را خواهد داشت و مقدار `status` آن، وضعیت کلی صفحه را تعیین می‌کند.
+                </p>
+
+                <h3>`ProfileSystem`: منطق تغییر وضعیت</h3>
+                <p>
+                    کلاس `ProfileSystem` مسئول مدیریت منطق و تغییر وضعیت‌هاست. این سیستم به رویداد `FetchProfileDataEvent` گوش می‌دهد.
+                </p>
+                <pre><code class="language-dart">
+// File: lib/src/profile/profile_module.dart
+
+class ProfileSystem extends System {
+  // ...
+  @override
+  void onAddedToWorld(NexusWorld world) {
+    super.onAddedToWorld(world);
+    listen<FetchProfileDataEvent>(_onFetchProfile);
+  }
+
+  void _onFetchProfile(FetchProfileDataEvent event) async {
+    final profileEntity = /* ... پیدا کردن موجودیت پروفایل ... */;
+
+    // 1. تغییر وضعیت به Loading
+    profileEntity.add(ApiStatusComponent(status: ApiStatus.loading));
+    
+    // 2. شبیه‌سازی تماس با API
+    await Future.delayed(Duration(milliseconds: 1500));
+
+    // 3. شبیه‌سازی نتیجه موفق یا ناموفق
+    if (Random().nextBool()) {
+      // SUCCESS: افزودن داده و تغییر وضعیت به Success
+      profileEntity.add(ProfileDataComponent(...));
+      profileEntity.add(ApiStatusComponent(status: ApiStatus.success));
+    } else {
+      // FAILURE: تغییر وضعیت به Error
+      profileEntity.add(ApiStatusComponent(
+        status: ApiStatus.error,
+        errorMessage: "خطا در برقراری ارتباط با سرور.",
+      ));
+    }
+  }
+}
+                </code></pre>
+                
+                <h3>`StateWidgetAssembler`: انتخاب بیلدر مناسب در UI</h3>
+                <p>
+                    حالا که منطق و داده وضعیت را داریم، چگونه به UI بگوییم که برای هر وضعیت، ویجت متفاوتی را رندر کند؟ پاسخ در یک نوع بیلدر خاص به نام `StateWidgetAssembler` نهفته است.
+                </p>
+                <p>
+                    در فایل `main.dart`، ما این اسمبلر را به این صورت پیکربندی می‌کنیم:
+                </p>
+                <pre><code class="language-dart">
+// File: lib/main.dart
+
+final profilePanelBuilder = StateWidgetAssembler<ApiStatusComponent>(
+  builderProvider: (apiStatusComponent) {
+    // 1. وضعیت فعلی را از کامپوننت می‌خواند
+    final status = apiStatusComponent?.status ?? ApiStatus.idle;
+    
+    // 2. بر اساس وضعیت، بیلدر مناسب را برمی‌گرداند
+    switch (status) {
+      case ApiStatus.loading:
+        return ProfileLoadingStateBuilder();
+      case ApiStatus.success:
+        return ProfileSuccessStateBuilder();
+      case ApiStatus.error:
+        return ProfileErrorStateBuilder();
+      case ApiStatus.idle:
+        return ProfileIdleStateBuilder();
+    }
+  },
+);
+                </code></pre>
+                <p class="mt-4">
+                    این کد به زیبایی منطق نمایش را از منطق وضعیت جدا می‌کند. `StateWidgetAssembler` به طور خودکار به تغییرات `ApiStatusComponent` گوش می‌دهد و هر بار که وضعیت تغییر می‌کند، تابع `builderProvider` را دوباره اجرا کرده و بیلدر جدید را برای رندر کردن انتخاب می‌کند. هر کدام از این `...StateBuilder` ها یک `IWidgetBuilder` هستند که فقط مسئول رندر کردن یک وضعیت خاص می‌باشند.
+                </p>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-6-event-bus.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: گذرگاه رویداد
+                    </a>
+                    <a href="#" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-400 bg-gray-200 border border-transparent rounded-lg cursor-not-allowed">
+                        بخش بعد (به زودی) &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

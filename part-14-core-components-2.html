@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۱۴: کامپوننت‌های هسته‌ای (بخش دوم)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #bae6fd; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #f0f9ff; border-color: #38bdf8; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۱۴: کامپوننت‌های هسته‌ای (۲ از ۲)</h1>
+            <p class="text-xl text-gray-500 mt-4">بررسی کامپوننت‌های پیشرفته برای مدیریت وضعیت، داده‌های پویا و ماندگاری.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>مدیریت داده و وضعیت‌های پیچیده</h2>
+                <p>
+                    در بخش قبل با کامپوننت‌های ساختاری آشنا شدیم. در این بخش، به سراغ کامپوننت‌هایی می‌رویم که برای مدیریت داده‌های پیچیده، وضعیت‌های برنامه و ذخیره‌سازی اطلاعات طراحی شده‌اند. این ابزارها به شما کمک می‌کنند تا منطق‌های سطح بالاتر را به روشی تمیز و داده-محور پیاده‌سازی کنید.
+                </p>
+
+                <h3>`ApiStatusComponent`: مدیریت وضعیت درخواست‌های شبکه</h3>
+                <p>
+                    این کامپوننت که قبلاً در بخش ۷ با آن آشنا شدیم، یک ماشین وضعیت ساده برای عملیات آسنکرون (مانند تماس با API) فراهم می‌کند. این کامپوننت به جای استفاده از چندین متغیر `bool` مانند `isLoading` و `hasError`، وضعیت را در یک `enum` تمیز و قابل مدیریت نگهداری می‌کند.
+                </p>
+                <pre><code class="language-dart">
+// از پکیج nexus
+
+enum ApiStatus { idle, loading, success, error }
+
+class ApiStatusComponent extends Component with SerializableComponent {
+  final ApiStatus status;
+  final String? errorMessage;
+  final int? statusCode;
+  // ...
+}
+
+// نحوه استفاده در یک سیستم:
+void _onFetchData(FetchDataEvent event) {
+  final entity = world.entities[event.entityId]!;
+  entity.add(ApiStatusComponent(status: ApiStatus.loading));
+  
+  try {
+    // ... call api ...
+    entity.add(ApiStatusComponent(status: ApiStatus.success));
+  } catch(e) {
+    entity.add(ApiStatusComponent(status: ApiStatus.error, errorMessage: e.toString()));
+  }
+}
+                </code></pre>
+
+                <h3>`BlackboardComponent`: حافظه پویا برای موجودیت‌ها</h3>
+                <p>
+                    گاهی اوقات شما نیاز دارید داده‌هایی را به یک موجودیت اضافه کنید بدون اینکه بخواهید برای هر فیلد کوچک یک کامپوننت جدید تعریف کنید. `BlackboardComponent` یک راه‌حل عالی برای این مشکل است. این کامپوننت یک `Map<String, dynamic>` را در خود نگه می‌دارد و به عنوان یک "تخته سیاه" یا حافظه موقت برای یک موجودیت عمل می‌کند.
+                </p>
+                <pre><code class="language-dart">
+// از پکیج nexus
+
+class BlackboardComponent extends Component with SerializableComponent {
+  // ...
+  T? get<T>(String key);
+  void set(String key, dynamic value);
+  bool has(String key);
+  void increment(String key, [num amount = 1]);
+}
+
+// نحوه استفاده:
+final playerEntity = Entity()
+  ..add(BlackboardComponent({
+    'score': 0,
+    'last_login': '2025-08-25'
+  }));
+
+// در یک سیستم:
+final blackboard = playerEntity.get<BlackboardComponent>()!;
+blackboard.increment('score', 10); // score becomes 10
+playerEntity.add(blackboard); // Re-add to notify changes
+                </code></pre>
+                <p class="mt-4">
+                    این کامپوننت برای هوش مصنوعی، مدیریت وضعیت‌های پیچیده UI، یا هر جایی که نیاز به ذخیره داده‌های ساختارنیافته دارید، بسیار مفید است.
+                </p>
+
+                <h3>`HistoryComponent`: قابلیت Undo/Redo</h3>
+                <p>
+                    این کامپوننت یک راه‌حل آماده برای پیاده‌سازی قابلیت‌های بازگشت به عقب (Undo) و جلو (Redo) فراهم می‌کند. `HistorySystem` به طور خودکار تغییرات کامپوننت‌های مشخص شده را ردیابی کرده و تاریخچه‌ای از وضعیت آن‌ها را در این کامپوننت ذخیره می‌کند.
+                </p>
+                <pre><code class="language-dart">
+// از پکیج nexus
+
+class HistoryComponent extends Component with SerializableComponent {
+  final List<Map<String, Map<String, dynamic>>> history;
+  final int currentIndex;
+  final Set<String> trackedComponents; // نام کامپوننت‌هایی که باید ردیابی شوند
+  // ...
+  bool get canUndo => currentIndex > 0;
+  bool get canRedo => currentIndex < history.length - 1;
+}
+
+// نحوه استفاده:
+final editorEntity = Entity()
+  ..add(TextContentComponent("Hello"))
+  ..add(HistoryComponent(
+    trackedComponents: {'TextContentComponent'},
+  ));
+
+// برای انجام undo:
+world.eventBus.fire(UndoEvent(editorEntity.id));
+                </code></pre>
+                
+                <h3>`PersistenceComponent`: ماندگاری داده‌ها</h3>
+                <p>
+                    این کامپوننت یک نشانگر است که به `PersistenceSystem` می‌گوید که این موجودیت باید در حافظه دائمی (مانند `SharedPreferences`) ذخیره شود.
+                </p>
+                <pre><code class="language-dart">
+// از پکیج nexus
+
+class PersistenceComponent extends Component with SerializableComponent {
+  final String storageKey; // کلید منحصر به فرد برای ذخیره‌سازی
+}
+
+// نحوه استفاده:
+final settingsEntity = Entity()
+  ..add(ThemeSettingsComponent(isDarkMode: true))
+  ..add(PersistenceComponent('app_settings'));
+                </code></pre>
+                <p class="mt-4">
+                    وقتی `PersistenceSystem` فعال باشد، به طور خودکار تمام کامپوننت‌های `Serializable` موجودیت `settingsEntity` را با کلید `app_settings` ذخیره کرده و در اجرای بعدی برنامه، آن‌ها را بارگذاری می‌کند. این یک راه بسیار ساده و قدرتمند برای ذخیره تنظیمات کاربر، پیشرفت بازی و سایر داده‌های ماندگار است.
+                </p>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-13-core-components-1.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: کامپوننت‌های ساختاری
+                    </a>
+                    <a href="./part-15-core-systems-1.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: سیستم‌های مدیریت دنیا &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

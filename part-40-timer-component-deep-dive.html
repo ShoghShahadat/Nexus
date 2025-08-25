@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۴۰: غواصی عمیق در TimerComponent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #fca5a5; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #fee2e2; color: #b91c1c; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #fef2f2; border-color: #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۴۰: غواصی عمیق در TimerComponent</h1>
+            <p class="text-xl text-gray-500 mt-4">چگونه منطق‌های زمان‌بندی شده را به صورت اعلامی و جدا از سیستم‌های دیگر مدیریت کنیم.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>فلسفه وجودی: جداسازی منطق از زمان</h2>
+                <p>
+                    در بسیاری از معماری‌ها، منطق‌های زمان‌بندی شده (مانند "بعد از ۵ ثانیه این کار را انجام بده") مستقیماً در دل متدهای دیگر با استفاده از `Future.delayed` یا `Timer.periodic` پیاده‌سازی می‌شوند. این کار، منطق اصلی را با دغدغه‌های زمان‌بندی مخلوط کرده و تست‌پذیری را دشوار می‌سازد.
+                </p>
+                <p>
+                    فلسفه Nexus این است که "زمان‌بندی" خود یک داده است. `TimerComponent` به شما اجازه می‌دهد تا یک "درخواست زمان‌بندی" را به عنوان داده به یک موجودیت اضافه کنید. سپس `TimerSystem`، که یک سیستم عمومی و کاملاً جداست، مسئولیت اجرای این زمان‌بندی را بر عهده می‌گیرد.
+                </p>
+
+                <h3>کالبدشکافی `TimerComponent` و `TimerTask`</h3>
+                <p>
+                    `TimerComponent` یک نگهدارنده برای لیستی از `TimerTask`ها است. هر `TimerTask` یک عملیات زمان‌بندی شده را تعریف می‌کند.
+                </p>
+                <pre><code class="language-dart">
+// از پکیج nexus
+
+class TimerTask with EquatableMixin {
+  final String id; // شناسه یکتا برای این تسک
+  final double duration; // مدت زمان به ثانیه
+  final bool repeats; // آیا باید تکرار شود؟
+  
+  // رویدادی که در هر فریم تا زمان اتمام تسک، منتشر می‌شود
+  final dynamic onTickEvent; 
+  
+  // رویدادی که دقیقاً پس از اتمام زمان، منتشر می‌شود
+  final dynamic onCompleteEvent; 
+  
+  double elapsedTime = 0.0; // زمان سپری شده، توسط TimerSystem مدیریت می‌شود
+}
+
+class TimerComponent extends Component {
+  final List<TimerTask> tasks;
+}
+                </code></pre>
+                <p class="mt-4">
+                    این ساختار به شما اجازه می‌دهد تا چندین عملیات زمان‌بندی شده را به صورت همزمان روی یک موجودیت مدیریت کنید.
+                </p>
+
+                <h3>`TimerSystem`: موتور زمان</h3>
+                <p>
+                    `TimerSystem` یک سیستم مبتنی بر حلقه `update` است که در هر فریم، تمام موجودیت‌های دارای `TimerComponent` را پیدا می‌کند. سپس برای هر `TimerTask`:
+                </p>
+                <ol class="list-decimal list-inside space-y-3 mt-4 pr-4">
+                    <li>مقدار `dt` را به `elapsedTime` اضافه می‌کند.</li>
+                    <li>اگر `onTickEvent` تعریف شده باشد، آن را در `EventBus` منتشر می‌کند.</li>
+                    <li>اگر `elapsedTime` از `duration` بیشتر یا مساوی شود:
+                        <ul>
+                            <li>رویداد `onCompleteEvent` را در `EventBus` منتشر می‌کند.</li>
+                            <li>اگر `repeats` برابر `true` باشد، `elapsedTime` را ریست می‌کند.</li>
+                            <li>در غیر این صورت، تسک را از لیست حذف می‌کند.</li>
+                        </ul>
+                    </li>
+                    <li>اگر لیست تسک‌ها خالی شود، کل `TimerComponent` را از موجودیت حذف می‌کند.</li>
+                </ol>
+
+                <h4>مثال: ماشین وضعیت انیمیشن دکمه</h4>
+                <p>
+                    این الگو همان چیزی است که در بخش ۱۲ برای انیمیشن چندمرحله‌ای دکمه‌ها استفاده کردیم. هر مرحله از انیمیشن، با افزودن یک `TimerTask` جدید، گذار به مرحله بعدی را زمان‌بندی می‌کرد.
+                </p>
+                <pre><code class="language-dart">
+// در ButtonInteractionSystem
+
+void _onShowStatus(ShowStatusEvent event) {
+  final entity = world.entities[event.entityId]!;
+  
+  // ... منطق نمایش وضعیت ...
+
+  final timerComp = entity.get<TimerComponent>()!;
+  timerComp.tasks.clear();
+  timerComp.tasks.add(TimerTask(
+    id: 'status_to_random',
+    duration: 1.5,
+    // پس از ۱.۵ ثانیه، این رویداد را برای رفتن به مرحله بعد منتشر کن
+    onCompleteEvent: RandomizeStateEvent(entity.id),
+  ));
+  entity.add(timerComp);
+}
+                </code></pre>
+
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">مقایسه با `Future.delayed`</p>
+                    <p>
+                        استفاده از `TimerComponent` به جای `Future.delayed` چندین مزیت دارد:
+                    </p>
+                    <ul class="list-disc list-inside space-y-2 mt-2 pr-4">
+                        <li><strong>وابستگی به حلقه بازی:</strong> تایمرها با حلقه بازی `NexusWorld` همگام هستند. اگر بازی متوقف (pause) شود، تایمرها نیز متوقف می‌شوند. `Future.delayed` مستقل از حلقه بازی کار می‌کند.</li>
+                        <li><strong>داده-محور و قابل بازرسی:</strong> شما می‌توانید با مشاهده `TimerComponent` یک موجودیت، دقیقاً ببینید چه تسک‌هایی در صف اجرا هستند و چقدر از زمانشان سپری شده است. این کار دیباگ کردن را بسیار آسان می‌کند.</li>
+                        <li><strong>تست‌پذیری:</strong> شما می‌توانید `TimerSystem` را در تست‌ها با یک نسخه شبیه‌سازی شده جایگزین کنید تا زمان را به صورت دستی کنترل کرده و گذار بین حالت‌ها را به راحتی تست نمایید.</li>
+                    </ul>
+                </div>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-39-nexus-philosophy.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: فلسفه Nexus
+                    </a>
+                    <a href="./part-41-network-components-deep-dive.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: کامپوننت‌های شبکه &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

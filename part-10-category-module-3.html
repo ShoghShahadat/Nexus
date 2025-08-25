@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۱۰: مثال عملی - ماژول دسته‌بندی (بخش سوم)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #fbcfe8; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #fce7f3; color: #be185d; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #fef2f2; border-color: #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۱۰: مثال عملی - ماژول دسته‌بندی (۳ از ۴)</h1>
+            <p class="text-xl text-gray-500 mt-4">پیاده‌سازی منطق ساخت و ویرایش داده‌ها در `CategorySystem`.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>جان بخشیدن به تعاملات</h2>
+                <p>
+                    در بخش قبل، دیدیم که چگونه لایه UI رویدادهای `CreateCategoryEvent` و `UpdateCategoryEvent` را به دنیای منطق ارسال می‌کند. اکنون، به سراغ `CategorySystem` می‌رویم تا ببینیم این سیستم چگونه به این رویدادها واکنش نشان می‌دهد و وضعیت دنیای ما را تغییر می‌دهد.
+                </p>
+
+                <h3>گوش دادن به رویدادها در `CategorySystem`</h3>
+                <p>
+                    مانند هر سیستم رویداد-محور دیگری، `CategorySystem` در متد `onAddedToWorld` خود، شنونده‌های لازم را برای رویدادهای مورد نظرش ثبت می‌کند.
+                </p>
+                <pre><code class="language-dart">
+// File: lib/src/category/category_module.dart
+
+class CategorySystem extends System {
+  @override
+  void onAddedToWorld(NexusWorld world) {
+    super.onAddedToWorld(world);
+    // ثبت شنونده برای رویدادهای مختلف
+    listen<CreateCategoryEvent>(_onCreate);
+    listen<UpdateCategoryEvent>(_onUpdate);
+    listen<StartEditCategoryEvent>(_onStartEdit);
+    listen<CancelEditCategoryEvent>(_onCancelEdit);
+    listen<SwipeActionEvent>(_onSwipe); // در بخش بعد بررسی می‌شود
+  }
+  // ...
+}
+                </code></pre>
+
+                <h3>پیاده‌سازی منطق ساخت (Create)</h3>
+                <p>
+                    متد `_onCreate` مسئولیت رسیدگی به رویداد `CreateCategoryEvent` را بر عهده دارد. این متد چندین کار مهم انجام می‌دهد:
+                </p>
+                <pre><code class="language-dart">
+// File: lib/src/category/category_module.dart -> class CategorySystem
+
+void _onCreate(CreateCategoryEvent event) {
+  // 1. یک موجودیت جدید برای آیتم می‌سازد
+  final newItem = Entity()
+    ..add(CategoryItemComponent(
+      id: DateTime.now().millisecondsSinceEpoch.toString(), // شناسه یکتا
+      name: event.name,
+      description: event.description,
+    ))
+    ..add(LifecyclePolicyComponent(isPersistent: true));
+  world.addEntity(newItem); // موجودیت را به دنیا اضافه می‌کند
+
+  // 2. موجودیت مدیر لیست را پیدا می‌کند
+  final listManagerEntity = /* ... */;
+  final listComp = listManagerEntity.get<ListComponent>()!;
+
+  // 3. شناسه آیتم جدید را به لیست allItems اضافه می‌کند
+  final updatedList = List<EntityId>.from(listComp.allItems)..add(newItem.id);
+
+  // 4. کامپوننت لیست را با لیست جدید به‌روزرسانی می‌کند
+  listManagerEntity.add(ListComponent(
+    listId: listComp.listId,
+    allItems: updatedList,
+    visibleItems: listComp.visibleItems, // فعلاً لیست قابل مشاهده را دست نمی‌زنیم
+  ));
+  
+  // 5. یک رویداد برای باز-محاسبه لیست قابل مشاهده ارسال می‌کند
+  world.eventBus.fire(
+      UpdateListFilterEvent(listId: listComp.listId, filterCriteria: {}));
+}
+                </code></pre>
+                <p class="mt-4">
+                    این جریان بسیار مهم است. سیستم مستقیماً `visibleItems` را تغییر نمی‌دهد. در عوض، با به‌روزرسانی `allItems` و سپس ارسال یک رویداد، مسئولیت باز-محاسبه لیست قابل مشاهده را به `ListStateSystem` واگذار می‌کند. این کار باعث می‌شود که منطق فیلتر، جستجو و مرتب‌سازی در یک مکان متمرکز باقی بماند.
+                </p>
+
+                <h3>پیاده‌سازی منطق ویرایش (Update)</h3>
+                <p>
+                    منطق ویرایش بسیار ساده‌تر است. متد `_onUpdate` رویداد `UpdateCategoryEvent` را دریافت می‌کند که حاوی شناسه موجودیت مورد نظر و داده‌های جدید است.
+                </p>
+                <pre><code class="language-dart">
+// File: lib/src/category/category_module.dart -> class CategorySystem
+
+void _onUpdate(UpdateCategoryEvent event) {
+  // 1. موجودیت را با استفاده از شناسه پیدا می‌کند
+  final itemEntity = world.entities[event.entityId];
+  if (itemEntity == null) return;
+
+  final currentItem = itemEntity.get<CategoryItemComponent>()!;
+  
+  // 2. یک نمونه جدید از کامپوننت را با داده‌های به‌روز شده اضافه می‌کند
+  // این کار به طور خودکار جایگزین کامپوننت قبلی می‌شود
+  itemEntity.add(CategoryItemComponent(
+    id: currentItem.id, // شناسه ثابت باقی می‌ماند
+    name: event.newName,
+    description: event.newDescription,
+  ));
+  
+  // 3. کامپوننت نشانگر "در حال ویرایش" را حذف می‌کند (اگر وجود داشته باشد)
+  itemEntity.remove<EditingCategoryComponent>();
+}
+                </code></pre>
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">به‌روزرسانی کامپوننت‌ها</p>
+                    <p>
+                        در Nexus، برای به‌روزرسانی یک کامپوننت، شما یک نمونه جدید از آن را با داده‌های جدید می‌سازید و به موجودیت `add` می‌کنید. فریم‌ورک به طور خودکار تشخیص می‌دهد که یک کامپوننت از همان نوع از قبل وجود دارد و آن را با نمونه جدید جایگزین می‌کند. این رویکرد به حفظ تغییرناپذیری (immutability) داده‌ها کمک می‌کند.
+                    </p>
+                </div>
+                <p>
+                    اکنون اپلیکیشن ما قابلیت خواندن، ساخت و ویرایش دسته‌بندی‌ها را دارد. در بخش نهایی این مجموعه، به سراغ منطق حذف آیتم‌ها با استفاده از ویجت `Dismissible` و انیمیشن‌های خروج خواهیم رفت.
+                </p>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-9-category-module-2.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: رندر کردن UI
+                    </a>
+                    <a href="./part-11-category-module-4.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: حذف و تعاملات &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

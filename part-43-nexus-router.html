@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۴۳: ادغام با GoRouter با پکیج nexus_router</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #a5b4fc; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #eef2ff; border-color: #6366f1; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۴۳: ادغام با GoRouter با پکیج nexus_router</h1>
+            <p class="text-xl text-gray-500 mt-4">چگونه برای هر صفحه، یک دنیای Nexus مستقل داشته باشیم و ناوبری را به صورت تمیز مدیریت کنیم.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>هر صفحه، یک دنیا</h2>
+                <p>
+                    در اپلیکیشن‌های تک-صفحه‌ای (Single Page Applications) مانند `nexus_layout_kit`، ما یک `NexusWorld` برای کل برنامه داریم. اما در بسیاری از اپلیکیشن‌ها، هر صفحه (route) منطق و وضعیت کاملاً مستقلی دارد. مدیریت تمام این منطق‌ها در یک دنیای واحد می‌تواند منجر به پیچیدگی شود.
+                </p>
+                <p>
+                    یک الگوی قدرتمند، در نظر گرفتن هر صفحه به عنوان یک "صحنه" یا "دنیای" Nexus مستقل است. پکیج `nexus_router` یک ابزار کمکی است که این الگو را با استفاده از پکیج محبوب `go_router` بسیار ساده می‌کند.
+                </p>
+                
+                <h3>فلسفه وجودی `NexusRoute`</h3>
+                <p>
+                    `NexusRoute` یک کلاس است که از `GoRoute` ارث‌بری می‌کند. این کلاس، تمام boilerplate مربوط به راه‌اندازی یک `NexusWidget` برای یک روت خاص را در خود کپسوله می‌کند. شما به جای تعریف یک `builder` پیچیده، فقط دو تابع اصلی را ارائه می‌دهید:
+                </p>
+                <ul class="list-disc list-inside space-y-3 mt-4 pr-4">
+                    <li><strong>`worldProvider`</strong>: تابعی که دنیای Nexus مخصوص این صفحه را می‌سازد. این تابع در ایزولیت منطق اجرا می‌شود.</li>
+                    <li><strong>`renderingSystemBuilder`</strong>: تابعی که سیستم رندرینگ مخصوص این صفحه را می‌سازد. این تابع در ترد UI اجرا می‌شود.</li>
+                </ul>
+
+                <h4>مثال عملی: اپلیکیشن با دو صفحه</h4>
+                <p>
+                    تصور کنید اپلیکیشنی با دو صفحه داریم: یک صفحه اصلی و یک صفحه بازی.
+                </p>
+                <pre><code class="language-dart">
+// router.dart
+
+import 'package:go_router/go_router.dart';
+import 'package:nexus_router/nexus_router.dart';
+
+// دنیای مربوط به صفحه اصلی
+NexusWorld createHomeWorld() {
+  final world = NexusWorld();
+  world.loadModule(HomeModule());
+  return world;
+}
+
+// دنیای مربوط به صفحه بازی
+NexusWorld createGameWorld() {
+  final world = NexusWorld();
+  world.loadModule(GameModule());
+  return world;
+}
+
+final router = GoRouter(
+  routes: [
+    // روت صفحه اصلی
+    NexusRoute(
+      path: '/',
+      worldProvider: createHomeWorld,
+      renderingSystemBuilder: (context) => HomeRenderingSystem(),
+    ),
+    // روت صفحه بازی
+    NexusRoute(
+      path: '/game',
+      worldProvider: createGameWorld,
+      renderingSystemBuilder: (context) => GameRenderingSystem(),
+    ),
+  ],
+);
+                </code></pre>
+                <p class="mt-4">
+                    به همین سادگی! وقتی کاربر به آدرس `/game` می‌رود، `NexusRoute` به طور خودکار:
+                </p>
+                <ol class="list-decimal list-inside space-y-2 mt-4 pr-4">
+                    <li>یک `NexusWidget` جدید می‌سازد.</li>
+                    <li>یک ایزولیت جدید برای `gameWorld` ایجاد می‌کند.</li>
+                    <li>`GameRenderingSystem` را به آن متصل می‌کند.</li>
+                </ol>
+                <p>
+                    و مهم‌تر از همه، وقتی کاربر از این صفحه خارج می‌شود، `NexusWidget` از بین رفته و متد `dispose` آن فراخوانی می‌شود، که به طور خودکار <strong>کل `gameWorld` و ایزولیت آن را از حافظه پاک می‌کند.</strong>
+                </p>
+
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">مزایای این الگو</p>
+                    <ul class="list-disc list-inside space-y-2 mt-2 pr-4">
+                        <li><strong>ایزولاسیون کامل صفحات:</strong> منطق و وضعیت هر صفحه کاملاً از صفحات دیگر جداست. یک کرش در دنیای بازی، هیچ تأثیری بر صفحه اصلی ندارد.</li>
+                        <li><strong>مدیریت خودکار حافظه:</strong> شما نگران پاک کردن وضعیت یک صفحه پس از خروج از آن نیستید. `NexusRoute` این کار را به صورت خودکار انجام می‌دهد.</li>
+                        <li><strong>کد تمیز و اعلامی:</strong> تعریف روت‌ها بسیار خوانا و ساده می‌شود. شما فقط "چه چیزی" (کدام دنیا و کدام سیستم رندرینگ) را مشخص می‌کنید، نه "چگونه" (نحوه ساخت ویجت و مدیریت ایزولیت).</li>
+                    </ul>
+                </div>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-42-binary-serialization-deep-dive.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: غواصی در سریال‌سازی باینری
+                    </a>
+                    <a href="./part-44-remaining-components.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: بررسی کامپوننت‌های باقی‌مانده &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۱۷: بازنگری خط لوله رندرینگ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #c7d2fe; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #eff6ff; border-color: #60a5fa; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۱۷: بازنگری خط لوله رندرینگ</h1>
+            <p class="text-xl text-gray-500 mt-4">نگاهی عمیق‌تر به نحوه ساخت UI از پایه و ترکیب بیلدرها در `nexus_layout_kit`.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>از `NexusApp` تا پیکسل‌ها</h2>
+                <p>
+                    در بخش ۵، ما یک نمای کلی از پل میان منطق و UI را دیدیم. در این بخش، ما به فایل `main.dart` پروژه `nexus_layout_kit` بازمی‌گردیم تا این خط لوله را به صورت عملی و با جزئیات بیشتری بررسی کنیم. هدف این است که بفهمیم چگونه یک ساختار درختی از ویجت‌ها با استفاده از بیلدرهای ماژولار ساخته می‌شود.
+                </p>
+                
+                <h3>نقطه شروع: `NexusApp` و `rootBuilder`</h3>
+                <p>
+                    همه چیز از ویجت `NexusApp` شروع می‌شود. ما قبلاً با پراپرتی `worldProvider` آن آشنا شدیم. پراپرتی کلیدی دیگر، `rootBuilder` است. این پراپرتی، اولین `IWidgetBuilder` در زنجیره رندرینگ را مشخص می‌کند. این بیلدر مسئول ساخت ویجت ریشه اپلیکیشن، یعنی `Scaffold`، است.
+                </p>
+                <pre><code class="language-dart">
+// File: lib/main.dart
+
+return NexusApp(
+  worldProvider: worldProvider,
+  rootBuilder: scaffoldBuilder, // نقطه شروع رندرینگ UI
+  theme: ThemeData(...),
+);
+                </code></pre>
+
+                <h3>`ScaffoldBuilder`: اسکلت اصلی UI</h3>
+                <p>
+                    متغیر `scaffoldBuilder` یک نمونه از کلاس `ScaffoldBuilder` است. این کلاس یک `IWidgetBuilder` است که مسئولیت ساخت `Scaffold` و ترکیب بخش‌های اصلی UI (AppBar, Drawer, Body) را بر عهده دارد.
+                </p>
+                <pre><code class="language-dart">
+// File: lib/main.dart
+
+final scaffoldBuilder = ScaffoldBuilder(
+  appBarBuilder: AppBarBuilder(),
+  appBarEntityTag: BuilderTags.appBar, // تگ برای پیدا کردن موجودیت AppBar
+  
+  drawerBuilder: NavigationPanelBuilder(),
+  drawerEntityTag: BuilderTags.navigationPanel, // تگ برای پیدا کردن موجودیت منو
+  
+  bodyBuilder: bodyBuilder, // یک بیلدر دیگر که در ادامه می‌بینیم
+  bodyEntityTag: BuilderTags.body, // تگ برای پیدا کردن موجودیت بدنه
+);
+                </code></pre>
+                <p class="mt-4">
+                    `ScaffoldBuilder` در متد `build` خود، با استفاده از تگ‌های ارائه شده، شناسه‌های موجودیت‌های مربوط به AppBar، Drawer و Body را از `FlutterRenderingSystem` پیدا می‌کند. سپس، بیلدر مربوط به هر بخش را فراخوانی کرده و ویجت‌های خروجی آن‌ها را در مکان‌های مناسب `Scaffold` قرار می‌دهد.
+                </p>
+
+                <h3>`BodyBuilder`: ترکیب محتوای پویا</h3>
+                <p>
+                    جذاب‌ترین بخش این ساختار، `bodyBuilder` است. این بیلدر خود یک ترکیب‌کننده است. `BodyBuilder` مسئولیت دارد که بر اساس وضعیت فعلی، تصمیم بگیرد کدام پنل محتوایی باید در بدنه اصلی صفحه نمایش داده شود.
+                </p>
+                <pre><code class="language-dart">
+// File: lib/main.dart
+
+final bodyBuilder = BodyBuilder(
+  contentBuilders: {
+    // یک نقشه از نوع محتوا به بیلدر مربوطه‌اش
+    BodyContentType.categories: CategoryPanelBuilder(),
+    BodyContentType.settings: SettingsPanelBuilder(),
+    BodyContentType.buttonsShowcase: ButtonsShowcasePanelBuilder(...),
+    BodyContentType.profile: profilePanelBuilder, // این خودش یک بیلدر ترکیبی است!
+  },
+);
+                </code></pre>
+                <p class="mt-4">
+                    `BodyBuilder` به کامپوننت `BodyStateComponent` در موجودیت `body` گوش می‌دهد. این کامپوننت یک `enum` به نام `BodyContentType` را در خود دارد. `BodyBuilder` از مقدار این `enum` به عنوان کلید برای پیدا کردن بیلدر مناسب از نقشه `contentBuilders` استفاده کرده و سپس متد `build` آن بیلدر را فراخوانی می‌کند.
+                </p>
+
+                <h3>`StateWidgetAssembler`: اوج ترکیب‌پذیری</h3>
+                <p>
+                    همانطور که در بخش ۷ دیدیم، `profilePanelBuilder` خود یک `StateWidgetAssembler` است. این یعنی ما می‌توانیم بیلدرها را مانند لگو روی هم بچینیم:
+                </p>
+                <ul class="list-disc list-inside space-y-2 mt-4 pr-4">
+                    <li>`ScaffoldBuilder` از `BodyBuilder` استفاده می‌کند.</li>
+                    <li>`BodyBuilder` بر اساس وضعیت، ممکن است از `StateWidgetAssembler` (برای پروفایل) استفاده کند.</li>
+                    <li>`StateWidgetAssembler` بر اساس وضعیت پروفایل، یکی از `Profile...StateBuilder` ها را انتخاب می‌کند.</li>
+                </ul>
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">الگوی طراحی ترکیبی (Composite Pattern)</p>
+                    <p>
+                        این ساختار درختی از بیلدرها، یک پیاده‌سازی زیبا از الگوی طراحی ترکیبی است. این الگو به ما اجازه می‌دهد تا با اشیاء ساده (بیلدرهای منفرد) و ترکیبی (بیلدرهایی که از بیلدرهای دیگر استفاده می‌کنند) به صورت یکسان رفتار کنیم. نتیجه، یک کد بسیار ماژولار، انعطاف‌پذیر و قابل توسعه است.
+                    </p>
+                </div>
+                <p>
+                    این بخش، پایان سفر ما در مفاهیم اصلی Nexus بود. شما اکنون با تمام قطعات اصلی این فریم‌ورک قدرتمند، از تعریف داده تا منطق و رندرینگ، آشنا شده‌اید.
+                </p>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-16-core-systems-2.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: سیستم‌های منطق و تعامل
+                    </a>
+                    <a href="./index.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        پایان و بازگشت به فهرست &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

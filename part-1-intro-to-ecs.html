@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۱: خوش آمدید به Nexus</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Prism JS for Syntax Highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            line-height: 1.8;
+        }
+        .prose h2, .prose h3 {
+            border-bottom: 2px solid #e9d5ff;
+            padding-bottom: 8px;
+            margin-top: 2em;
+            margin-bottom: 1em;
+        }
+        .prose code {
+            font-family: 'Vazirmatn', monospace;
+            background-color: #f3e8ff;
+            color: #6b21a8;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        pre[class*="language-"] {
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .callout {
+            border-right: 4px solid;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 8px 0 0 8px;
+        }
+        .callout-info {
+            background-color: #f0f9ff;
+            border-color: #38bdf8;
+        }
+        .callout-warning {
+            background-color: #fffbeb;
+            border-color: #f59e0b;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <!-- Header -->
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۱: خوش آمدید به Nexus</h1>
+            <p class="text-xl text-gray-500 mt-4">آشنایی با معماری Entity-Component-System (ECS) و نگاهی کلی به پروژه‌ای که خواهیم ساخت.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>یک معماری جدید برای فلاتر</h2>
+                <p>
+                    به اولین بخش از مجموعه آموزشی فریم‌ورک Nexus خوش آمدید! در این سفر، ما قصد داریم یک روش نوین و قدرتمند برای ساخت اپلیکیشن‌های فلاتر را بیاموزیم. این روش بر پایه‌ی یک الگوی معماری به نام <strong>Entity-Component-System (ECS)</strong> استوار است. اگر این نام برایتان جدید است، نگران نباشید؛ ما همه چیز را از پایه و با مثال‌های ملموس توضیح خواهیم داد.
+                </p>
+                <p>
+                    هدف اصلی این معماری، <strong>جداسازی کامل داده از منطق</strong> است. این ایده ساده، پیامدهای عمیقی در نحوه ساخت، نگهداری و مقیاس‌پذیری نرم‌افزار دارد.
+                </p>
+
+                <h3>معماری ECS چیست؟ یک مثال ساده</h3>
+                <p>
+                    تصور کنید می‌خواهیم یک بازی ساده بسازیم. در رویکرد سنتی (شیء-گرا)، ممکن است کلاس‌هایی مانند `Player`، `Enemy` و `Bullet` داشته باشیم که هم داده (موقعیت، سلامتی) و هم رفتار (حرکت، شلیک) را در خود دارند. این روش با افزایش پیچیدگی، به ارث‌بری‌های تو در تو و کلاس‌های سنگین منجر می‌شود.
+                </p>
+                <p>
+                    معماری ECS یک راه حل متفاوت ارائه می‌دهد:
+                </p>
+                <ul class="list-none space-y-4 mt-6">
+                    <li class="flex items-start">
+                        <span class="text-purple-600 font-bold text-2xl mr-4">&#9679;</span>
+                        <div><strong>Entity (موجودیت):</strong> یک کیسه خالی است. فقط یک شماره سریال منحصربه‌فرد دارد. مثلاً موجودیت شماره ۱۲.</div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-purple-600 font-bold text-2xl mr-4">&#9679;</span>
+                        <div><strong>Component (جزء):</strong> یک برچسب داده است که داخل کیسه می‌اندازیم. مثلاً برچسب `Position{x:10, y:20}` یا `Health{value:100}`. این برچسب‌ها فقط داده هستند.</div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-purple-600 font-bold text-2xl mr-4">&#9679;</span>
+                        <div><strong>System (سیستم):</strong> یک کارگر است که یک وظیفه مشخص دارد. مثلاً کارگر `PhysicsSystem` تمام کیسه‌هایی را که برچسب `Position` و `Velocity` دارند پیدا می‌کند و موقعیتشان را تغییر می‌دهد.</div>
+                    </li>
+                </ul>
+
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">نکته کلیدی</p>
+                    <p>در ECS، هویت یک چیز (Entity) توسط ترکیب داده‌هایش (Components) تعریف می‌شود و رفتار آن توسط سیستم‌های خارجی (Systems) اعمال می‌گردد. این یعنی ما به جای "بودن" (is-a)، بر "داشتن" (has-a) تمرکز می‌کنیم.</p>
+                </div>
+
+                <h3>چرا ECS را در فلاتر استفاده کنیم؟</h3>
+                <p>
+                    این معماری که از دنیای توسعه بازی‌های ویدیویی با کارایی بالا آمده، مزایای شگفت‌انگیزی برای اپلیکیشن‌های UI-محور فلاتر به ارمغان می‌آورد:
+                </p>
+                <ol class="list-decimal list-inside space-y-3 mt-4 pr-4">
+                    <li><strong>مقیاس‌پذیری و نگهداری آسان:</strong> افزودن یک ویژگی جدید (مثلاً قابلیت پرواز برای کاراکتر) به سادگی افزودن یک `FlightComponent` و یک `FlightSystem` است، بدون دستکاری کلاس‌های موجود.</li>
+                    <li><strong>عملکرد بالا:</strong> با اجرای منطق در یک ایزولیت (Isolate) جداگانه و جداسازی کامل داده از UI، از بلاک شدن ترد اصلی جلوگیری شده و به اپلیکیشن‌هایی روان و سریع دست می‌یابیم.</li>
+                    <li><strong>تست‌پذیری فوق‌العاده:</strong> سیستم‌ها و کامپوننت‌ها کلاس‌های ساده دارت هستند که به راحتی و بدون نیاز به محیط کامل فلاتر، می‌توان آن‌ها را به صورت مستقل تست کرد.</li>
+                    <li><strong>انعطاف‌پذیری پویا:</strong> شما می‌توانید در زمان اجرا، با افزودن یا حذف کامپوننت‌ها، رفتار و ظاهر یک موجودیت را به طور کامل تغییر دهید. این قابلیت برای مدیریت وضعیت‌های پیچیده UI بی‌نظیر است.</li>
+                </ol>
+
+                <h3>معرفی پروژه: `nexus_layout_kit`</h3>
+                <p>
+                    در طول این دوره، ما با هم یک اپلیکیشن داشبورد ماژولار به نام `nexus_layout_kit` را بررسی و تکمیل خواهیم کرد. این پروژه یک نمونه عالی از قدرت Nexus در عمل است. این اپلیکیشن شامل بخش‌های مختلفی است: منوی کناری، نوار اپلیکیشن، بدنه اصلی که محتوای آن به صورت پویا تغییر می‌کند (داشبورد، تنظیمات، پروفایل، و یک صفحه مدیریت دسته‌بندی‌ها با قابلیت‌های CRUD کامل).
+                </p>
+                <figure class="mt-6">
+                    <img src="https://placehold.co/800x450/a78bfa/ffffff?text=Nexus+Layout+Kit+UI" alt="UI اپلیکیشن نمونه" class="rounded-lg shadow-xl">
+                    <figcaption class="text-center text-sm text-gray-500 mt-2">نمایی از اپلیکیشن داشبوردی که با آن کار خواهیم کرد.</figcaption>
+                </figure>
+                
+                <div class="callout callout-warning mt-12">
+                    <p class="font-bold text-lg">آماده‌اید؟</p>
+                    <p>در بخش بعدی، ما به سراغ اولین قطعه از پازل خواهیم رفت: `NexusWorld`. یاد می‌گیریم که چگونه دنیای اپلیکیشن خود را برپا کنیم و ماژول‌های مختلف را در آن بارگذاری نماییم تا ساختار پروژه خود را شکل دهیم.</p>
+                </div>
+
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

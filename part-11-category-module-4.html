@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۱۱: مثال عملی - ماژول دسته‌بندی (بخش چهارم)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #fbcfe8; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #fce7f3; color: #be185d; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #fef2f2; border-color: #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۱۱: مثال عملی - ماژول دسته‌بندی (۴ از ۴)</h1>
+            <p class="text-xl text-gray-500 mt-4">پیاده‌سازی منطق حذف (Delete) با استفاده از `Dismissible` و انیمیشن‌های خروج.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>حذف آیتم‌ها با یک ژست حرکتی</h2>
+                <p>
+                    در آخرین بخش از تحلیل ماژول دسته‌بندی، به سراغ پیاده‌سازی قابلیت حذف آیتم‌ها می‌رویم. ما می‌خواهیم کاربر بتواند با کشیدن (swipe) یک آیتم به سمت چپ، آن را حذف کند. برای این کار از ویجت قدرتمند `Dismissible` در فلاتر استفاده می‌کنیم.
+                </p>
+
+                <h3>پیاده‌سازی `Dismissible` در لایه UI</h3>
+                <p>
+                    در ویجت `_CategoryItemTile`، ما `ListTile` را درون یک `Dismissible` قرار می‌دهیم.
+                </p>
+                <pre><code class="language-dart">
+// File: lib/src/category/category_panel_builder.dart -> _CategoryItemTile
+
+// ...
+return Dismissible(
+  key: ValueKey('dismissible_${item.id}'),
+  background: Container(color: Colors.green, /* ... */),
+  secondaryBackground: Container(color: Colors.red, /* ... */),
+  
+  // این پراپرتی کلیدی است!
+  confirmDismiss: (direction) async {
+    // 1. تعیین نوع عمل بر اساس جهت کشیدن
+    final action = direction == DismissDirection.endToStart ? 'delete' : 'share';
+
+    // 2. ارسال رویداد به دنیای منطق
+    renderingSystem.manager?.send(SwipeActionEvent(
+      itemId: itemId,
+      action: action,
+    ));
+
+    // 3. اگر عمل "حذف" بود، به ویجت اجازه می‌دهیم آیتم را از درخت ویجت حذف کند
+    if (action == 'delete') {
+      onDeleteInitiated(itemId); // این یک callback برای مدیریت UI است
+      return true;
+    }
+
+    // در غیر این صورت (مثلاً برای share)، آیتم به جای خود برمی‌گردد
+    return false;
+  },
+  child: ListTile(...),
+);
+// ...
+                </code></pre>
+                <p class="mt-4">
+                    مجدداً، لایه UI هیچ منطق حذفی را پیاده‌سازی نمی‌کند. فقط یک رویداد `SwipeActionEvent` را ارسال می‌کند و منتظر می‌ماند تا دنیای منطق وضعیت را به‌روز کند.
+                </p>
+
+                <h3>رسیدگی به حذف در `CategorySystem`</h3>
+                <p>
+                    `CategorySystem` به رویداد `SwipeActionEvent` گوش می‌دهد. منطق متد `_onSwipe` بسیار جالب است.
+                </p>
+                <pre><code class="language-dart">
+// File: lib/src/category/category_module.dart -> class CategorySystem
+
+void _onSwipe(SwipeActionEvent event) {
+  final itemEntity = world.entities[event.itemId];
+  if (itemEntity == null) return;
+
+  switch (event.action) {
+    case 'delete':
+      // به جای حذف فوری موجودیت، یک رویداد دیگر ارسال می‌کنیم!
+      world.eventBus.fire(PurgeListItemEvent(event.itemId));
+      break;
+    case 'share':
+      // ...
+      break;
+  }
+}
+                </code></pre>
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">چرا یک رویداد دیگر؟</p>
+                    <p>
+                        این یک الگوی طراحی مهم است. `CategorySystem` فقط مسئول منطق مربوط به "دسته‌بندی‌ها" است. حذف یک آیتم از لیست‌های داده‌ای (`allItems` و `visibleItems`) وظیفه یک سیستم عمومی‌تر به نام `ListStateSystem` است. با ارسال رویداد `PurgeListItemEvent`، `CategorySystem` این وظیفه را به سیستم مسئول واگذار می‌کند و اصل تفکیک مسئولیت‌ها را رعایت می‌کند.
+                    </p>
+                </div>
+
+                <h3>`ListStateSystem` و حذف نهایی داده</h3>
+                <p>
+                    `ListStateSystem` (که بخشی از پکیج اصلی Nexus است) به `PurgeListItemEvent` گوش می‌دهد. وقتی این رویداد را دریافت می‌کند، شناسه آیتم مورد نظر را از کامپوننت `ListComponent` در موجودیت مدیر لیست حذف می‌کند.
+                </p>
+                <p>
+                    این تغییر در `ListComponent` باعث می‌شود که `CategoryPanelBuilder` در لایه UI بازسازی شود و آیتم حذف شده دیگر در لیست نمایش داده نشود.
+                </p>
+
+                <h3>و انیمیشن چطور؟</h3>
+                <p>
+                    ممکن است بپرسید پس انیمیشن حذف چه می‌شود؟ در نسخه فعلی کد، ما از یک ترفند ساده در `CategoryPanelBuilder` استفاده کرده‌ایم تا آیتم به صورت بصری حذف شود. اما راه حل بهتر و استاندارد Nexus، استفاده از یک سیستم انیمیشن است.
+                </p>
+                <p>
+                    در یک پیاده‌سازی پیشرفته‌تر، `CategorySystem` به جای ارسال `PurgeListItemEvent`، یک `AnimateOutComponent` به موجودیت اضافه می‌کرد. سپس `ListItemAnimationSystem` این کامپوننت را می‌دید، یک انیمیشن محو شدن (fade) را اجرا می‌کرد و <strong>پس از اتمام انیمیشن</strong>، رویداد `PurgeListItemEvent` را ارسال می‌کرد. این رویکرد یک تجربه کاربری بسیار روان‌تر را ایجاد می‌کند.
+                </p>
+
+                <h3>پایان کالبدشکافی `CategoryModule`</h3>
+                <p>
+                    تبریک! ما با موفقیت یک ماژول کامل CRUD را در معماری Nexus بررسی کردیم. ما دیدیم که چگونه:
+                </p>
+                <ul class="list-disc list-inside space-y-2 mt-4 pr-4">
+                    <li>داده‌ها با کامپوننت‌ها تعریف می‌شوند.</li>
+                    <li>UI داده‌ها را از طریق `FlutterRenderingSystem` می‌خواند.</li>
+                    <li>تعاملات کاربر به رویداد تبدیل شده و به دنیای منطق ارسال می‌شوند.</li>
+                    <li>سیستم‌ها به رویدادها گوش داده و با تغییر کامپوننت‌ها، وضعیت برنامه را به‌روز می‌کنند.</li>
+                    <li>این تغییرات به صورت بهینه به UI بازتاب داده می‌شوند.</li>
+                </ul>
+                <p>
+                    در بخش بعدی، به سراغ یک مثال پیشرفته‌تر از منطق در سیستم‌ها خواهیم رفت: انیمیشن‌های پیچیده و چند مرحله‌ای در `ButtonsModule`.
+                </p>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-10-category-module-3.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: ساخت و ویرایش داده
+                    </a>
+                    <a href="./part-12-animation-deep-dive.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: غواصی در انیمیشن‌ها &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

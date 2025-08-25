@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۳۷: مدیریت پیشرفته لیست‌ها</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #a5b4fc; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #eef2ff; border-color: #6366f1; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۳۷: مدیریت پیشرفته لیست‌ها</h1>
+            <p class="text-xl text-gray-500 mt-4">کالبدشکافی `ListStateSystem` و نحوه پیاده‌سازی فیلتر، مرتب‌سازی و جستجوی کارآمد.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>چالش مدیریت مجموعه‌ها</h2>
+                <p>
+                    نمایش لیستی از داده‌ها یکی از رایج‌ترین کارها در هر اپلیکیشنی است. اما مدیریت وضعیت‌های این لیست‌ها (مانند فیلتر، مرتب‌سازی، جستجو و صفحه‌بندی) می‌تواند به سرعت کد شما را پیچیده کند. پکیج `nexus` یک راه‌حل عمومی و قدرتمند برای این مشکل ارائه می‌دهد: `ListStateSystem`.
+                </p>
+                
+                <h3>الگوی "موجودیت مدیر لیست" (List Manager Entity)</h3>
+                <p>
+                    همانطور که در مثال `CategoryModule` دیدیم، به جای پخش کردن وضعیت لیست در ویجت‌ها یا کنترلرها، ما یک موجودیت مرکزی برای هر لیست می‌سازیم. این موجودیت دو کامپوننت کلیدی دارد:
+                </p>
+                <ul class="list-disc list-inside space-y-3 mt-4 pr-4">
+                    <li><strong>`ListComponent`</strong>: این کامپوننت "منبع حقیقت" (Source of Truth) است. این کامپوننت دو لیست از شناسه‌ها را نگه می‌دارد: `allItems` (لیست کامل و فیلتر نشده) و `visibleItems` (لیستی که باید در UI نمایش داده شود).</li>
+                    <li><strong>`ListStateComponent`</strong>: این کامپوننت، وضعیت فعلی "نمایش" (view) را نگه می‌دارد. شامل معیارهای فیلتر (`filterCriteria`), فیلد مرتب‌سازی (`sortByField`) و عبارت جستجو (`searchQuery`) است.</li>
+                </ul>
+
+                <h3>`ListStateSystem`: پردازشگر مرکزی لیست</h3>
+                <p>
+                    `ListStateSystem` یک سیستم عمومی و رویداد-محور است که به عنوان پردازشگر مرکزی برای تمام لیست‌های اپلیکیشن عمل می‌کند. این سیستم به رویدادهای زیر گوش می‌دهد:
+                </p>
+                <ul class="list-disc list-inside space-y-2 mt-4 pr-4">
+                    <li>`UpdateListFilterEvent`</li>
+                    <li>`UpdateListSortEvent`</li>
+                    <li>`UpdateListSearchEvent`</li>
+                </ul>
+                <p>
+                    وقتی یکی از این رویدادها رخ می‌دهد، `ListStateSystem` کارهای زیر را انجام می‌دهد:
+                </p>
+                <ol class="list-decimal list-inside space-y-3 mt-4 pr-4">
+                    <li>موجودیت مدیر لیست مربوطه را با استفاده از `listId` پیدا می‌کند.</li>
+                    <li>`ListStateComponent` آن موجودیت را با داده‌های جدید از رویداد، به‌روز می‌کند.</li>
+                    <li>متد اصلی خود، `_recalculateVisibleItems`، را فراخوانی می‌کند.</li>
+                </ol>
+
+                <h4>کالبدشکافی `_recalculateVisibleItems`</h4>
+                <p>
+                    این متد، خط لوله پردازش لیست است:
+                </p>
+                <pre><code class="language-dart">
+void _recalculateVisibleItems(Entity manager) {
+  final listComp = manager.get<ListComponent>()!;
+  final state = manager.get<ListStateComponent>()!;
+  
+  // ۱. با لیست کامل شروع می‌کند
+  var items = List<EntityId>.from(listComp.allItems);
+
+  // ۲. فیلتر را اعمال می‌کند
+  if (state.filterCriteria.isNotEmpty) {
+    items = items.where((itemId) => /* منطق فیلتر بر اساس BlackboardComponent */).toList();
+  }
+
+  // ۳. جستجو را اعمال می‌کند
+  if (state.searchQuery.isNotEmpty) {
+    items = items.where((itemId) => /* منطق جستجو در تمام فیلدهای متنی */).toList();
+  }
+
+  // ۴. مرتب‌سازی را اعمال می‌کند
+  if (state.sortByField != null) {
+    items.sort((aId, bId) => /* منطق مقایسه بر اساس sortByField */);
+  }
+
+  // ۵. کامپوننت لیست را با visibleItems جدید به‌روز می‌کند
+  manager.add(ListComponent(
+    listId: listComp.listId,
+    allItems: listComp.allItems,
+    visibleItems: items, // نتیجه نهایی
+  ));
+}
+                </code></pre>
+                
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">مقایسه با Redux/BLoC</p>
+                    <p>
+                        این الگو شباهت زیادی به داشتن یک `reducer` یا `BLoC` برای مدیریت وضعیت لیست دارد. اما چند مزیت کلیدی دارد:
+                    </p>
+                    <ul class="list-disc list-inside space-y-2 mt-2 pr-4">
+                        <li><strong>عمومی و قابل استفاده مجدد:</strong> شما یک `ListStateSystem` برای کل اپلیکیشن دارید، نه یک BLoC جداگانه برای هر لیست.</li>
+                        <li><strong>داده-محور:</strong> تمام وضعیت در کامپوننت‌ها ذخیره می‌شود که به راحتی قابل مشاهده، دیباگ و ذخیره‌سازی هستند.</li>
+                        <li><strong>یکپارچگی با ECS:</strong> این الگو به طور کامل با سایر بخش‌های معماری ECS یکپارچه است. شما می‌توانید به راحتی سیستم‌های دیگری بنویسید که به تغییرات `ListComponent` واکنش نشان دهند.</li>
+                    </ul>
+                </div>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-36-dynamic-behavior-archetypes.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: رفتار پویا با آرکیتایپ‌ها
+                    </a>
+                    <a href="./part-38-game-loop-physics.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: حلقه بازی و فیزیک &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

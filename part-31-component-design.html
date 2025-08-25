@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۳۱: هنر طراحی کامپوننت</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #a5b4fc; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #eef2ff; border-color: #6366f1; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۳۱: هنر طراحی کامپوننت</h1>
+            <p class="text-xl text-gray-500 mt-4">چگونه کامپوننت‌هایی طراحی کنیم که داده‌ها را به صورت بهینه، قابل ترکیب و قابل نگهداری مدل‌سازی کنند.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>کامپوننت: اتم‌های سازنده دنیا</h2>
+                <p>
+                    کامپوننت‌ها، اتم‌های دنیای Nexus شما هستند. آن‌ها کوچکترین واحدهای داده‌ای هستند که هویت و وضعیت موجودیت‌ها را تعریف می‌کنند. طراحی صحیح کامپوننت‌ها، بیشترین تأثیر را بر کیفیت، انعطاف‌پذیری و عملکرد معماری شما دارد. یک کامپوننت خوب، کوچک، متمرکز و تغییرناپذیر (immutable) است.
+                </p>
+                
+                <h3>انواع کامپوننت‌ها و کاربردهایشان</h3>
+                <p>
+                    در عمل، ما می‌توانیم کامپوننت‌ها را به چند دسته اصلی تقسیم کنیم:
+                </p>
+                <ol class="list-decimal list-inside space-y-4 mt-6 pr-4">
+                    <li>
+                        <strong>کامپوننت داده (Data Component):</strong> رایج‌ترین نوع. این کامپوننت‌ها داده‌های خام را نگهداری می‌کنند. مثال: `PositionComponent`, `HealthComponent`.
+                    </li>
+                    <li>
+                        <strong>کامپوننت نشانگر (Marker Component):</strong> این کامپوننت‌ها هیچ داده‌ای ندارند و صرفاً وجودشان بر روی یک موجودیت، یک وضعیت `bool` را نشان می‌دهد. مثال: `IsDeadComponent`, `EditingCategoryComponent`.
+                    </li>
+                    <li>
+                        <strong>کامپوننت وضعیت (State Component):</strong> این کامپوننت‌ها یک وضعیت پیچیده‌تر را با استفاده از `enum` مدل‌سازی می‌کنند و اغلب به عنوان ماشین وضعیت عمل می‌کنند. مثال: `ApiStatusComponent`.
+                    </li>
+                </ol>
+
+                <h3>اصل کلیدی: ترکیب بر ارث‌بری (Composition over Inheritance)</h3>
+                <p>
+                    بیایید یک سناریو را با دو معماری مقایسه کنیم. می‌خواهیم یک دشمن در بازی بسازیم که هم پرواز می‌کند و هم آتش شلیک می‌کند.
+                </p>
+                <p><strong>رویکرد سنتی (ارث‌بری):</strong></p>
+                <pre><code class="language-dart">
+abstract class Enemy { void update(); }
+abstract class FlyingEnemy extends Enemy { void fly(); }
+abstract class ShootingEnemy extends Enemy { void shoot(); }
+
+// مشکل: برای دشمنی که هم پرواز می‌کند و هم شلیک می‌کند، چه کنیم؟
+class FlyingShootingEnemy extends FlyingEnemy { // یا ShootingEnemy؟
+  // باید منطق هر دو را کپی یا ترکیب کنیم. این به "diamond problem" معروف است.
+}
+                </code></pre>
+                <p class="mt-4"><strong>رویکرد Nexus (ترکیب):</strong></p>
+                <pre><code class="language-dart">
+// کامپوننت‌های نشانگر برای قابلیت‌ها
+class CanFlyComponent extends Component {}
+class CanShootComponent extends Component { final double fireRate; ... }
+
+// سیستم‌های مجزا برای هر قابلیت
+class FlightSystem extends System { /* منطق پرواز */ }
+class ShootingSystem extends System { /* منطق شلیک */ }
+
+// ساخت موجودیت با ترکیب قابلیت‌ها
+final myEnemy = Entity()
+  ..add(EnemyTagComponent())
+  ..add(CanFlyComponent())
+  ..add(CanShootComponent(fireRate: 2.0));
+                </code></pre>
+                <p class="mt-4">
+                    در رویکرد Nexus، ما به سادگی با افزودن کامپوننت‌ها، قابلیت‌ها را به موجودیت "می‌چسبانیم". این روش بی‌نهایت انعطاف‌پذیرتر است. فردا می‌توانیم یک `CanSwimComponent` و `SwimmingSystem` اضافه کنیم و دشمن ما می‌تواند شنا هم بکند، بدون اینکه ساختار کلاس‌های موجود را تغییر دهیم.
+                </p>
+
+                <h3>طراحی برای تغییرناپذیری (Immutability)</h3>
+                <p>
+                    یک اصل مهم در طراحی کامپوننت‌ها، تغییرناپذیری است. این یعنی به جای تغییر مقادیر داخلی یک کامپوننت، شما همیشه یک <strong>نمونه جدید</strong> از آن را با مقادیر به‌روز شده می‌سازید.
+                </p>
+                <pre><code class="language-dart">
+// بد: تغییر مستقیم داده (Mutable)
+final pos = entity.get<PositionComponent>()!;
+pos.x += 10; // این تغییر توسط فریم‌ورک به راحتی قابل ردیابی نیست.
+
+// خوب: ساخت نمونه جدید (Immutable)
+final pos = entity.get<PositionComponent>()!;
+final newPos = PositionComponent(x: pos.x + 10, y: pos.y);
+entity.add(newPos); // فریم‌ورک این جایگزینی را به عنوان یک تغییر تشخیص می‌دهد.
+                </code></pre>
+                <p class="mt-4">
+                    استفاده از `final` برای فیلدهای کامپوننت، این اصل را تقویت می‌کند. این رویکرد، جریان داده را قابل پیش‌بینی کرده و به `EquatableMixin` اجازه می‌دهد تا به درستی تشخیص دهد که آیا داده واقعاً تغییر کرده است یا خیر، که برای بهینه‌سازی UI حیاتی است.
+                </p>
+                
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">مقایسه با BLoC/Cubit</p>
+                    <p>
+                        در BLoC، ما معمولاً یک کلاس `State` بزرگ داریم که تمام وضعیت یک صفحه را در خود نگه می‌دارد. با هر تغییر کوچک، باید یک کپی از کل این کلاس `State` با متد `copyWith` بسازیم. در Nexus، ما وضعیت را به کامپوننت‌های کوچک و مستقل می‌شکنیم. این یعنی وقتی فقط موقعیت تغییر می‌کند، ما فقط یک `PositionComponent` جدید می‌سازیم، نه یک کپی از کل وضعیت موجودیت. این رویکرد، مدیریت وضعیت را دانه‌ریزتر (more granular) و کارآمدتر می‌کند.
+                    </p>
+                </div>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-30-conclusion.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: جمع‌بندی و مسیر آینده
+                    </a>
+                    <a href="./part-32-advanced-systems.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: الگوهای پیشرفته سیستم &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

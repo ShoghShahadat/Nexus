@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۳۸: حلقه بازی و فیزیک</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; line-height: 1.8; }
+        .prose h2, .prose h3 { border-bottom: 2px solid #a5b4fc; padding-bottom: 8px; margin-top: 2em; margin-bottom: 1em; }
+        .prose code { font-family: 'Vazirmatn', monospace; background-color: #e0e7ff; color: #4338ca; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre[class*="language-"] { border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); background-color: #2d3748; }
+        pre[class*="language-"] code { color: #e2e8f0; background-color: transparent; font-size: 14px; }
+        .callout { border-right: 4px solid; padding: 1.5rem; margin: 2rem 0; border-radius: 8px 0 0 8px; }
+        .callout-info { background-color: #eef2ff; border-color: #6366f1; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۳۸: حلقه بازی و فیزیک</h1>
+            <p class="text-xl text-gray-500 mt-4">نگاهی به ریتم تپنده دنیای Nexus و نحوه پیاده‌سازی سیستم‌های مبتنی بر زمان.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>ریتم تپنده: حلقه `update`</h2>
+                <p>
+                    قلب هر اپلیکیشن real-time (مانند بازی یا شبیه‌سازی)، یک حلقه بی‌نهایت است که به آن "حلقه بازی" یا "Game Loop" می‌گویند. این حلقه مسئولیت به‌روزرسانی وضعیت دنیا و رندر کردن آن بر روی صفحه را با سرعت بالا (معمولاً ۶۰ بار در ثانیه) بر عهده دارد.
+                </p>
+                <p>
+                    در Nexus، این حلقه توسط `NexusManager` (چه در حالت تک‌تردی و چه در حالت ایزولیت) مدیریت می‌شود. این مدیر از یک `Ticker` فلاتر استفاده می‌کند تا در هر فریم، متد `world.update(dt)` را فراخوانی کند.
+                </p>
+                
+                <h3>`dt` یا Delta Time: کلید حرکت روان</h3>
+                <p>
+                    پارامتر `dt` (دلتا تایم) که به متد `update` سیستم‌ها پاس داده می‌شود، یکی از مهم‌ترین مفاهیم در توسعه real-time است. `dt` مدت زمان سپری شده (به ثانیه) از فریم قبلی تا فریم فعلی را نشان می‌دهد.
+                </p>
+                <p>
+                    چرا این مهم است؟ چون نرخ فریم (FPS) دستگاه‌های مختلف ممکن است متفاوت باشد (یکی ۶۰ FPS، دیگری ۱۲۰ FPS). اگر ما حرکت را بر اساس فریم محاسبه کنیم (مثلاً `pos.x += 1`)، کاراکتر ما روی دستگاه ۱۲۰ FPS دو برابر سریع‌تر حرکت خواهد کرد!
+                </p>
+                <p>
+                    با استفاده از `dt`، ما حرکت را مبتنی بر زمان واقعی می‌کنیم و از این مشکل جلوگیری می‌کنیم.
+                </p>
+                <pre><code class="language-dart">
+// حرکت مبتنی بر فریم (بد)
+// speed = 1 pixel per frame
+position.x += 1;
+
+// حرکت مبتنی بر زمان (خوب)
+// speed = 60 pixels per second
+// On a 60 FPS device, dt ≈ 1/60, so position.x += 60 * (1/60) => position.x += 1
+// On a 120 FPS device, dt ≈ 1/120, so position.x += 60 * (1/120) => position.x += 0.5
+// در هر دو حالت، کاراکتر در یک ثانیه، ۶۰ پیکسل جابجا می‌شود.
+position.x += speed * dt;
+                </code></pre>
+                
+                <h3>سیستم‌های فیزیکی: نمونه‌های کلاسیک</h3>
+                <p>
+                    با داشتن حلقه `update` و `dt`، ما می‌توانیم انواع سیستم‌های فیزیکی را به راحتی پیاده‌سازی کنیم.
+                </p>
+                
+                <h4>`PhysicsSystem`</h4>
+                <p>
+                    این ساده‌ترین سیستم فیزیکی است که فقط سرعت را به موقعیت اعمال می‌کند.
+                </p>
+                <pre><code class="language-dart">
+class PhysicsSystem extends System {
+  @override
+  bool matches(Entity entity) => entity.has<PositionComponent>() && entity.has<VelocityComponent>();
+
+  @override
+  void update(Entity entity, double dt) {
+    final pos = entity.get<PositionComponent>()!;
+    final vel = entity.get<VelocityComponent>()!;
+    pos.x += vel.x * dt;
+    pos.y += vel.y * dt;
+    entity.add(pos);
+  }
+}
+                </code></pre>
+
+                <h4>`GravitySystem`</h4>
+                <p>
+                    این سیستم یک نیروی ثابت (جاذبه) را به سرعت عمودی تمام موجودیت‌هایی که جرم دارند، اعمال می‌کند.
+                </p>
+                <pre><code class="language-dart">
+class GravitySystem extends System {
+  final double gravityForce = 9.8;
+
+  @override
+  bool matches(Entity entity) => entity.has<VelocityComponent>() && entity.has<MassComponent>();
+
+  @override
+  void update(Entity entity, double dt) {
+    final vel = entity.get<VelocityComponent>()!;
+    vel.y += gravityForce * dt; // اعمال نیروی جاذبه به سمت پایین
+    entity.add(vel);
+  }
+}
+                </code></pre>
+
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">قدرت ترکیب‌پذیری در عمل</p>
+                    <p>
+                        حالا جادوی ECS را ببینید. اگر یک موجودیت فقط `PositionComponent` و `VelocityComponent` داشته باشد، `PhysicsSystem` آن را حرکت می‌دهد. اگر ما `MassComponent` را هم به آن اضافه کنیم، `GravitySystem` <strong>نیز</strong> شروع به کار روی آن می‌کند و موجودیت ما شروع به سقوط می‌کند! ما قابلیت "سقوط کردن" را به موجودیت اضافه کردیم، بدون اینکه هیچ کدی را در `PhysicsSystem` یا کلاس موجودیت تغییر دهیم. این همان قدرت ترکیب‌پذیری است.
+                    </p>
+                </div>
+
+                <div class="flex justify-between mt-12">
+                    <a href="./part-37-advanced-list-management.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                        &rarr; بخش قبل: مدیریت پیشرفته لیست‌ها
+                    </a>
+                    <a href="./part-39-nexus-philosophy.html" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700">
+                        بخش بعد: فلسفه Nexus &larr;
+                    </a>
+                </div>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>

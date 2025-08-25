@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بخش ۴: سیستم‌ها، مغز متفکر معماری</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Prism JS for Syntax Highlighting (Dark Theme) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            line-height: 1.8;
+        }
+        .prose h2, .prose h3 {
+            border-bottom: 2px solid #d1fae5;
+            padding-bottom: 8px;
+            margin-top: 2em;
+            margin-bottom: 1em;
+        }
+        .prose code {
+            font-family: 'Vazirmatn', monospace;
+            background-color: #d1fae5;
+            color: #065f46;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        /* Ensure the background is dark and text is light for pre > code blocks */
+        pre[class*="language-"] {
+            border: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            background-color: #2d3748; /* Dark background */
+        }
+        pre[class*="language-"] code {
+            color: #e2e8f0; /* Light text */
+            background-color: transparent;
+            font-size: 14px;
+        }
+        .callout {
+            border-right: 4px solid;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 8px 0 0 8px;
+        }
+        .callout-info {
+            background-color: #f0f9ff;
+            border-color: #38bdf8;
+        }
+        .callout-deep-dive {
+            background-color: #f0fdf4;
+            border-color: #4ade80;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-700">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <!-- Header -->
+        <header class="mb-10 text-center">
+            <a href="./index.html" class="text-purple-600 hover:text-purple-800 transition-colors">&larr; بازگشت به فهرست</a>
+            <p class="text-purple-600 font-semibold mt-4">مستندات پروژه-محور Nexus</p>
+            <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 mt-2">بخش ۴: سیستم‌ها، مغز متفکر معماری</h1>
+            <p class="text-xl text-gray-500 mt-4">آشنایی با `System`، جایی که تمام منطق برنامه شما در آن زنده می‌شود.</p>
+        </header>
+
+        <main class="bg-white p-6 md:p-10 rounded-xl shadow-lg">
+            <article class="prose lg:prose-xl max-w-none">
+                <h2>System: جایی که منطق اتفاق می‌افتد</h2>
+                <p>
+                    تا به اینجا، ما "چیزها" (Entities) و "داده‌هایشان" (Components) را تعریف کرده‌ایم. اما این دو به تنهایی بی‌جان هستند. قطعه سوم و نهایی پازل ECS، <strong>System (سیستم)</strong> است. سیستم‌ها، کارگران خط تولید ما هستند؛ آن‌ها منطق برنامه را اجرا می‌کنند. هر سیستم یک وظیفه کاملاً مشخص دارد و فقط روی موجودیت‌هایی کار می‌کند که داده‌های مورد نیازش را داشته باشند.
+                </p>
+
+                <h3>دو نوع اصلی منطق در سیستم‌ها</h3>
+                <p>
+                    در فریم‌ورک Nexus، سیستم‌ها می‌توانند منطق خود را به دو روش اصلی اجرا کنند:
+                </p>
+                <ol class="list-decimal list-inside space-y-3 mt-4 pr-4">
+                    <li><strong>منطق مبتنی بر کوئری (Query-Based):</strong> سیستم در هر فریم (یا تیک منطقی)، تمام موجودیت‌هایی را که با یک الگوی خاص از کامپوننت‌ها مطابقت دارند، پیدا کرده و روی آن‌ها یک عملیات را اجرا می‌کند. این روش برای کارهای مداوم مانند حرکت فیزیکی یا انیمیشن ایده‌آل است.</li>
+                    <li><strong>منطق رویداد-محور (Event-Driven):</strong> سیستم به رویدادهای خاصی که در اپلیکیشن رخ می‌دهند (مانند کلیک کاربر) گوش می‌دهد و فقط در پاسخ به آن رویدادها فعال می‌شود. این روش برای واکنش به تعاملات کاربر بسیار کارآمد است.</li>
+                </ol>
+
+                <div class="callout callout-deep-dive">
+                    <p class="font-bold text-lg">غواصی عمیق: `AppBarSystem` (منطق رویداد-محور)</p>
+                    <p>
+                        بیایید به `lib/src/app_bar/app_bar_module.dart` نگاهی بیندازیم. این سیستم مسئول به‌روزرسانی عنوان AppBar هنگام تغییر صفحه است.
+                    </p>
+                    <pre class="mt-4"><code class="language-dart">
+// File: lib/src/app_bar/app_bar_module.dart
+
+class AppBarSystem extends System {
+  @override
+  void onAddedToWorld(NexusWorld world) {
+    super.onAddedToWorld(world);
+    // 1. به محض اضافه شدن به دنیا، شروع به گوش دادن به رویداد می‌کند
+    listen<NavigationItemTappedEvent>((event) {
+      // 2. موجودیت AppBar را پیدا می‌کند
+      final appBarEntity =
+          world.entities.values.firstWhere((e) => e.has<AppBarComponent>());
+      
+      // 3. کامپوننت داده آن را با عنوان جدید به‌روزرسانی می‌کند
+      appBarEntity.add(AppBarComponent(title: event.title));
+    });
+  }
+
+  // این سیستم نیازی به حلقه update ندارد، پس این متدها خالی می‌مانند
+  @override
+  bool matches(Entity entity) => false;
+
+  @override
+  void update(Entity entity, double dt) {}
+}
+                    </code></pre>
+                    <p class="mt-4">
+                        این یک مثال بی‌نقص از یک سیستم رویداد-محور است. `AppBarSystem` هیچ کاری انجام نمی‌دهد تا زمانی که رویداد `NavigationItemTappedEvent` رخ دهد. این رویکرد بسیار بهینه است زیرا از اجرای کدهای غیرضروری جلوگیری می‌کند.
+                    </p>
+                </div>
+
+                <h3>متد `matches` و حلقه `update`</h3>
+                <p>
+                    حالا بیایید به نوع دیگر سیستم‌ها بپردازیم. سیستم‌های مبتنی بر کوئری از دو متد کلیدی استفاده می‌کنند:
+                </p>
+                <ul class="list-disc list-inside space-y-3 mt-4 pr-4">
+                    <li><strong>`bool matches(Entity entity)`:</strong> این متد برای هر موجودیت در دنیا فراخوانی می‌شود. اگر `true` برگرداند، یعنی این سیستم به این موجودیت "علاقه‌مند" است.</li>
+                    <li><strong>`void update(Entity entity, double dt)`:</strong> این متد در هر فریم، فقط برای موجودیت‌هایی که `matches` برای آن‌ها `true` بوده است، اجرا می‌شود. `dt` یا دلتا تایم، زمان سپری شده از فریم قبلی است.</li>
+                </ul>
+
+                <div class="callout callout-info">
+                    <p class="font-bold text-lg">مثال: `PhysicsSystem`</p>
+                    <p>
+                        یک سیستم فیزیک کلاسیک در ECS به این شکل خواهد بود:
+                    </p>
+                    <pre class="mt-4"><code class="language-dart">
+class PhysicsSystem extends System {
+  // 1. به موجودیت‌هایی علاقه‌مند است که هم موقعیت و هم سرعت دارند
+  @override
+  bool matches(Entity entity) {
+    return entity.has<PositionComponent>() && entity.has<VelocityComponent>();
+  }
+
+  // 2. در هر فریم، موقعیت را بر اساس سرعت به‌روز می‌کند
+  @override
+  void update(Entity entity, double dt) {
+    final pos = entity.get<PositionComponent>()!;
+    final vel = entity.get<VelocityComponent>()!;
+
+    pos.x += vel.x * dt;
+    pos.y += vel.y * dt;
+
+    // کامپوننت را دوباره اضافه می‌کنیم تا فریم‌ورک متوجه تغییر شود
+    entity.add(pos);
+  }
+}
+                    </code></pre>
+                </div>
+
+                <h3>جمع‌بندی و نگاه به آینده</h3>
+                <p>
+                    ما سه قطعه اصلی پازل را تکمیل کردیم:
+                </p>
+                <ul class="list-disc list-inside space-y-2 mt-4 pr-4">
+                    <li><strong>Entity:</strong> شناسه</li>
+                    <li><strong>Component:</strong> داده</li>
+                    <li><strong>System:</strong> منطق</li>
+                </ul>
+                <p>
+                    سیستم‌ها با خواندن داده‌ها از کامپوننت‌ها، اجرای منطق و سپس نوشتن نتایج در کامپوننت‌های دیگر، وضعیت اپلیکیشن را به پیش می‌برند. اما چگونه این تغییرات داده در دنیای منطق، به تغییرات بصری در UI فلاتر تبدیل می‌شود؟ این سوال هیجان‌انگیز، موضوع بخش بعدی ما خواهد بود.
+                </p>
+            </article>
+        </main>
+    </div>
+
+</body>
+</html>
