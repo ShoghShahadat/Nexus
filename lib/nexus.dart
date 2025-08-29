@@ -1,5 +1,3 @@
-// FILE: packages/nexus/lib/nexus.dart
-
 /// The main library for the Nexus framework.
 library nexus;
 
@@ -50,13 +48,9 @@ export 'src/events/history_events.dart';
 export 'src/events/theme_events.dart';
 export 'src/events/responsive_events.dart';
 export 'src/events/ui_events.dart';
-// --- FINAL FIX: Export core persistence events so they are accessible to the app ---
-export 'src/systems/persistence_system.dart'
-    show DataLoadedEvent, SaveDataEvent;
 
 // --- Components ---
 export 'src/components/animation_component.dart';
-export 'src/events/component_events.dart';
 export 'src/components/animation_progress_component.dart';
 export 'src/components/api_request_component.dart';
 export 'src/components/api_status_component.dart';
@@ -70,7 +64,8 @@ export 'src/components/children_component.dart';
 export 'src/components/clickable_component.dart';
 export 'src/components/counter_state_component.dart';
 export 'src/components/custom_widget_component.dart';
-export 'src/components/decoration_components.dart';
+export 'src/components/decoration_components.dart'
+    hide StyleColor, GradientColor;
 export 'src/components/effect_component.dart';
 export 'src/components/gameplay_components.dart';
 export 'src/components/input_focus_component.dart';
@@ -100,6 +95,14 @@ export 'src/components/web_socket_components.dart';
 export 'src/components/widget_component.dart';
 export 'src/components/history_component.dart';
 
+// --- Rendering Components ---
+export 'src/components/rendering/drawable_component.dart';
+export 'src/components/rendering/interactive_component.dart';
+export 'src/components/rendering/layer_component.dart';
+export 'src/components/rendering/scene_render_packet_component.dart';
+export 'src/components/rendering/shape_component.dart';
+export 'src/components/rendering/style_component.dart' hide SolidColor;
+
 // --- Systems ---
 export 'src/systems/advanced_input_system.dart';
 export 'src/systems/animation_system.dart';
@@ -123,8 +126,7 @@ export 'src/systems/list_state_system.dart';
 export 'src/systems/lifecycle_system.dart';
 export 'src/systems/morphing_system.dart';
 export 'src/systems/particle_lifecycle_system.dart';
-export 'src/systems/persistence_system.dart'
-    show PersistenceSystem; // Hide events here to avoid ambiguity
+export 'src/systems/persistence_system.dart';
 export 'src/systems/physics_system.dart';
 export 'src/systems/pointer_system.dart';
 export 'src/systems/pulsing_warning_system.dart';
@@ -139,6 +141,9 @@ export 'src/systems/timer_system.dart';
 export 'src/systems/transform_system.dart';
 export 'src/systems/web_socket_system.dart';
 
+// --- Rendering System ---
+export 'src/systems/rendering/custom_painting_system.dart';
+
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';
 export 'src/flutter/nexus_widget.dart';
@@ -147,3 +152,6 @@ export 'src/flutter/nexus_isolate_manager.dart';
 export 'src/flutter/nexus_single_thread_manager.dart';
 export 'src/flutter/builder_tags.dart';
 export 'src/flutter/widget_builder.dart';
+
+// --- Rendering Builder ---
+export 'src/flutter/rendering/nexus_canvas_builder.dart';
