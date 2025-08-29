@@ -1,11 +1,6 @@
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/decoration_components.dart';
-import 'package:nexus/src/components/rendering/drawable_component.dart';
-import 'package:nexus/src/components/rendering/layer_component.dart';
-import 'package:nexus/src/components/rendering/scene_render_packet_component.dart';
-import 'package:nexus/src/components/rendering/shape_component.dart';
-import 'package:nexus/src/components/rendering/style_component.dart';
-import 'package:nexus/src/components/rendering/transform_component.dart';
+import 'package:nexus/src/components/dom_element_component.dart';
+import 'package:nexus/src/components/stylesheet_component.dart';
 
 /// A function signature for a factory that creates a [Component] from a JSON map.
 typedef ComponentFactory = Component Function(Map<String, dynamic> json);
@@ -76,6 +71,10 @@ void registerCoreComponents() {
     'ParentComponent': (json) => ParentComponent.fromJson(json),
     'LinkComponent': (json) => LinkComponent.fromJson(json),
     'DecorationComponent': (json) => DecorationComponent.fromJson(json),
+
+    // NEW: Web UI Components
+    'DomElementComponent': (json) => DomElementComponent.fromJson(json),
+    'StyleSheetComponent': (json) => StyleSheetComponent.fromJson(json),
 
     // Gameplay Components
     'TargetingComponent': (json) => TargetingComponent.fromJson(json),
