@@ -22,8 +22,8 @@ class TimerTask with EquatableMixin {
   /// یک رویداد اختیاری که در هر فریم تا زمانی که تایمر فعال است، منتشر می‌شود.
   final dynamic onTickEvent;
 
-  /// The event to be fired when the timer completes.
-  /// رویدادی که پس از اتمام تایمر منتشر می‌شود.
+  /// An optional event to be fired when the timer completes.
+  /// یک رویداد اختیاری که پس از اتمام تایمر منتشر می‌شود.
   final dynamic onCompleteEvent;
 
   /// The time elapsed since the timer started. Should only be modified by TimerSystem.
@@ -33,10 +33,14 @@ class TimerTask with EquatableMixin {
   TimerTask({
     required this.id,
     required this.duration,
-    required this.onCompleteEvent,
+    this.onCompleteEvent, // *** UPGRADE: Made optional ***
     this.repeats = false,
     this.onTickEvent,
-  });
+  }) :
+        // *** UPGRADE: Added assertion for smarter behavior ***
+        // A timer task must have at least one event to fire.
+        assert(onTickEvent != null || onCompleteEvent != null,
+            'TimerTask must have an onTickEvent or an onCompleteEvent.');
 
   @override
   List<Object?> get props =>

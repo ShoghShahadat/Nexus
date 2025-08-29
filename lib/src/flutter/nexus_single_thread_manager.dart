@@ -4,8 +4,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:nexus/nexus.dart';
 
 class NexusSingleThreadManager implements NexusManager {
-  // CRITICAL FIX: Made the world publicly accessible via a getter.
   NexusWorld? _world;
+  @override
   NexusWorld? get world => _world;
 
   Ticker? _ticker;
@@ -16,6 +16,32 @@ class NexusSingleThreadManager implements NexusManager {
   @override
   Stream<List<RenderPacket>> get renderPacketStream =>
       _renderPacketController.stream;
+
+  /// *** NEW: Implements the hydrate method for single-threaded mode. ***
+  /// It creates a complete snapshot of the world and pushes it to the stream.
+  @override
+  void hydrate() {
+    if (_world == null) return;
+
+    final packets = <RenderPacket>[];
+    for (final entity in _world!.entities.values) {
+      final serializableComponents = <String, Map<String, dynamic>>{};
+      for (final component in entity.allComponents) {
+        if (component is SerializableComponent) {
+          serializableComponents[component.runtimeType.toString()] =
+              (component as SerializableComponent).toJson();
+        }
+      }
+      if (serializableComponents.isNotEmpty) {
+        packets.add(
+            RenderPacket(id: entity.id, components: serializableComponents));
+      }
+    }
+
+    if (packets.isNotEmpty) {
+      _renderPacketController.add(packets);
+    }
+  }
 
   void _updateLoop() {
     if (_world == null) return;
@@ -74,10 +100,14 @@ class NexusSingleThreadManager implements NexusManager {
 
   @override
   Future<void> dispose({bool isHotReload = false}) async {
-    if (isHotReload && _world != null) {
-      _world!.eventBus.fire(SaveDataEvent());
+    // In single-threaded mode, hot reload is less of an issue,
+    // but we respect the flag for consistency.
+    if (isHotReload) {
+      _world?.eventBus.fire(SaveDataEvent());
       _updateLoop();
+      return;
     }
+
     _ticker?.stop();
     _ticker?.dispose();
     _ticker = null;

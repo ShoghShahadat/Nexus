@@ -1,13 +1,20 @@
+// FILE: packages/nexus/lib/src/systems/persistence_system.dart
+// (English comments for code clarity)
+
 import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/core/storage/storage_adapter.dart';
 import 'package:flutter/foundation.dart';
 
+// --- FINAL FIX: Core events are now defined and exported from the package itself ---
 class SaveDataEvent {}
+
+class DataLoadedEvent {}
 
 /// A system that handles saving and loading entities with a [PersistenceComponent].
 class PersistenceSystem extends System {
-  StorageAdapter? _storage; // Make nullable initially
+  StorageAdapter? _storage;
+  bool _hasLoaded = false;
 
   @override
   void onAddedToWorld(NexusWorld world) {
@@ -17,7 +24,6 @@ class PersistenceSystem extends System {
 
   @override
   Future<void> init() async {
-    // --- FIX: Get the service here, after the initializer has run ---
     try {
       debugPrint(
           '[PersistenceSystem] Attempting to get StorageAdapter from GetIt...');
@@ -48,20 +54,24 @@ class PersistenceSystem extends System {
               (component as SerializableComponent).toJson();
         }
       }
-      await _storage!.save('nexus_$key', entityJson); // Add namespace
-      debugPrint('[PersistenceSystem] Saved data for key: $key');
+      await _storage!.save('nexus_$key', entityJson);
+      debugPrint('💾 [PersistenceSystem] Saved data for key: $key');
     }
   }
 
   Future<void> _load() async {
-    if (_storage == null) return;
+    if (_storage == null || _hasLoaded) return;
+    _hasLoaded = true;
+
     final allData = await _storage!.loadAll();
     if (allData.isEmpty) {
-      debugPrint('[PersistenceSystem] No data to load.');
+      debugPrint('[PersistenceSystem] No data to load from storage.');
+      world.eventBus.fire(DataLoadedEvent());
       return;
     }
 
-    debugPrint('[PersistenceSystem] Loading data for keys: ${allData.keys}');
+    debugPrint(
+        '📂 [PersistenceSystem] Loading data for ${allData.length} keys: ${allData.keys}');
 
     for (final key in allData.keys) {
       final entityData = allData[key]!;
@@ -80,7 +90,9 @@ class PersistenceSystem extends System {
         world.addEntity(entity);
       }
     }
-    debugPrint('[PersistenceSystem] Data loading complete.');
+    debugPrint(
+        '🏁 [PersistenceSystem] Data loading complete. Firing DataLoadedEvent.');
+    world.eventBus.fire(DataLoadedEvent());
   }
 
   @override

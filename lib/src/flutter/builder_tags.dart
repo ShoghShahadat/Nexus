@@ -10,4 +10,15 @@ class BuilderTags {
   /// A generic tag for any entity that should be rendered by the data-driven
   /// CustomWidgetBuilder.
   static const String customWidget = 'custom_widget';
+
+  static const String root = 'root';
+
+  /// A conventional tag for the main application bar entity.
+  static const String appBar = 'app_bar';
+
+  /// A conventional tag for the main body or content area entity.
+  static const String body = 'body';
+
+  /// A conventional tag for the navigation drawer or panel entity.
+  static const String navigationPanel = 'navigation_panel';
 }

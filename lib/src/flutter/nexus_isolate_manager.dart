@@ -16,6 +16,9 @@ class NexusIsolateManager implements NexusManager {
       _renderPacketController.stream;
 
   @override
+  NexusWorld? get world => null;
+
+  @override
   Future<void> spawn(
     NexusWorld Function() worldProvider, {
     Future<void> Function()? isolateInitializer,
@@ -50,9 +53,19 @@ class NexusIsolateManager implements NexusManager {
   }
 
   @override
+  void hydrate() {
+    _sendPort?.send('hydrate');
+  }
+
+  @override
   Future<void> dispose({bool isHotReload = false}) async {
-    // Note: Stateful Hot Reload is a debug-only feature and doesn't apply
-    // to isolate mode, but we implement the signature for consistency.
+    if (isHotReload) {
+      // debugPrint((
+      // "[NexusIsolateManager] Hot reload detected. Isolate will be preserved.");
+      return;
+    }
+
+    // debugPrint(("[NexusIsolateManager] Disposing isolate...");
     _sendPort?.send('shutdown');
     _receivePort.close();
     await _renderPacketController.close();
@@ -61,8 +74,9 @@ class NexusIsolateManager implements NexusManager {
   }
 }
 
+// --- Isolate Entry Point ---
+
 void _isolateEntryPoint(List<dynamic> args) async {
-  // ... (rest of the isolate code remains the same)
   final mainSendPort = args[0] as SendPort;
   final isolateInitializer = args[1] as Future<void> Function()?;
   final worldProvider = args[2] as NexusWorld Function();
@@ -83,8 +97,32 @@ void _isolateEntryPoint(List<dynamic> args) async {
     registerCoreComponents();
 
     final world = worldProvider();
-
     await world.init();
+
+    // *** FINAL FIX: Proactive Hydration ***
+    // Immediately send the initial state of the world to the UI after initialization.
+    // This solves the initial loading screen bug by ensuring the UI gets data
+    // as soon as the logic isolate is ready, without waiting for a message from the UI.
+    // debugPrint((
+    // "[NexusLogicIsolate] World initialized. Sending initial hydration packet.");
+    final initialPackets = <RenderPacket>[];
+    for (final entity in world.entities.values) {
+      final serializableComponents = <String, Map<String, dynamic>>{};
+      for (final component in entity.allComponents) {
+        if (component is SerializableComponent) {
+          serializableComponents[component.runtimeType.toString()] =
+              (component as SerializableComponent).toJson();
+        }
+      }
+      if (serializableComponents.isNotEmpty) {
+        initialPackets.add(
+            RenderPacket(id: entity.id, components: serializableComponents));
+      }
+    }
+    if (initialPackets.isNotEmpty) {
+      mainSendPort.send(initialPackets);
+    }
+    // End of Proactive Hydration block
 
     final stopwatch = Stopwatch()..start();
 
@@ -129,16 +167,37 @@ void _isolateEntryPoint(List<dynamic> args) async {
     });
 
     isolateReceivePort.listen((message) {
-      if (message is SaveDataEvent ||
-          message is EntityTapEvent ||
-          message is NexusPointerMoveEvent ||
-          message is UndoEvent ||
-          message is RedoEvent) {
+      if (message is String) {
+        switch (message) {
+          case 'shutdown':
+            timer.cancel();
+            world.clear();
+            isolateReceivePort.close();
+            break;
+          case 'hydrate':
+            // debugPrint((
+            // "[NexusLogicIsolate] Hydration requested. Sending full world snapshot.");
+            final packets = <RenderPacket>[];
+            for (final entity in world.entities.values) {
+              final serializableComponents = <String, Map<String, dynamic>>{};
+              for (final component in entity.allComponents) {
+                if (component is SerializableComponent) {
+                  serializableComponents[component.runtimeType.toString()] =
+                      (component as SerializableComponent).toJson();
+                }
+              }
+              if (serializableComponents.isNotEmpty) {
+                packets.add(RenderPacket(
+                    id: entity.id, components: serializableComponents));
+              }
+            }
+            if (packets.isNotEmpty) {
+              mainSendPort.send(packets);
+            }
+            break;
+        }
+      } else {
         world.eventBus.fire(message);
-      } else if (message == 'shutdown') {
-        timer.cancel();
-        world.clear();
-        isolateReceivePort.close();
       }
     });
   } catch (e, stacktrace) {

@@ -7,34 +7,32 @@ import 'package:nexus/src/components/lifecycle_policy_component.dart';
 class GarbageCollectorSystem extends System {
   double _timer = 0.0;
   final double _checkInterval; // How often to run the check, in seconds.
+  final bool enabled; // --- NEW: Flag to enable/disable the GC ---
 
-  GarbageCollectorSystem({double checkInterval = 2.0})
-      : _checkInterval = checkInterval;
+  GarbageCollectorSystem({
+    double checkInterval = 2.0,
+    this.enabled =
+        true, // --- NEW: Enabled by default for backward compatibility ---
+  }) : _checkInterval = checkInterval;
 
   @override
   bool matches(Entity entity) {
     // This system doesn't operate on entities in the traditional update loop.
-    // It iterates over all entities manually.
     return false;
   }
 
   @override
   void update(Entity entity, double dt) {
-    // The logic is handled in the root entity's update or a separate timer.
-    // For simplicity, we'll tie it to the root entity's update cycle.
+    // The logic is handled in the runGc method.
   }
 
-  @override
-  void onAddedToWorld(NexusWorld world) {
-    super.onAddedToWorld(world);
-    // We can use a simple timer tied to the game loop.
-    // This system will be driven by the update of the root entity.
-    // A more advanced implementation could use its own independent timer.
-  }
-
-  /// This method should be called once per frame from a central system
-  /// or tied to the root entity's update.
+  /// This method should be called once per frame from a central system.
   void runGc(double dt) {
+    // --- NEW: Immediately exit if the system is disabled ---
+    if (!enabled) {
+      return;
+    }
+
     _timer += dt;
     if (_timer < _checkInterval) {
       return;
@@ -48,7 +46,6 @@ class GarbageCollectorSystem extends System {
       final policy = entity.get<LifecyclePolicyComponent>();
 
       if (policy == null) {
-        // Ignore the root entity as it's the foundation.
         if (entity.id != world.rootEntity.id) {
           debugPrint(
               '[GarbageCollector] WARNING: Entity ID ${entity.id} is missing a LifecyclePolicyComponent. This can lead to memory leaks.');

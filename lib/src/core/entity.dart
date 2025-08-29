@@ -23,50 +23,63 @@ class Entity extends ChangeNotifier {
   Entity() : id = _nextId++;
 
   /// Adds a component to the entity and notifies listeners.
-  void add<T extends Component>(T component) {
+  ///
+  /// The [forceNotify] parameter, when set to true, bypasses the equality check
+  /// and guarantees that the entity is marked as dirty, forcing a UI update.
+  /// This is crucial for animations or state changes where the component's value
+  /// might not change, but a rebuild is still desired.
+  void add<T extends Component>(T component, {bool forceNotify = false}) {
     final existingComponent = _components[T];
 
+    // If forceNotify is true, we always replace the component and notify.
+    if (forceNotify) {
+      _components[T] = component;
+      _dirtyComponents.add(T);
+      notifyListeners();
+      return;
+    }
+
+    // --- Original optimization logic ---
+
+    // If the exact same instance is being re-added, just mark it dirty.
     if (identical(existingComponent, component)) {
       _dirtyComponents.add(T);
       notifyListeners();
       return;
     }
 
+    // If an equivalent but different instance is added, do nothing to save performance.
     if (existingComponent != null && existingComponent == component) {
       return;
     }
 
+    // Otherwise, add the new/different component.
     _components[T] = component;
     _dirtyComponents.add(T);
     notifyListeners();
   }
 
-  // *** FIX: Correctly add multiple components using their runtimeType. ***
-  // *** اصلاح: افزودن صحیح چندین کامپوننت با استفاده از runtimeType آن‌ها. ***
+  /// Adds multiple components to the entity.
   void addComponents(List<Component> components) {
     bool hasChanged = false;
     for (final component in components) {
-      final type = component.runtimeType; // Use runtimeType here!
+      final type = component.runtimeType;
       final existingComponent = _components[type];
 
-      // If the exact same instance is being re-added, just mark it dirty.
       if (identical(existingComponent, component)) {
         _dirtyComponents.add(type);
         hasChanged = true;
         continue;
       }
 
-      // If an equivalent component is already there, do nothing.
       if (existingComponent != null && existingComponent == component) {
         continue;
       }
 
-      // Otherwise, add the new component.
       _components[type] = component;
       _dirtyComponents.add(type);
       hasChanged = true;
     }
-    // Notify listeners only once if any changes were made.
     if (hasChanged) {
       notifyListeners();
     }

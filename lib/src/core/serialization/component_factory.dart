@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/components/decoration_components.dart';
 
 // This file is now fully self-contained within the library.
 
@@ -17,14 +19,22 @@ class ComponentFactoryRegistry {
 
   ComponentFactoryRegistry._internal();
 
+  /// Returns a list of all registered component type names for debugging.
+  List<String> get registeredTypeNames => _factories.keys.toList();
+
   /// Registers a single component factory.
   void register(String typeName, ComponentFactory factory) {
+    if (kDebugMode) {
+      // print("[ComponentRegistry] Registering factory for: $typeName");
+    }
     _factories[typeName] = factory;
   }
 
   /// Registers multiple component factories from a map.
   void registerAll(ComponentRegistryMap factories) {
-    _factories.addAll(factories);
+    factories.forEach((key, value) {
+      register(key, value);
+    });
   }
 
   Component create(String typeName, Map<String, dynamic> json) {
@@ -70,6 +80,8 @@ void registerCoreComponents() {
     'CategoryComponent': (json) => CategoryComponent.fromJson(json),
     'ParentComponent': (json) => ParentComponent.fromJson(json),
     'LinkComponent': (json) => LinkComponent.fromJson(json),
+
+    'DecorationComponent': (json) => DecorationComponent.fromJson(json),
 
     // Gameplay Components
     'TargetingComponent': (json) => TargetingComponent.fromJson(json),

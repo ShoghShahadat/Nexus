@@ -2,8 +2,6 @@ import 'package:nexus/nexus.dart';
 
 /// A system that processes entities with a `TimerComponent` to manage
 /// scheduled and recurring tasks.
-/// سیستمی که موجودیت‌های دارای `TimerComponent` را برای مدیریت وظایف
-/// زمان‌بندی شده و تکراری پردازش می‌کند.
 class TimerSystem extends System {
   @override
   bool matches(Entity entity) {
@@ -13,49 +11,41 @@ class TimerSystem extends System {
   @override
   void update(Entity entity, double dt) {
     final timerComponent = entity.get<TimerComponent>()!;
-    // Create a copy for safe iteration, as tasks might be removed.
-    // یک کپی برای پیمایش امن ایجاد می‌کنیم، زیرا ممکن است وظایف حذف شوند.
     final tasksToRemove = <TimerTask>{};
+    bool hasChanged = false;
 
     for (final task in timerComponent.tasks) {
       task.elapsedTime += dt;
 
-      // Fire the onTick event every frame if it exists.
-      // رویداد onTick را در هر فریم، در صورت وجود، منتشر می‌کنیم.
       if (task.onTickEvent != null) {
         world.eventBus.fire(task.onTickEvent);
       }
 
       if (task.elapsedTime >= task.duration) {
-        // Fire the completion event.
-        // رویداد اتمام را منتشر می‌کنیم.
-        world.eventBus.fire(task.onCompleteEvent);
+        if (task.onCompleteEvent != null) {
+          world.eventBus.fire(task.onCompleteEvent);
+        }
 
         if (task.repeats) {
-          // Reset for the next cycle.
-          // برای چرخه بعدی ریست می‌کنیم.
           task.elapsedTime -= task.duration;
         } else {
-          // Mark for removal if it's a one-shot timer.
-          // اگر تایمر یک‌باره است، آن را برای حذف علامت‌گذاری می‌کنیم.
           tasksToRemove.add(task);
         }
       }
     }
 
     if (tasksToRemove.isNotEmpty) {
-      // Remove completed tasks from the original list.
-      // وظایف تکمیل‌شده را از لیست اصلی حذف می‌کنیم.
       timerComponent.tasks.removeWhere((task) => tasksToRemove.contains(task));
+      hasChanged = true;
     }
 
-    // If there are no more tasks, remove the component itself.
-    // اگر وظیفه دیگری باقی نمانده، خود کامپوننت را حذف می‌کنیم.
-    if (timerComponent.tasks.isEmpty) {
-      entity.remove<TimerComponent>();
-    } else {
-      // Re-add the component to signal that its internal state has changed.
-      // کامپوننت را دوباره اضافه می‌کنیم تا نشان دهیم وضعیت داخلی آن تغییر کرده است.
+    // *** FINAL FIX: Make the system more predictable and robust. ***
+    // Instead of aggressively removing the component when the task list is empty,
+    // we will always re-add it if its internal state (the tasks list) has changed.
+    // This prevents race conditions where another system tries to access the component
+    // right after it has been removed. The component's lifecycle should be managed
+    // by the system that created it (e.g., ButtonInteractionSystem) or a GarbageCollector.
+    if (hasChanged) {
       entity.add(timerComponent);
     }
   }

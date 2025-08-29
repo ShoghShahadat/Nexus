@@ -1,10 +1,13 @@
+// FILE: lib/src/components/position_component.dart
+// (English comments for code clarity)
+// MODIFIED v2.0: Added the missing `copyWith` method for easier, immutable updates.
+
 import 'package:nexus/src/core/component.dart';
 import 'package:nexus/src/core/serialization/binary_component.dart';
 import 'package:nexus/src/core/serialization/binary_reader_writer.dart';
 import 'package:nexus/src/core/serialization/serializable_component.dart';
 
 /// A component that stores the 2D position and size of an entity.
-/// It now implements [BinaryComponent] for efficient network serialization.
 class PositionComponent extends Component
     with SerializableComponent, BinaryComponent {
   double x;
@@ -21,10 +24,27 @@ class PositionComponent extends Component
     this.scale = 1.0,
   });
 
+  /// Creates a new PositionComponent with updated values.
+  PositionComponent copyWith({
+    double? x,
+    double? y,
+    double? width,
+    double? height,
+    double? scale,
+  }) {
+    return PositionComponent(
+      x: x ?? this.x,
+      y: y ?? this.y,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      scale: scale ?? this.scale,
+    );
+  }
+
   // --- BinaryComponent Implementation ---
 
   @override
-  int get typeId => 1; // Unique network ID for PositionComponent
+  int get typeId => 1;
 
   @override
   void toBinary(BinaryWriter writer) {
@@ -52,7 +72,7 @@ class PositionComponent extends Component
       y: (json['y'] as num).toDouble(),
       width: (json['width'] as num).toDouble(),
       height: (json['height'] as num).toDouble(),
-      scale: (json['scale'] as num).toDouble(),
+      scale: (json['scale'] as num? ?? 1.0).toDouble(),
     );
   }
 

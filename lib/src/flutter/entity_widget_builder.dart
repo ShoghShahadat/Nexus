@@ -1,19 +1,24 @@
 import 'package:flutter/widgets.dart';
 import 'package:nexus/src/core/entity.dart';
+import 'package:nexus/src/systems/flutter_rendering_system.dart';
 
-/// A highly performant widget that listens to a single [Entity] and rebuilds
-/// its child whenever the entity's components change.
+/// A highly performant widget that listens to a single entity using its ID
+/// and the rendering system, then rebuilds its child whenever the entity's
+/// components change.
 ///
-/// This is the core of the reactive UI layer in Nexus. It ensures that only
-/// the specific parts of the widget tree that depend on an entity are rebuilt,
-/// preventing unnecessary builds of the entire screen.
+/// This is the core of the reactive UI layer in Nexus for an isolate-based
+/// architecture. It ensures that only the specific parts of the widget tree
+/// that depend on an entity are rebuilt, by listening to notifiers provided
+/// by the FlutterRenderingSystem.
 class EntityWidgetBuilder extends StatefulWidget {
-  final Entity entity;
-  final Widget Function(BuildContext context, Entity entity) builder;
+  final FlutterRenderingSystem renderingSystem;
+  final EntityId entityId;
+  final Widget Function(BuildContext context) builder;
 
   const EntityWidgetBuilder({
     super.key,
-    required this.entity,
+    required this.renderingSystem,
+    required this.entityId,
     required this.builder,
   });
 
@@ -25,24 +30,33 @@ class _EntityWidgetBuilderState extends State<EntityWidgetBuilder> {
   @override
   void initState() {
     super.initState();
-    // Subscribe to the entity's changes.
-    widget.entity.addListener(_onEntityChanged);
+    // Subscribe to the entity's changes via the notifier from the rendering system.
+    widget.renderingSystem
+        .getNotifier(widget.entityId)
+        .addListener(_onEntityChanged);
   }
 
   @override
   void didUpdateWidget(covariant EntityWidgetBuilder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If the entity instance itself changes, update the listener.
-    if (widget.entity != oldWidget.entity) {
-      oldWidget.entity.removeListener(_onEntityChanged);
-      widget.entity.addListener(_onEntityChanged);
+    // If the entity ID or rendering system instance itself changes, update the listener.
+    if (widget.entityId != oldWidget.entityId ||
+        widget.renderingSystem != oldWidget.renderingSystem) {
+      oldWidget.renderingSystem
+          .getNotifier(oldWidget.entityId)
+          .removeListener(_onEntityChanged);
+      widget.renderingSystem
+          .getNotifier(widget.entityId)
+          .addListener(_onEntityChanged);
     }
   }
 
   @override
   void dispose() {
     // Unsubscribe to prevent memory leaks.
-    widget.entity.removeListener(_onEntityChanged);
+    widget.renderingSystem
+        .getNotifier(widget.entityId)
+        .removeListener(_onEntityChanged);
     super.dispose();
   }
 
@@ -56,6 +70,8 @@ class _EntityWidgetBuilderState extends State<EntityWidgetBuilder> {
 
   @override
   Widget build(BuildContext context) {
-    return widget.builder(context, widget.entity);
+    // The builder function doesn't need any parameters, as it can get all
+    // necessary data from the renderingSystem available in its parent scope.
+    return widget.builder(context);
   }
 }
