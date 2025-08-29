@@ -3,12 +3,12 @@ import 'package:collection/collection.dart'; // Import for firstWhereOrNull
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/components/attractor_component.dart';
 
-/// سیستمی که یک کشش گرانشی را از یک موجودیت جاذب
-/// به تمام موجودیت‌های دیگر با سرعت اعمال می‌کند.
+/// A system that applies a gravitational pull from an attractor entity
+/// to all other entities with velocity.
 class AttractionSystem extends System {
   @override
   bool matches(Entity entity) {
-    // این سیستم روی هر موجودیت متحرکی که خودش جاذب نباشد، عمل می‌کند.
+    // This system acts on any movable entity that is not an attractor itself.
     return entity.has<PositionComponent>() &&
         entity.has<VelocityComponent>() &&
         !entity.has<AttractorComponent>();
@@ -17,11 +17,11 @@ class AttractionSystem extends System {
   @override
   void update(Entity entity, double dt) {
     // --- FIX: Race condition fixed by finding the attractor on every frame ---
-    // به جای کش کردن، هر بار جاذب را پیدا می‌کنیم تا از بروز خطا جلوگیری شود.
+    // Instead of caching, we look it up every time to ensure it's available.
     final attractor = world.entities.values
         .firstWhereOrNull((e) => e.has<AttractorComponent>());
 
-    // اگر جاذب هنوز وجود ندارد، هیچ کاری انجام نده.
+    // If the attractor doesn't exist yet, do nothing.
     if (attractor == null) {
       return;
     }
@@ -35,18 +35,18 @@ class AttractionSystem extends System {
     final dy = attractorPos.y - pos.y;
     final distSq = dx * dx + dy * dy;
 
-    // از نیروهای بسیار شدید در فاصله نزدیک جلوگیری می‌کند تا شبیه‌سازی پایدار بماند.
+    // Prevent extreme forces at close range to keep the simulation stable.
     if (distSq < 25) return;
 
-    // محاسبه نیروی جاذبه بر اساس قانون عکس مربع فاصله.
+    // Calculate gravitational force based on inverse square law.
     final force = attractorComp.strength * 30000 / distSq;
     final angle = atan2(dy, dx);
 
-    // اعمال شتاب به سرعت موجودیت.
-    vel.x += cos(angle) * force * dt;
-    vel.y += sin(angle) * force * dt;
+    // Apply acceleration to the entity's velocity.
+    final newVelX = vel.x + cos(angle) * force * dt;
+    final newVelY = vel.y + sin(angle) * force * dt;
 
-    // کامپوننت سرعت را دوباره اضافه می‌کنیم تا سیستم از تغییر آن مطلع شود.
-    entity.add(vel);
+    // Use the new copyWith extension for an immutable, clean update.
+    entity.add(vel.copyWith({'x': newVelX, 'y': newVelY}));
   }
 }

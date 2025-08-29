@@ -131,6 +131,8 @@ class NexusWorld {
 
     final entitiesList = List<Entity>.from(_entities.values);
     for (final system in _systems) {
+      // MODIFIED: Run system-wide logic if implemented
+      system.run(dt);
       for (final entity in entitiesList) {
         if (_entities.containsKey(entity.id) && system.matches(entity)) {
           system.update(entity, dt);

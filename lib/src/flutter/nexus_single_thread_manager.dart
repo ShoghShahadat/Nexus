@@ -43,11 +43,12 @@ class NexusSingleThreadManager implements NexusManager {
     }
   }
 
-  void _updateLoop() {
+  void _updateLoop(Duration elapsed) {
     if (_world == null) return;
     final dt =
         _stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
     _stopwatch.reset();
+    _stopwatch.start();
     _world!.update(dt);
     final packets = <RenderPacket>[];
     for (final entity in _world!.entities.values) {
@@ -64,6 +65,7 @@ class NexusSingleThreadManager implements NexusManager {
         packets.add(
             RenderPacket(id: entity.id, components: serializableComponents));
       }
+      entity.clearDirty();
     }
     final removedEntityIds = _world!.getAndClearRemovedEntities();
     for (final id in removedEntityIds) {
@@ -71,9 +73,6 @@ class NexusSingleThreadManager implements NexusManager {
     }
     if (packets.isNotEmpty) {
       _renderPacketController.add(packets);
-    }
-    for (final entity in _world!.entities.values) {
-      entity.clearDirty();
     }
   }
 
@@ -83,13 +82,17 @@ class NexusSingleThreadManager implements NexusManager {
     Future<void> Function()? isolateInitializer,
     RootIsolateToken? rootIsolateToken,
   }) async {
+    if (_world != null) return;
+
     if (isolateInitializer != null) {
       await isolateInitializer();
     }
+    registerCoreComponents();
     _world = worldProvider();
     await _world!.init();
+    hydrate(); // Proactive hydration
     _stopwatch.start();
-    _ticker = Ticker((_) => _updateLoop());
+    _ticker = Ticker(_updateLoop);
     _ticker!.start();
   }
 
@@ -100,11 +103,11 @@ class NexusSingleThreadManager implements NexusManager {
 
   @override
   Future<void> dispose({bool isHotReload = false}) async {
-    // In single-threaded mode, hot reload is less of an issue,
-    // but we respect the flag for consistency.
     if (isHotReload) {
+      // For single-threaded hot reload, we might need to save state
+      // if persistence is being used.
       _world?.eventBus.fire(SaveDataEvent());
-      _updateLoop();
+      _updateLoop(Duration.zero); // Ensure the save is processed
       return;
     }
 

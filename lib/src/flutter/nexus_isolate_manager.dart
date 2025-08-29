@@ -125,11 +125,13 @@ void _isolateEntryPoint(List<dynamic> args) async {
     // End of Proactive Hydration block
 
     final stopwatch = Stopwatch()..start();
+    Timer? gameLoopTimer;
 
-    final timer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+    gameLoopTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
       final dt =
           stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
       stopwatch.reset();
+      stopwatch.start();
 
       world.update(dt);
 
@@ -150,6 +152,7 @@ void _isolateEntryPoint(List<dynamic> args) async {
           packets.add(
               RenderPacket(id: entity.id, components: serializableComponents));
         }
+        entity.clearDirty();
       }
 
       final removedEntityIds = world.getAndClearRemovedEntities();
@@ -160,23 +163,17 @@ void _isolateEntryPoint(List<dynamic> args) async {
       if (packets.isNotEmpty) {
         mainSendPort.send(packets);
       }
-
-      for (final entity in world.entities.values) {
-        entity.clearDirty();
-      }
     });
 
     isolateReceivePort.listen((message) {
       if (message is String) {
         switch (message) {
           case 'shutdown':
-            timer.cancel();
+            gameLoopTimer?.cancel();
             world.clear();
             isolateReceivePort.close();
             break;
           case 'hydrate':
-            // debugPrint((
-            // "[NexusLogicIsolate] Hydration requested. Sending full world snapshot.");
             final packets = <RenderPacket>[];
             for (final entity in world.entities.values) {
               final serializableComponents = <String, Map<String, dynamic>>{};

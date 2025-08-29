@@ -1,19 +1,16 @@
 import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/attractor_component.dart';
-import 'package:nexus/src/events/pointer_events.dart';
+
+// UNNECESSARY IMPORTS REMOVED: Redundant imports were cleaned up as requested by the analyzer.
 
 /// A system that listens for pointer events from the UI and updates the
 /// position of a designated entity (like the attractor).
 class PointerSystem extends System {
-  StreamSubscription? _pointerMoveSubscription;
-
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    _pointerMoveSubscription =
-        world.eventBus.on<NexusPointerMoveEvent>(_onPointerMove);
+    listen<NexusPointerMoveEvent>(_onPointerMove);
   }
 
   void _onPointerMove(NexusPointerMoveEvent event) {
@@ -24,9 +21,10 @@ class PointerSystem extends System {
 
     if (trackedEntity != null) {
       final pos = trackedEntity.get<PositionComponent>()!;
-      pos.x = event.x;
-      pos.y = event.y;
-      trackedEntity.add(pos);
+      // FINAL FIX: Correctly call the member 'copyWith' with named arguments.
+      // This resolves the 'extra_positional_arguments_could_be_named' error
+      // because PositionComponent has its own specific, type-safe copyWith method.
+      trackedEntity.add(pos.copyWith(x: event.x, y: event.y));
     }
   }
 
@@ -35,11 +33,4 @@ class PointerSystem extends System {
 
   @override
   void update(Entity entity, double dt) {}
-
-  @override
-  void onRemovedFromWorld() {
-    _pointerMoveSubscription?.cancel();
-    _pointerMoveSubscription = null;
-    super.onRemovedFromWorld();
-  }
 }

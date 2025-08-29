@@ -36,6 +36,13 @@ abstract class System {
   /// [dt] is the delta time, the time elapsed since the last frame in seconds.
   void update(Entity entity, double dt);
 
+  /// An optional method for systems that need to perform logic once per frame
+  /// on the entire set of entities, rather than one by one.
+  ///
+  /// This is useful for systems like `CustomPaintingSystem` that aggregate data
+  /// from many entities before acting.
+  void run(double dt) {}
+
   /// An optional async method for systems that need to perform setup
   /// before the main game loop starts (e.g., loading data from a database).
   Future<void> init() async {}

@@ -9,14 +9,12 @@ class NexusWidget extends StatefulWidget {
   final NexusWorld Function() worldProvider;
   final FlutterRenderingSystem renderingSystem;
   final Future<void> Function()? isolateInitializer;
-  final RootIsolateToken? rootIsolateToken;
 
   const NexusWidget({
     super.key,
     required this.worldProvider,
     required this.renderingSystem,
     this.isolateInitializer,
-    this.rootIsolateToken,
   });
 
   @override
@@ -24,6 +22,7 @@ class NexusWidget extends StatefulWidget {
 }
 
 class _NexusWidgetState extends State<NexusWidget> {
+  // A static manager to survive hot reloads in debug mode.
   static NexusManager? _staticDebugManager;
 
   late NexusManager _manager;
@@ -50,7 +49,9 @@ class _NexusWidgetState extends State<NexusWidget> {
   @override
   void reassemble() {
     super.reassemble();
-    // debugPrint(("🔄 [NexusWidget] Reassembling (Hot Reload detected).");
+    // This is the key to fixing hot reload!
+    // We re-subscribe to the (preserved) manager's stream and
+    // explicitly request a full state snapshot.
     _subscribeToRenderPackets();
     _manager.hydrate();
   }
@@ -75,24 +76,22 @@ class _NexusWidgetState extends State<NexusWidget> {
   }
 
   void _initializeManager() {
-    if (kDebugMode && !kIsWeb) {
+    final useIsolate = !kIsWeb;
+
+    if (kDebugMode && useIsolate) {
       if (_staticDebugManager == null) {
-        // debugPrint((
-        // "🚀 [NexusWidget] First run in debug mode. Creating and preserving IsolateManager.");
         _staticDebugManager = NexusIsolateManager();
         _manager = _staticDebugManager!;
         widget.renderingSystem.setManager(_manager);
         _spawnWorld();
       } else {
-        // debugPrint((
-        // "🔄 [NexusWidget] Hot reload: Re-using existing IsolateManager.");
         _manager = _staticDebugManager!;
         widget.renderingSystem.setManager(_manager);
+        // Do not re-spawn, just re-hydrate in reassemble.
       }
     } else {
-      // debugPrint((
-      // "🚀 [NexusWidget] Production or Web build. Creating fresh manager.");
-      _manager = kIsWeb ? NexusSingleThreadManager() : NexusIsolateManager();
+      _manager =
+          useIsolate ? NexusIsolateManager() : NexusSingleThreadManager();
       widget.renderingSystem.setManager(_manager);
       _spawnWorld();
     }
@@ -102,14 +101,14 @@ class _NexusWidgetState extends State<NexusWidget> {
     _manager.spawn(
       widget.worldProvider,
       isolateInitializer: widget.isolateInitializer,
-      rootIsolateToken: widget.rootIsolateToken,
+      // Required for using platform channels in the isolate.
+      rootIsolateToken: RootIsolateToken.instance,
     );
     _subscribeToRenderPackets();
   }
 
   void _subscribeToRenderPackets() {
     _renderPacketSubscription?.cancel();
-    // debugPrint(("🎧 [NexusWidget] Subscribing to render packet stream.");
     _renderPacketSubscription = _manager.renderPacketStream
         .listen(widget.renderingSystem.updateFromPackets);
   }
@@ -120,6 +119,8 @@ class _NexusWidgetState extends State<NexusWidget> {
     _focusNode.dispose();
     _renderPacketSubscription?.cancel();
 
+    // Dispose the manager only in release builds or on the web.
+    // In debug mode, the static manager is preserved across hot reloads.
     if (!kDebugMode || kIsWeb) {
       _manager.dispose();
       if (kDebugMode) {
@@ -131,11 +132,8 @@ class _NexusWidgetState extends State<NexusWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // *** FINAL FIX: The NexusWidget is now simpler. ***
-    // It no longer needs an AnimatedBuilder. Its main job is to host the rendering
-    // system and provide layout/input context.
-    // debugPrint(("🎨 [NexusWidget] Build triggered.");
-
+    // This widget's primary job is to provide context (Layout, Input)
+    // and delegate the actual rendering to the rendering system.
     return LayoutBuilder(
       builder: (context, constraints) {
         final rootEntityId =
@@ -150,8 +148,6 @@ class _NexusWidgetState extends State<NexusWidget> {
           if (currentInfo == null ||
               currentInfo.width != newWidth ||
               currentInfo.height != newHeight) {
-            // // debugPrint((
-            //     "  - 📏 Screen size changed or is new. Sending ScreenResizedEvent ($newWidth x $newHeight).");
             _manager.send(ScreenResizedEvent(
               newWidth: newWidth,
               newHeight: newHeight,
@@ -165,7 +161,12 @@ class _NexusWidgetState extends State<NexusWidget> {
         return KeyboardListener(
           focusNode: _focusNode,
           onKeyEvent: _handleKeyEvent,
-          child: widget.renderingSystem.build(context),
+          // AnimatedBuilder ensures that the rendering system's own build
+          // method is called whenever new entities are added or removed.
+          child: AnimatedBuilder(
+            animation: widget.renderingSystem,
+            builder: (context, child) => widget.renderingSystem.build(context),
+          ),
         );
       },
     );

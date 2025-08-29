@@ -19,7 +19,7 @@ class PersistenceSystem extends System {
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    world.eventBus.on<SaveDataEvent>(_handleSave);
+    listen<SaveDataEvent>(_handleSave);
   }
 
   @override
@@ -30,9 +30,11 @@ class PersistenceSystem extends System {
       _storage = services.get<StorageAdapter>();
       debugPrint('[PersistenceSystem] StorageAdapter retrieved successfully.');
       await _load();
-    } on StateError catch (e) {
+    } on StateError {
       debugPrint(
-          '[PersistenceSystem] FATAL ERROR: Could not get StorageAdapter. Make sure it is registered in the isolateInitializer. Details: $e');
+          '[PersistenceSystem] WARNING: No StorageAdapter found in GetIt. Persistence will be disabled.');
+      _hasLoaded = true; // Mark as "loaded" to prevent retries
+      world.eventBus.fire(DataLoadedEvent()); // Allow app to proceed
     } catch (e) {
       debugPrint(
           '[PersistenceSystem] An unexpected error occurred during init: $e');
@@ -54,7 +56,7 @@ class PersistenceSystem extends System {
               (component as SerializableComponent).toJson();
         }
       }
-      await _storage!.save('nexus_$key', entityJson);
+      await _storage!.save(key, entityJson);
       debugPrint('💾 [PersistenceSystem] Saved data for key: $key');
     }
   }
@@ -75,19 +77,29 @@ class PersistenceSystem extends System {
 
     for (final key in allData.keys) {
       final entityData = allData[key]!;
-      var entity = world.entities.values.firstWhere(
-          (e) => e.get<PersistenceComponent>()?.storageKey == key,
-          orElse: () => Entity());
+      // Find the entity that is *already supposed to exist* with this storage key.
+      final targetEntity = world.entities.values.firstWhere(
+        (e) => e.get<PersistenceComponent>()?.storageKey == key,
+        orElse: () {
+          debugPrint(
+              '[PersistenceSystem] WARNING: Could not find an existing entity for storage key "$key". A new entity will be created, but this may indicate an issue in your EntityProviders.');
+          final newEntity = Entity();
+          newEntity.add(PersistenceComponent(key));
+          world.addEntity(newEntity);
+          return newEntity;
+        },
+      );
 
       for (final typeName in entityData.keys) {
         final componentJson = entityData[typeName]!;
-        final component =
-            ComponentFactoryRegistry.I.create(typeName, componentJson);
-        entity.add(component);
-      }
-
-      if (!world.entities.containsKey(entity.id)) {
-        world.addEntity(entity);
+        try {
+          final component =
+              ComponentFactoryRegistry.I.create(typeName, componentJson);
+          targetEntity.add(component);
+        } catch (e) {
+          debugPrint(
+              '[PersistenceSystem] ERROR: Failed to deserialize component "$typeName" for key "$key". Error: $e');
+        }
       }
     }
     debugPrint(

@@ -27,6 +27,9 @@ class EventBus {
   /// Note: Listening for `dynamic` is an advanced use-case, typically for
   /// dispatcher systems like RuleSystem that need to react to any event.
   StreamSubscription<T> on<T>(void Function(T event) onData) {
+    // FINAL FIX: Removed the special 'if (T == dynamic)' case.
+    // The where/cast combination works correctly for all types, including dynamic,
+    // and satisfies the type checker, resolving the 'return_of_invalid_type' error.
     return _streamController.stream
         .where((event) => event is T)
         .cast<T>()
