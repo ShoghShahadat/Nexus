@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'dart:ui' as ui;
 import 'package:collection/collection.dart';
+import 'package:nexus/src/events/rendering_events.dart';
 
 /// A custom painter that interprets a render packet (a list of declarative
 /// drawing commands) and translates them into imperative canvas calls.
@@ -27,8 +28,13 @@ class NexusPainter extends CustomPainter {
       canvas.translate((transform['x'] as num).toDouble(),
           (transform['y'] as num).toDouble());
       final scale = (transform['scale'] as num).toDouble();
-      canvas.scale(scale, scale);
-      // TODO: Apply rotation
+      final rotation = (transform['rotation'] as num).toDouble();
+      if (rotation != 0.0) {
+        canvas.rotate(rotation);
+      }
+      if (scale != 1.0) {
+        canvas.scale(scale, scale);
+      }
 
       final shape = command['shape'] as Map<String, dynamic>;
       final style = command['style'] as Map<String, dynamic>;
@@ -143,12 +149,19 @@ class NexusPainter extends CustomPainter {
       final tx = (transform['x'] as num).toDouble();
       final ty = (transform['y'] as num).toDouble();
       final scale = (transform['scale'] as num).toDouble();
+      final rotation = (transform['rotation'] as num).toDouble();
 
-      // Inverse transform the hit position
-      final localPosition = Offset(
-        (position.dx - tx) / scale,
-        (position.dy - ty) / scale,
-      );
+      // Create an inverse transform matrix to convert the hit point to local coordinates.
+      final matrix = Matrix4.identity()
+        ..translate(tx, ty)
+        ..rotateZ(rotation)
+        ..scale(scale, scale);
+
+      final invMatrix = Matrix4.tryInvert(matrix);
+      if (invMatrix == null) {
+        continue; // Non-invertible matrix, can't hit test.
+      }
+      final localPosition = MatrixUtils.transformPoint(invMatrix, position);
 
       final shape = command['shape'] as Map<String, dynamic>;
       bool isHit = false;
@@ -181,7 +194,8 @@ class NexusPainter extends CustomPainter {
         if (interactive['onTap'] == true) {
           final entityId = command['entityId'] as int;
           // Send an event back to the logic isolate.
-          renderingSystem.manager?.send(EntityTapEvent(entityId));
+          renderingSystem.manager
+              ?.send(ShapeTapEvent(entityId, shape['type'] as String));
         }
         // If we hit a shape, we stop and don't check shapes below it.
         return true;

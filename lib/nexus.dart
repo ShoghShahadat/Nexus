@@ -16,6 +16,8 @@ export 'src/core/logic/logic_function.dart';
 export 'src/core/utils/equatable_mixin.dart';
 export 'src/core/storage/storage_adapter.dart';
 export 'src/core/utils/frequency.dart';
+// *** NEW: Exporting the new copyWith extension ***
+export 'src/core/utils/component_extensions.dart';
 
 // --- GPU Compute API ---
 export 'src/compute/gpu_buffer.dart';
@@ -38,6 +40,7 @@ export 'src/core/serialization/binary_world_serializer.dart';
 
 // --- Events ---
 export 'src/events/app_lifecycle_event.dart';
+export 'src/events/component_events.dart';
 export 'src/events/gameplay_events.dart';
 export 'src/events/hardware_input_events.dart';
 export 'src/events/list_events.dart';
@@ -48,6 +51,7 @@ export 'src/events/history_events.dart';
 export 'src/events/theme_events.dart';
 export 'src/events/responsive_events.dart';
 export 'src/events/ui_events.dart';
+export 'src/events/rendering_events.dart';
 
 // --- Components ---
 export 'src/components/animation_component.dart';
@@ -65,7 +69,7 @@ export 'src/components/clickable_component.dart';
 export 'src/components/counter_state_component.dart';
 export 'src/components/custom_widget_component.dart';
 export 'src/components/decoration_components.dart'
-    hide StyleColor, GradientColor;
+    hide StyleColor, SolidColor, GradientColor;
 export 'src/components/effect_component.dart';
 export 'src/components/gameplay_components.dart';
 export 'src/components/input_focus_component.dart';
@@ -102,6 +106,7 @@ export 'src/components/rendering/layer_component.dart';
 export 'src/components/rendering/scene_render_packet_component.dart';
 export 'src/components/rendering/shape_component.dart';
 export 'src/components/rendering/style_component.dart' hide SolidColor;
+export 'src/components/rendering/transform_component.dart';
 
 // --- Systems ---
 export 'src/systems/advanced_input_system.dart';
@@ -143,6 +148,8 @@ export 'src/systems/web_socket_system.dart';
 
 // --- Rendering System ---
 export 'src/systems/rendering/custom_painting_system.dart';
+
+// --- Modules ---
 
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';

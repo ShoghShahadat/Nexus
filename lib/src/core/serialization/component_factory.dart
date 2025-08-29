@@ -1,8 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/components/decoration_components.dart';
-
-// This file is now fully self-contained within the library.
+import 'package:nexus/src/components/rendering/drawable_component.dart';
+import 'package:nexus/src/components/rendering/layer_component.dart';
+import 'package:nexus/src/components/rendering/scene_render_packet_component.dart';
+import 'package:nexus/src/components/rendering/shape_component.dart';
+import 'package:nexus/src/components/rendering/style_component.dart';
+import 'package:nexus/src/components/rendering/transform_component.dart';
 
 /// A function signature for a factory that creates a [Component] from a JSON map.
 typedef ComponentFactory = Component Function(Map<String, dynamic> json);
@@ -19,22 +22,14 @@ class ComponentFactoryRegistry {
 
   ComponentFactoryRegistry._internal();
 
-  /// Returns a list of all registered component type names for debugging.
-  List<String> get registeredTypeNames => _factories.keys.toList();
-
   /// Registers a single component factory.
   void register(String typeName, ComponentFactory factory) {
-    if (kDebugMode) {
-      // print("[ComponentRegistry] Registering factory for: $typeName");
-    }
     _factories[typeName] = factory;
   }
 
   /// Registers multiple component factories from a map.
   void registerAll(ComponentRegistryMap factories) {
-    factories.forEach((key, value) {
-      register(key, value);
-    });
+    _factories.addAll(factories);
   }
 
   Component create(String typeName, Map<String, dynamic> json) {
@@ -80,7 +75,6 @@ void registerCoreComponents() {
     'CategoryComponent': (json) => CategoryComponent.fromJson(json),
     'ParentComponent': (json) => ParentComponent.fromJson(json),
     'LinkComponent': (json) => LinkComponent.fromJson(json),
-
     'DecorationComponent': (json) => DecorationComponent.fromJson(json),
 
     // Gameplay Components
@@ -95,6 +89,15 @@ void registerCoreComponents() {
     'ListComponent': (json) => ListComponent.fromJson(json),
     'ListStateComponent': (json) => ListStateComponent.fromJson(json),
     'AnimateOutComponent': (json) => AnimateOutComponent.fromJson(json),
+
+    // Rendering Components
+    'DrawableComponent': (json) => DrawableComponent.fromJson(json),
+    'LayerComponent': (json) => LayerComponent.fromJson(json),
+    'ShapeComponent': (json) => ShapeComponent.fromJson(json),
+    'StyleComponent': (json) => StyleComponent.fromJson(json),
+    'SceneRenderPacketComponent': (json) =>
+        SceneRenderPacketComponent.fromJson(json),
+    'TransformComponent': (json) => TransformComponent.fromJson(json),
   };
 
   ComponentFactoryRegistry.I.registerAll(coreComponents);

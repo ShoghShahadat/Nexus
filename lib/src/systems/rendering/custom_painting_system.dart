@@ -5,6 +5,7 @@ import 'package:nexus/src/components/rendering/layer_component.dart';
 import 'package:nexus/src/components/rendering/scene_render_packet_component.dart';
 import 'package:nexus/src/components/rendering/shape_component.dart';
 import 'package:nexus/src/components/rendering/style_component.dart';
+import 'package:nexus/src/components/rendering/transform_component.dart';
 
 /// This system runs in the logic isolate. It queries for all drawable entities,
 /// sorts them by layer, and generates a serializable "render packet".
@@ -61,11 +62,10 @@ class CustomPaintingSystem extends System {
     for (final entity in entities) {
       final shapeComp = entity.get<ShapeComponent>();
       final styleComp = entity.get<StyleComponent>();
-      final posComp = entity
-          .get<PositionComponent>(); // Using PositionComponent as Transform
+      final transformComp = entity.get<TransformComponent>();
       final interactiveComp = entity.get<InteractiveComponent>();
 
-      if (shapeComp == null || styleComp == null || posComp == null) {
+      if (shapeComp == null || styleComp == null || transformComp == null) {
         continue;
       }
 
@@ -73,20 +73,13 @@ class CustomPaintingSystem extends System {
         'entityId': entity.id,
         'shape': shapeComp.shape.toJson(),
         'style': styleComp.toJson(),
-        // Simple transform from PositionComponent for now.
-        // A more advanced TransformComponent would produce a full Matrix4.
-        'transform': {
-          'x': posComp.x,
-          'y': posComp.y,
-          'scale': posComp.scale,
-          'rotation': 0.0, // Placeholder for rotation
-        },
+        'transform': transformComp.toJson(),
       };
 
       if (interactiveComp != null && interactiveComp.isHitTestable) {
         command['interactive'] = {
           // We don't serialize the event itself, just markers.
-          // The UI thread will send back an event with the entityId.
+          // The UI thread will send back an event with the entityId and shape type.
           'onTap': interactiveComp.onTapEvent != null,
           'onDrag': interactiveComp.onDragUpdateEvent != null,
         };
