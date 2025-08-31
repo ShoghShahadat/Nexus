@@ -1,5 +1,6 @@
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/components/dom_element_component.dart';
+import 'package:nexus/src/components/global_transform_component.dart';
 import 'package:nexus/src/components/stylesheet_component.dart';
 
 /// A function signature for a factory that creates a [Component] from a JSON map.
@@ -88,7 +89,8 @@ void registerCoreComponents() {
     'ListComponent': (json) => ListComponent.fromJson(json),
     'ListStateComponent': (json) => ListStateComponent.fromJson(json),
     'AnimateOutComponent': (json) => AnimateOutComponent.fromJson(json),
-
+    'GlobalTransformComponent': (json) =>
+        GlobalTransformComponent.fromJson(json),
     // Rendering Components
     'DrawableComponent': (json) => DrawableComponent.fromJson(json),
     'LayerComponent': (json) => LayerComponent.fromJson(json),
