@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/lifecycle_policy_component.dart';
 
 /// A background system that periodically checks for and removes entities
 /// that meet their destruction condition, preventing logical memory leaks.
@@ -14,17 +13,6 @@ class GarbageCollectorSystem extends System {
     this.enabled =
         true, // --- NEW: Enabled by default for backward compatibility ---
   }) : _checkInterval = checkInterval;
-
-  @override
-  bool matches(Entity entity) {
-    // This system doesn't operate on entities in the traditional update loop.
-    return false;
-  }
-
-  @override
-  void update(Entity entity, double dt) {
-    // The logic is handled in the runGc method.
-  }
 
   /// This method should be called once per frame from a central system.
   void runGc(double dt) {

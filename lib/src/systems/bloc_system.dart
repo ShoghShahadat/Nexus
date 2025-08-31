@@ -26,12 +26,6 @@ abstract class BlocSystem<B extends BlocBase<S>, S> extends System {
   void onStateChange(S state);
 
   @override
-  bool matches(Entity entity) => false;
-
-  @override
-  void update(Entity entity, double dt) {}
-
-  @override
   void onRemovedFromWorld() {
     _subscription?.cancel();
     super.onRemovedFromWorld();

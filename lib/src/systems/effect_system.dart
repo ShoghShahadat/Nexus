@@ -1,11 +1,10 @@
 import 'dart:async';
 
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/effect_component.dart';
 
 /// A system that manages the application and removal of temporary effects
 /// on entities based on `EffectComponent` definitions.
-class EffectSystem extends System {
+class EffectSystem extends UpdateSystem {
   StreamSubscription? _eventBusSubscription;
 
   @override

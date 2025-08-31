@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/components/rendering/drawable_component.dart';
 import 'package:nexus/src/components/rendering/interactive_component.dart';
@@ -69,6 +70,12 @@ class CustomPaintingSystem extends System {
         continue;
       }
 
+      // *** FIX & LOGGING: Only add shapes that actually have something to draw ***
+      if (shapeComp.shape is PathShape &&
+          (shapeComp.shape as PathShape).commands.isEmpty) {
+        continue;
+      }
+
       final command = <String, dynamic>{
         'entityId': entity.id,
         'shape': shapeComp.shape.toJson(),
@@ -87,6 +94,10 @@ class CustomPaintingSystem extends System {
 
       renderPacket.add(command);
     }
+
+    // *** LOGGING ADDED ***
+    debugPrint(
+        '[CustomPaintingSystem] 🟢 Generated render packet with ${renderPacket.length} drawable commands.');
 
     // Update the central scene entity with the new packet.
     // This will be picked up by the UI thread.

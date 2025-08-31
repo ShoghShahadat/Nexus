@@ -36,10 +36,4 @@ class DamageSystem extends System {
       currentHealth: newHealth,
     ));
   }
-
-  @override
-  bool matches(Entity entity) => false; // Purely event-driven
-
-  @override
-  void update(Entity entity, double dt) {}
 }

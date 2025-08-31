@@ -23,9 +23,10 @@ class SceneRenderingSystem extends FlutterRenderingSystem {
   @override
   Widget build(BuildContext context) {
     final sceneEntities = getAllIdsWithTag(sceneEntityTag);
-    if (sceneEntities.isEmpty && manager?.world == null) {
-      // Show loading indicator until the first render packet arrives.
-      // تا رسیدن اولین بسته رندر، نشانگر بارگذاری را نمایش می‌دهد.
+    if (sceneEntities.isEmpty) {
+      // *** LOGGING ADDED ***
+      debugPrint(
+          '[SceneRenderingSystem] 🟡 Build called, but scene entity not found yet. Showing loader.');
       return Container(
         color: backgroundColor,
         child: const Center(child: CircularProgressIndicator()),
@@ -55,6 +56,10 @@ class SceneRenderingSystem extends FlutterRenderingSystem {
                 final packetComponent =
                     get<SceneRenderPacketComponent>(sceneEntityId);
                 final renderPacket = packetComponent?.packet ?? const [];
+
+                // *** LOGGING ADDED ***
+                debugPrint(
+                    '[SceneRenderingSystem] 🟢 Rebuilding CustomPaint. Passing ${renderPacket.length} commands to painter.');
 
                 return CustomPaint(
                   painter: NexusPainter(

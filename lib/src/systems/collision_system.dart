@@ -1,11 +1,8 @@
-import 'dart:math';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/gameplay_components.dart';
-import 'package:nexus/src/events/gameplay_events.dart';
 
 /// A system that detects collisions between entities with `CollisionComponent`.
 /// سیستمی که برخورد بین موجودیت‌های دارای `CollisionComponent` را تشخیص می‌دهد.
-class CollisionSystem extends System {
+class CollisionSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     return entity.has<CollisionComponent>() && entity.has<PositionComponent>();
@@ -23,11 +20,10 @@ class CollisionSystem extends System {
 
     // Iterate through all other collidable entities
     // تمام موجودیت‌های قابل برخورد دیگر را پیمایش می‌کند
-    for (final otherEntity in world.entities.values) {
+    for (final otherEntity in matchedEntities) {
       // Don't collide with self
       // با خودش برخورد نکند
       if (entity.id == otherEntity.id) continue;
-      if (!matches(otherEntity)) continue;
 
       final collB = otherEntity.get<CollisionComponent>()!;
       final posB = otherEntity.get<PositionComponent>()!;

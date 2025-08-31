@@ -32,7 +32,10 @@ class _MyAppState extends State<MyApp> {
     // Create the rendering system once.
     // سیستم رندرینگ را یک بار ایجاد می‌کنیم.
     _renderingSystem = SceneRenderingSystem(
-      backgroundColor: const Color(0xFF1D1D1D),
+      // --- AESTHETIC UPGRADE: Changed background color for a better mood ---
+      // --- ارتقاء ظاهری: تغییر رنگ پس‌زمینه برای ایجاد حس بهتر ---
+      backgroundColor:
+          const Color(0xFF2C3E50), // A dark, atmospheric slate blue
     );
   }
 
@@ -45,8 +48,6 @@ class _MyAppState extends State<MyApp> {
       home: NexusWidget(
         worldProvider: () {
           final world = NexusWorld();
-          // *** MODIFIED: Load the new Metaball scene module ***
-          // *** اصلاح: بارگذاری ماژول جدید صحنه متابال ***
           world.loadModule(MetaballSceneModule());
           return world;
         },

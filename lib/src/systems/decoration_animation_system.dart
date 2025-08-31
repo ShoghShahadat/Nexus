@@ -1,6 +1,5 @@
 import 'package:flutter/animation.dart' show Curves, Curve;
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/decoration_components.dart';
 
 /// A system that drives animations for `DecorationComponent`.
 /// سیستمی که انیمیشن‌ها را برای `DecorationComponent` هدایت می‌کند.
@@ -13,7 +12,7 @@ import 'package:nexus/src/components/decoration_components.dart';
 /// آن‌ها تنظیم شده باشد، و سپس یک `AnimationComponent` استاندارد برای هدایت یک
 /// `AnimationProgressComponent` ایجاد می‌کند. درون‌یابی بصری واقعی در
 /// `FlutterRenderingSystem` اتفاق می‌افتد.
-class DecorationAnimationSystem extends System {
+class DecorationAnimationSystem extends UpdateSystem {
   // A map to convert string curve names to Curve objects.
   // مپی برای تبدیل نام‌های رشته‌ای curve به آبجکت‌های Curve.
   static const Map<String, Curve> _stringToCurve = {

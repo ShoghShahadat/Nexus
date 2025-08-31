@@ -3,7 +3,7 @@ import 'package:nexus/nexus.dart';
 
 /// A system that processes [ArchetypeComponent]s to dynamically apply and
 /// remove collections of components (Archetypes) based on conditions.
-class ArchetypeSystem extends System {
+class ArchetypeSystem extends UpdateSystem {
   final Map<Type, List<EntityId>> _eventSubscriptions = {};
   StreamSubscription? _eventBusSubscription;
 
@@ -80,10 +80,16 @@ class ArchetypeSystem extends System {
   bool matches(Entity entity) => entity.has<ArchetypeComponent>();
 
   @override
-  void onEntityAdded(Entity entity) => _registerEntity(entity);
+  void onEntityAdded(Entity entity) {
+    super.onEntityAdded(entity); // Call super
+    _registerEntity(entity);
+  }
 
   @override
-  void onEntityRemoved(Entity entity) => _unregisterEntity(entity);
+  void onEntityRemoved(Entity entity) {
+    super.onEntityRemoved(entity); // Call super
+    _unregisterEntity(entity);
+  }
 
   @override
   void update(Entity entity, double dt) {

@@ -1,37 +1,44 @@
 import 'package:flutter/foundation.dart';
 import 'package:nexus/src/core/component.dart';
+import 'package:nexus/src/core/nexus_world.dart';
 
 /// A unique identifier for an Entity.
 typedef EntityId = int;
 
 /// Represents a single object in the application world.
 ///
-/// An Entity is essentially a container for a collection of [Component]s.
-/// It extends [ChangeNotifier] so that widgets can listen to changes
-/// on a specific entity and rebuild atomically.
+/// --- NEW ARCHITECTURE ---
+/// An entity now holds a reference to the world it belongs to. This allows it
+/// to notify the world whenever its components change, enabling the new
+/// reactive system architecture.
 class Entity extends ChangeNotifier {
   static int _nextId = 0;
   final EntityId id;
   final Map<Type, Component> _components = {};
 
-  // --- Dirty Checking Mechanism ---
-  /// A set of component types that have been modified in the current frame.
+  /// --- NEW: A reference to the world. ---
+  late final NexusWorld world;
+
+  // --- Dirty Checking Mechanism (for rendering) ---
   final Set<Type> _dirtyComponents = {};
   Set<Type> get dirtyComponents => Set.unmodifiable(_dirtyComponents);
   void clearDirty() => _dirtyComponents.clear();
 
   Entity() : id = _nextId++;
 
-  /// Adds a component to the entity and notifies listeners.
-  ///
-  /// The [forceNotify] parameter, when set to true, bypasses the equality check
-  /// and guarantees that the entity is marked as dirty, forcing a UI update.
-  /// This is crucial for animations or state changes where the component's value
-  /// might not change, but a rebuild is still desired.
+  /// Internal method to assign the world to the entity.
+  void setWorld(NexusWorld world) {
+    this.world = world;
+  }
+
+  /// --- MODIFIED: Now notifies the world of component changes. ---
   void add<T extends Component>(T component, {bool forceNotify = false}) {
     final existingComponent = _components[T];
 
-    // If forceNotify is true, we always replace the component and notify.
+    // --- NEW: Notify the reactive systems BEFORE the component is actually added ---
+    // This allows systems to react to the change based on the old and new state.
+    world.notifyComponentChange(this, existingComponent, component);
+
     if (forceNotify) {
       _components[T] = component;
       _dirtyComponents.add(T);
@@ -39,32 +46,29 @@ class Entity extends ChangeNotifier {
       return;
     }
 
-    // --- Original optimization logic ---
-
-    // If the exact same instance is being re-added, just mark it dirty.
     if (identical(existingComponent, component)) {
       _dirtyComponents.add(T);
       notifyListeners();
       return;
     }
 
-    // If an equivalent but different instance is added, do nothing to save performance.
     if (existingComponent != null && existingComponent == component) {
       return;
     }
 
-    // Otherwise, add the new/different component.
     _components[T] = component;
     _dirtyComponents.add(T);
     notifyListeners();
   }
 
-  /// Adds multiple components to the entity.
   void addComponents(List<Component> components) {
     bool hasChanged = false;
     for (final component in components) {
       final type = component.runtimeType;
       final existingComponent = _components[type];
+
+      // --- NEW: Notification for reactive systems ---
+      world.notifyComponentChange(this, existingComponent, component);
 
       if (identical(existingComponent, component)) {
         _dirtyComponents.add(type);
@@ -85,19 +89,25 @@ class Entity extends ChangeNotifier {
     }
   }
 
-  /// Removes a component of a specific type using generics and notifies listeners.
+  /// --- MODIFIED: Now notifies the world of component removal. ---
   T? remove<T extends Component>() {
     final removed = _components.remove(T) as T?;
     if (removed != null) {
+      // --- NEW: Notify reactive systems of the removal ---
+      // --- FIX: Removed the explicit generic type <T> which is no longer needed. ---
+      world.notifyComponentChange(this, removed, null);
       notifyListeners();
     }
     return removed;
   }
 
-  /// Removes a component of a specific type using a Type object and notifies listeners.
+  /// --- MODIFIED: Now notifies the world of component removal. ---
   Component? removeByType(Type componentType) {
     final removed = _components.remove(componentType);
     if (removed != null) {
+      // --- NEW: Notify reactive systems of the removal ---
+      // --- FIX: This call now works correctly due to the non-generic notifyComponentChange. ---
+      world.notifyComponentChange(this, removed, null);
       notifyListeners();
     }
     return removed;

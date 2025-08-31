@@ -1,11 +1,10 @@
 import 'dart:math';
 import 'package:collection/collection.dart'; // Import for firstWhereOrNull
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/attractor_component.dart';
 
 /// A system that applies a gravitational pull from an attractor entity
 /// to all other entities with velocity.
-class AttractionSystem extends System {
+class AttractionSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     // This system acts on any movable entity that is not an attractor itself.

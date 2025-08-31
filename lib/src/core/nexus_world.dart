@@ -1,20 +1,28 @@
 // FILE: packages/nexus/lib/src/core/nexus_world.dart
 // (English comments for code clarity)
-// FRAMEWORK-LEVEL FIX: This file contains the core logic change to prevent race conditions.
+// --- ARCHITECTURAL UPGRADE: From Proactive to Fully Reactive Core ---
 
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
 
 /// Manages all the entities, systems, and modules in the Nexus world.
-/// This class has been re-engineered with a robust, multi-stage initialization
-/// process to completely eliminate race conditions during startup.
+///
+/// --- NEW REACTIVE ARCHITECTURE ---
+/// The world now acts as a central dispatcher. It maintains a subscription map
+/// linking component types to the reactive systems that care about them.
+/// When a component changes, the world notifies only the relevant systems,
+/// leading to massive performance gains.
 class NexusWorld {
   final Map<EntityId, Entity> _entities = {};
-  final List<System> _systems = [];
   final List<NexusModule> _modules = [];
   final GetIt services;
   late final EventBus eventBus;
+
+  // --- NEW: Segregated lists for different system types ---
+  final List<System> _allSystems = [];
+  final List<UpdateSystem> _updateSystems = [];
+  final Map<Type, List<ReactiveSystem>> _componentSubscriptions = {};
 
   late final Entity rootEntity;
   GarbageCollectorSystem? _gc;
@@ -22,7 +30,7 @@ class NexusWorld {
   final Set<EntityId> _removedEntityIdsThisFrame = {};
 
   Map<EntityId, Entity> get entities => Map.unmodifiable(_entities);
-  List<System> get systems => List.unmodifiable(_systems);
+  List<System> get systems => List.unmodifiable(_allSystems);
 
   NexusWorld({GetIt? serviceLocator, EventBus? eventBus})
       : services = serviceLocator ?? GetIt.instance {
@@ -35,6 +43,8 @@ class NexusWorld {
 
   void _createRootEntity() {
     rootEntity = Entity();
+    // --- NEW: Entity needs a reference to the world to enable notifications ---
+    rootEntity.setWorld(this);
     rootEntity.addComponents([
       TagsComponent({'root'}),
       ScreenInfoComponent(
@@ -44,26 +54,16 @@ class NexusWorld {
     addEntity(rootEntity);
   }
 
-  /// **RE-ENGINEERED INITIALIZATION LIFECYCLE**
   Future<void> init() async {
-    // Stage 1: Load all modules and create all initial entities from providers.
-    // This ensures the world's structure is fully defined before any logic runs.
     for (final module in _modules) {
       module.onLoad(this);
       for (final provider in module.entityProviders) {
         provider.createEntities(this);
       }
     }
-
-    // Stage 2: Initialize all systems.
-    // This is now guaranteed to run *after* all initial entities (like containers) exist.
-    // This is where PersistenceSystem will now safely run and load data.
-    for (final system in _systems) {
+    for (final system in _allSystems) {
       await system.init();
     }
-
-    // Note: The PersistenceSystem is now responsible for firing the DataLoadedEvent
-    // at the end of its `_load` method, signaling the final step of initialization.
   }
 
   void loadModule(NexusModule module) {
@@ -82,10 +82,18 @@ class NexusWorld {
             '[NexusWorld] WARNING: An entity with ID ${entity.id} already exists. Overwriting.');
       }
     }
+    // --- NEW: Assign world reference before adding ---
+    entity.setWorld(this);
     _entities[entity.id] = entity;
-    for (final system in _systems) {
-      if (system.matches(entity)) {
-        system.onEntityAdded(entity);
+
+    // --- MODIFIED: Call onEntityAdded for ALL systems ---
+    for (final system in _allSystems) {
+      // General lifecycle hook for all systems
+      system.onEntityAdded(entity);
+
+      // Specific logic for UpdateSystems
+      if (system is UpdateSystem && system.matches(entity)) {
+        system.addEntityToCache(entity);
       }
     }
   }
@@ -94,8 +102,16 @@ class NexusWorld {
     final entity = _entities.remove(id);
     if (entity != null) {
       _removedEntityIdsThisFrame.add(id);
-      for (final system in _systems) {
+
+      // --- MODIFIED: Call onEntityRemoved for ALL systems ---
+      for (final system in _allSystems) {
+        // General lifecycle hook for all systems
         system.onEntityRemoved(entity);
+
+        // Specific logic for UpdateSystems
+        if (system is UpdateSystem) {
+          system.removeEntityFromCache(entity);
+        }
       }
       entity.dispose();
     }
@@ -108,36 +124,79 @@ class NexusWorld {
     return removed;
   }
 
+  /// --- MODIFIED: Now registers systems based on their type ---
   void addSystem(System system) {
     if (system is GarbageCollectorSystem) {
       _gc = system;
     }
-    _systems.add(system);
+    _allSystems.add(system);
     system.onAddedToWorld(this);
+
+    // --- NEW: Handle system specialization ---
+    if (system is UpdateSystem) {
+      _updateSystems.add(system);
+      for (final entity in _entities.values) {
+        if (system.matches(entity)) {
+          system.addEntityToCache(entity);
+        }
+      }
+    } else if (system is ReactiveSystem) {
+      for (final componentType in system.subscribedComponentTypes) {
+        _componentSubscriptions
+            .putIfAbsent(componentType, () => [])
+            .add(system);
+      }
+    }
   }
 
   void removeSystem(System system) {
     if (system is GarbageCollectorSystem) {
       _gc = null;
     }
-    if (_systems.remove(system)) {
+    if (_allSystems.remove(system)) {
+      // --- NEW: Also remove from specialized lists/maps ---
+      if (system is UpdateSystem) {
+        _updateSystems.remove(system);
+      } else if (system is ReactiveSystem) {
+        for (final componentType in system.subscribedComponentTypes) {
+          _componentSubscriptions[componentType]?.remove(system);
+        }
+      }
       system.onRemovedFromWorld();
     }
   }
 
+  /// --- NEW & MODIFIED: The central dispatcher, now non-generic and more robust. ---
+  /// It uses runtime types to notify the correct systems, fixing the type inference error.
+  void notifyComponentChange(
+      Entity entity, Component? oldComponent, Component? newComponent) {
+    // Determine the component type from the arguments at runtime.
+    final componentType =
+        newComponent?.runtimeType ?? oldComponent!.runtimeType;
+
+    final interestedSystems = _componentSubscriptions[componentType];
+
+    if (interestedSystems == null) return;
+
+    // Use a copy of the list to avoid concurrent modification issues.
+    for (final system in List<ReactiveSystem>.from(interestedSystems)) {
+      if (newComponent == null && oldComponent != null) {
+        // This is a removal
+        system.onComponentRemoved(entity, oldComponent);
+      } else if (newComponent != null) {
+        // This is an addition or update
+        system.onComponentChanged(entity, oldComponent, newComponent);
+      }
+    }
+  }
+
+  /// --- THE ULTIMATELY OPTIMIZED UPDATE LOOP ---
+  /// Now, it only iterates over the systems that absolutely need to run every frame.
   void update(double dt) {
-    // Run the garbage collector first, if it's enabled.
     _gc?.runGc(dt);
 
-    final entitiesList = List<Entity>.from(_entities.values);
-    for (final system in _systems) {
-      // MODIFIED: Run system-wide logic if implemented
+    for (final system in _updateSystems) {
       system.run(dt);
-      for (final entity in entitiesList) {
-        if (_entities.containsKey(entity.id) && system.matches(entity)) {
-          system.update(entity, dt);
-        }
-      }
     }
   }
 
@@ -145,14 +204,16 @@ class NexusWorld {
     for (final module in _modules) {
       module.onUnload(this);
     }
-    for (final system in _systems) {
+    for (final system in _allSystems) {
       system.onRemovedFromWorld();
     }
     for (final entity in _entities.values) {
       entity.dispose();
     }
     _entities.clear();
-    _systems.clear();
+    _allSystems.clear();
+    _updateSystems.clear();
+    _componentSubscriptions.clear();
     _modules.clear();
     eventBus.destroy();
     _removedEntityIdsThisFrame.clear();

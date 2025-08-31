@@ -2,7 +2,9 @@ import 'package:nexus/nexus.dart';
 
 /// A system that processes entities with a `TimerComponent` to manage
 /// scheduled and recurring tasks.
-class TimerSystem extends System {
+///
+/// --- RE-ARCHITECTED as an UpdateSystem ---
+class TimerSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     return entity.has<TimerComponent>();
@@ -16,6 +18,7 @@ class TimerSystem extends System {
 
     for (final task in timerComponent.tasks) {
       task.elapsedTime += dt;
+      hasChanged = true; // elapsedTime always changes
 
       if (task.onTickEvent != null) {
         world.eventBus.fire(task.onTickEvent);
@@ -36,16 +39,10 @@ class TimerSystem extends System {
 
     if (tasksToRemove.isNotEmpty) {
       timerComponent.tasks.removeWhere((task) => tasksToRemove.contains(task));
-      hasChanged = true;
     }
 
-    // *** FINAL FIX: Make the system more predictable and robust. ***
-    // Instead of aggressively removing the component when the task list is empty,
-    // we will always re-add it if its internal state (the tasks list) has changed.
-    // This prevents race conditions where another system tries to access the component
-    // right after it has been removed. The component's lifecycle should be managed
-    // by the system that created it (e.g., ButtonInteractionSystem) or a GarbageCollector.
     if (hasChanged) {
+      // Re-add the component to save its updated state (elapsedTime, removed tasks).
       entity.add(timerComponent);
     }
   }

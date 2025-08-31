@@ -1,12 +1,14 @@
-import 'package:nexus/src/components/lifecycle_component.dart';
-import 'package:nexus/src/core/entity.dart';
-import 'package:nexus/src/core/system.dart';
+import 'package:nexus/nexus.dart';
 
 /// A system that manages the lifecycle of entities.
 ///
 /// It listens for entities with a [LifecycleComponent] and executes the
 /// provided `onInit` and `onDispose` callbacks at the appropriate times.
-class LifecycleSystem extends System {
+///
+/// --- RE-ARCHITECTED as an UpdateSystem ---
+/// This system needs to know about entity addition/removal, which is a feature
+/// of the UpdateSystem class in the new architecture. Its update loop is empty.
+class LifecycleSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     return entity.has<LifecycleComponent>();

@@ -1,21 +1,22 @@
 import 'dart:async';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/web_socket_components.dart';
-import 'package:nexus/src/services/network/i_web_socket_service.dart';
 
 /// A system that manages WebSocket connections for entities.
-/// سیستمی که اتصالات WebSocket را برای موجودیت‌ها مدیریت می‌کند.
 ///
 /// It processes entities with `WebSocketRequestComponent` to establish connections
 /// using the registered `IWebSocketService`. It listens to incoming messages,
 /// parses them into components, and updates the entity's state.
-/// این سیستم موجودیت‌های دارای `WebSocketRequestComponent` را برای برقراری اتصال
-/// با استفاده از `IWebSocketService` ثبت‌شده، پردازش می‌کند. به پیام‌های ورودی گوش داده،
-/// آن‌ها را به کامپوننت‌ها پارس کرده و وضعیت موجودیت را به‌روز می‌کند.
-class WebSocketSystem extends System {
+///
+/// --- RE-ARCHITECTED as a ReactiveSystem ---
+/// This system now reacts to the ADDITION of a WebSocketRequestComponent,
+/// making it far more efficient as it doesn't run in the main update loop.
+class WebSocketSystem extends ReactiveSystem {
   late final IWebSocketService _webSocketService;
   bool _isServiceInitialized = false;
   final Map<EntityId, StreamSubscription> _subscriptions = {};
+
+  @override
+  Set<Type> get subscribedComponentTypes => {WebSocketRequestComponent};
 
   @override
   Future<void> init() async {
@@ -29,22 +30,19 @@ class WebSocketSystem extends System {
     }
   }
 
+  /// This is the core logic, triggered ONLY when a WebSocketRequestComponent is added.
   @override
-  bool matches(Entity entity) {
-    return entity.has<WebSocketRequestComponent>();
-  }
+  void onComponentChanged(
+      Entity entity, Component? oldComponent, Component newComponent) {
+    if (!_isServiceInitialized || newComponent is! WebSocketRequestComponent) {
+      return;
+    }
 
-  @override
-  void update(Entity entity, double dt) {
-    if (!_isServiceInitialized) return;
-
-    final request = entity.get<WebSocketRequestComponent>()!;
-    // Remove the request component to prevent re-processing.
-    // کامپوننت درخواست را برای جلوگیری از پردازش مجدد، حذف می‌کنیم.
-    entity.remove<WebSocketRequestComponent>();
+    final request = newComponent;
+    // Immediately remove the request component to prevent re-processing.
+    Future.microtask(() => entity.remove<WebSocketRequestComponent>());
 
     // Set initial state.
-    // وضعیت اولیه را تنظیم می‌کنیم.
     entity.add(WebSocketStateComponent(status: WebSocketStatus.connecting));
 
     try {
@@ -60,8 +58,6 @@ class WebSocketSystem extends System {
 
       final subscription = stream.listen(
         (data) {
-          // On each message, parse it into components and add them to the entity.
-          // با هر پیام، آن را به کامپوننت‌ها پارس کرده و به موجودیت اضافه می‌کنیم.
           final components = request.onParseMessage(data);
           for (final component in components) {
             entity.add(component);
@@ -91,9 +87,15 @@ class WebSocketSystem extends System {
   }
 
   @override
+  void onComponentRemoved(Entity entity, Component removedComponent) {
+    // This system doesn't need to react to removal of its trigger component,
+    // as it removes it itself immediately after processing.
+  }
+
+  /// NEW: This lifecycle hook is now inherited from the base System class.
+  /// It's the correct place to clean up when an entity is removed from the world.
+  @override
   void onEntityRemoved(Entity entity) {
-    // Ensure we clean up the subscription if the entity is removed.
-    // اطمینان حاصل می‌کنیم که در صورت حذف موجودیت، اشتراک (subscription) پاک‌سازی شود.
     _cleanupConnection(entity.id, null);
     super.onEntityRemoved(entity);
   }
@@ -108,8 +110,6 @@ class WebSocketSystem extends System {
 
   @override
   void onRemovedFromWorld() {
-    // Clean up all active connections when the world is destroyed.
-    // تمام اتصالات فعال را هنگام از بین رفتن دنیا، پاک‌سازی می‌کنیم.
     for (final sub in _subscriptions.values) {
       sub.cancel();
     }
