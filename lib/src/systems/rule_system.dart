@@ -5,7 +5,7 @@ import 'package:nexus/nexus.dart';
 ///
 /// It listens for events on the global event bus and triggers the evaluation
 /// of rules that are registered for a given event type.
-class RuleSystem extends System {
+class RuleSystem extends UpdateSystem {
   final Map<Type, List<EntityId>> _eventSubscriptions = {};
   StreamSubscription? _eventBusSubscription;
 
@@ -71,11 +71,13 @@ class RuleSystem extends System {
 
   @override
   void onEntityAdded(Entity entity) {
+    super.onEntityAdded(entity);
     _registerEntityRules(entity);
   }
 
   @override
   void onEntityRemoved(Entity entity) {
+    super.onEntityRemoved(entity);
     _unregisterEntityRules(entity);
   }
 

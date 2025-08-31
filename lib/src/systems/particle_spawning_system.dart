@@ -1,11 +1,10 @@
 import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/particle_spawner_component.dart';
 
 /// A system that spawns new particle entities based on a ParticleSpawnerComponent.
 /// سیستمی که موجودیت‌های ذره جدید را بر اساس یک ParticleSpawnerComponent تولید می‌کند.
-class ParticleSpawningSystem extends System {
+class ParticleSpawningSystem extends UpdateSystem {
   final Random _random = Random();
 
   @override

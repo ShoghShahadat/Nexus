@@ -1,9 +1,6 @@
 import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/responsive_component.dart';
-import 'package:nexus/src/components/screen_info_component.dart';
-import 'package:nexus/src/events/responsive_events.dart';
 
 /// A system that manages responsive layout changes for entities.
 class ResponsivenessSystem extends System {
@@ -70,10 +67,4 @@ class ResponsivenessSystem extends System {
     responsiveComp.lastAppliedArchetype = targetArchetype;
     entity.add(responsiveComp);
   }
-
-  @override
-  bool matches(Entity entity) => false; // Purely event-driven.
-
-  @override
-  void update(Entity entity, double dt) {}
 }

@@ -1,7 +1,4 @@
-import 'package:nexus/src/components/position_component.dart';
-import 'package:nexus/src/components/velocity_component.dart';
-import 'package:nexus/src/core/entity.dart';
-import 'package:nexus/src/core/system.dart';
+import 'package:nexus/nexus.dart';
 
 /// سیستمی که سرعت را به موجودیت‌ها اعمال می‌کند تا حرکت ایجاد شود.
 ///
@@ -9,7 +6,7 @@ import 'package:nexus/src/core/system.dart';
 /// [VelocityComponent] دارند. در هر فریم، موقعیت موجودیت را بر اساس
 /// سرعت فعلی و زمان دلتا به‌روزرسانی می‌کند.
 
-class PhysicsSystem extends System {
+class PhysicsSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     return entity.has<PositionComponent>() && entity.has<VelocityComponent>();

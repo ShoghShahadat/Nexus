@@ -1,12 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/rendering/drawable_component.dart';
-import 'package:nexus/src/components/rendering/interactive_component.dart';
-import 'package:nexus/src/components/rendering/layer_component.dart';
-import 'package:nexus/src/components/rendering/scene_render_packet_component.dart';
-import 'package:nexus/src/components/rendering/shape_component.dart';
-import 'package:nexus/src/components/rendering/style_component.dart';
-import 'package:nexus/src/components/rendering/transform_component.dart';
 
 /// This system runs in the logic isolate. It queries for all drawable entities,
 /// sorts them by layer, and generates a serializable "render packet".
@@ -33,18 +26,8 @@ class CustomPaintingSystem extends System {
     }
   }
 
-  @override
-  bool matches(Entity entity) {
-    // This system doesn't operate on entities one by one, but on the whole set.
-    return false;
-  }
-
-  @override
-  void update(Entity entity, double dt) {
-    // The logic is in the overridden run() method to process all entities at once.
-  }
-
-  @override
+  /// This method is not part of the standard update loop but can be called by it.
+  /// It processes all drawable entities at once to generate the render packet.
   void run(double dt) {
     if (_sceneEntity == null) return;
 

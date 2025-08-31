@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 
@@ -27,10 +26,4 @@ class PointerSystem extends System {
       trackedEntity.add(pos.copyWith(x: event.x, y: event.y));
     }
   }
-
-  @override
-  bool matches(Entity entity) => false;
-
-  @override
-  void update(Entity entity, double dt) {}
 }

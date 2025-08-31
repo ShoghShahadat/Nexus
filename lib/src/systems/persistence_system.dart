@@ -1,9 +1,7 @@
 // FILE: packages/nexus/lib/src/systems/persistence_system.dart
 // (English comments for code clarity)
 
-import 'package:get_it/get_it.dart';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/core/storage/storage_adapter.dart';
 import 'package:flutter/foundation.dart';
 
 // --- FINAL FIX: Core events are now defined and exported from the package itself ---
@@ -106,10 +104,4 @@ class PersistenceSystem extends System {
         '🏁 [PersistenceSystem] Data loading complete. Firing DataLoadedEvent.');
     world.eventBus.fire(DataLoadedEvent());
   }
-
-  @override
-  bool matches(Entity entity) => false;
-
-  @override
-  void update(Entity entity, double dt) {}
 }

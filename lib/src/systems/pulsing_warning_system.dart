@@ -6,7 +6,7 @@ import 'package:nexus/nexus.dart';
 /// This system is the single source of truth for the warning animation behavior.
 /// It watches for the 'warning' tag and manages the lifecycle of the
 /// associated AnimationComponent.
-class PulsingWarningSystem extends System {
+class PulsingWarningSystem extends UpdateSystem {
   // A private tag to mark entities that this system is currently animating.
   static const _pulsingMarkerTag = 'system_is_pulsing';
 
