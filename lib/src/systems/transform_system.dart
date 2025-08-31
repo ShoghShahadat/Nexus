@@ -1,12 +1,11 @@
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/parent_component.dart';
 
 /// A system that manages hierarchical transformations.
 ///
 /// It processes entities with a `ParentComponent` and updates their global
 /// position based on the parent's position. This allows for complex, nested
 /// movements where children move relative to their parent.
-class TransformSystem extends System {
+class TransformSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     // This system acts on any entity that has a parent and a position.
@@ -31,8 +30,8 @@ class TransformSystem extends System {
     // NOTE: This is a simplified implementation. A full implementation would
     // handle local vs. global positions, rotation, and scale inheritance.
     // Here, we assume the child's position is an offset from the parent's position.
-    final globalX = parentPos.x + pos.x;
-    final globalY = parentPos.y + pos.y;
+    // final globalX = parentPos.x + pos.x;
+    // final globalY = parentPos.y + pos.y;
 
     // This system calculates the global position but doesn't directly modify
     // the entity's PositionComponent, as that stores local position.

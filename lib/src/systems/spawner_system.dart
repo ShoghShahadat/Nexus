@@ -1,10 +1,8 @@
 import 'package:nexus/nexus.dart' hide SpawnerComponent;
 import 'package:nexus/src/components/gameplay_components.dart';
-import 'package:nexus/src/core/utils/frequency.dart';
-import 'package:nexus/src/events/gameplay_events.dart';
 
 /// A system that handles the spawning of new entities based on a `SpawnerComponent`.
-class SpawnerSystem extends System {
+class SpawnerSystem extends UpdateSystem {
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);

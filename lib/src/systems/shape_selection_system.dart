@@ -37,9 +37,4 @@ class ShapeSelectionSystem extends System {
       targetSides: event.targetSides,
     ));
   }
-
-  @override
-  bool matches(Entity entity) => false;
-  @override
-  void update(Entity entity, double dt) {}
 }

@@ -1,9 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/components/decoration_components.dart';
-import 'package:nexus/src/events/theme_events.dart';
-import 'package:nexus/src/components/styleable_component.dart';
-import 'package:nexus/src/components/theme_component.dart';
 
 // A mock service for providing theme data.
 // In a real application, this data could be loaded from a JSON file or an API.
@@ -83,10 +80,4 @@ class ThemingSystem extends System {
       // Similar logic can be added for other properties like shadowColor, borderColor, etc.
     }
   }
-
-  @override
-  bool matches(Entity entity) => false; // This system is purely event-driven.
-
-  @override
-  void update(Entity entity, double dt) {}
 }

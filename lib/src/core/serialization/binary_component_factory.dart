@@ -1,6 +1,5 @@
 import 'package:nexus/nexus.dart';
 import 'binary_component.dart';
-import 'binary_reader_writer.dart';
 
 /// A function signature for a factory that creates an empty instance of a
 /// [BinaryComponent].

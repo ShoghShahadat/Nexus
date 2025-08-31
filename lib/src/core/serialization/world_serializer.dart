@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:nexus/src/core/component.dart';
 import 'package:nexus/src/core/entity.dart';
 import 'package:nexus/src/core/nexus_world.dart';
 import 'package:nexus/src/core/serialization/component_factory.dart';

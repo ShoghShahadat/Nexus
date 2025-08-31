@@ -1,10 +1,9 @@
 import 'dart:math';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/gameplay_components.dart';
 
 /// A system that steers entities with a `TargetingComponent` towards their target.
 /// سیستمی که موجودیت‌های دارای `TargetingComponent` را به سمت هدفشان هدایت می‌کند.
-class TargetingSystem extends System {
+class TargetingSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     return entity.has<TargetingComponent>() &&
@@ -40,8 +39,12 @@ class TargetingSystem extends System {
     // Find the shortest angle to turn
     // کوتاه‌ترین زاویه برای چرخش را پیدا می‌کند
     var angleDiff = desiredAngle - currentAngle;
-    while (angleDiff > pi) angleDiff -= 2 * pi;
-    while (angleDiff < -pi) angleDiff += 2 * pi;
+    while (angleDiff > pi) {
+      angleDiff -= 2 * pi;
+    }
+    while (angleDiff < -pi) {
+      angleDiff += 2 * pi;
+    }
 
     // Clamp the turn speed
     // سرعت چرخش را محدود می‌کند
