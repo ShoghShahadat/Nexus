@@ -15,7 +15,7 @@ class TransformSystem extends UpdateSystem {
   @override
   void update(Entity entity, double dt) {
     final parentComp = entity.get<ParentComponent>()!;
-    final pos = entity.get<PositionComponent>()!;
+    // final pos = entity.get<PositionComponent>()!;
 
     final parentEntity = world.entities[parentComp.parentId];
     if (parentEntity == null) {

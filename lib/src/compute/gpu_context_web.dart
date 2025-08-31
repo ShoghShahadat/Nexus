@@ -1,6 +1,5 @@
 import 'dart:js_interop';
 import 'dart:typed_data';
-import 'package:flutter/services.dart';
 import 'package:web/web.dart' as web;
 
 // This file provides the web-specific implementation of GpuContext.

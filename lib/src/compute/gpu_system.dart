@@ -119,10 +119,4 @@ abstract class GpuSystem<T> extends System {
   }
 
   Float32List flattenData(List<T> data);
-
-  @override
-  bool matches(Entity entity) => false;
-
-  @override
-  void update(Entity entity, double dt) {}
 }
