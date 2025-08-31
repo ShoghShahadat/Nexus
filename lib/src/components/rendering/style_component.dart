@@ -90,7 +90,7 @@ class StyleComponent extends Component with SerializableComponent {
   final double strokeWidth;
   final StrokeCap strokeCap;
   final StrokeJoin strokeJoin;
-  // Could add ImageFilter, Shader, etc. in the future.
+  final double opacity; // *** NEW: Added for animation capabilities ***
 
   StyleComponent({
     this.style = PaintingStyle.fill,
@@ -98,6 +98,7 @@ class StyleComponent extends Component with SerializableComponent {
     this.strokeWidth = 1.0,
     this.strokeCap = StrokeCap.butt,
     this.strokeJoin = StrokeJoin.miter,
+    this.opacity = 1.0, // *** NEW ***
   });
 
   factory StyleComponent.fromJson(Map<String, dynamic> json) {
@@ -107,6 +108,7 @@ class StyleComponent extends Component with SerializableComponent {
       strokeWidth: (json['strokeWidth'] as num).toDouble(),
       strokeCap: StrokeCap.values[json['strokeCap'] as int],
       strokeJoin: StrokeJoin.values[json['strokeJoin'] as int],
+      opacity: (json['opacity'] as num? ?? 1.0).toDouble(), // *** NEW ***
     );
   }
 
@@ -117,8 +119,10 @@ class StyleComponent extends Component with SerializableComponent {
         'strokeWidth': strokeWidth,
         'strokeCap': strokeCap.index,
         'strokeJoin': strokeJoin.index,
+        'opacity': opacity, // *** NEW ***
       };
 
   @override
-  List<Object?> get props => [style, color, strokeWidth, strokeCap, strokeJoin];
+  List<Object?> get props =>
+      [style, color, strokeWidth, strokeCap, strokeJoin, opacity];
 }

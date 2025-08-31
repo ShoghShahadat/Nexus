@@ -3,11 +3,17 @@ import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:nexus/nexus.dart';
+import 'package:nexus/src/core/component_update.dart';
+import 'package:nexus/src/core/render_packet.dart';
 
 class NexusIsolateManager implements NexusManager {
   Isolate? _isolate;
   SendPort? _sendPort;
   final ReceivePort _receivePort = ReceivePort();
+
+  final _updateController = StreamController<ComponentUpdate>.broadcast();
+  @override
+  Stream<ComponentUpdate> get componentUpdateStream => _updateController.stream;
 
   final _renderPacketController =
       StreamController<List<RenderPacket>>.broadcast();
@@ -26,13 +32,17 @@ class NexusIsolateManager implements NexusManager {
   }) async {
     if (_isolate != null) return;
     final completer = Completer<SendPort>();
+
     _receivePort.listen((message) {
       if (message is SendPort) {
         completer.complete(message);
+      } else if (message is ComponentUpdate) {
+        _updateController.add(message);
       } else if (message is List<RenderPacket>) {
         _renderPacketController.add(message);
       }
     });
+
     final entryPointArgs = [
       _receivePort.sendPort,
       isolateInitializer,
@@ -60,14 +70,11 @@ class NexusIsolateManager implements NexusManager {
   @override
   Future<void> dispose({bool isHotReload = false}) async {
     if (isHotReload) {
-      // debugPrint((
-      // "[NexusIsolateManager] Hot reload detected. Isolate will be preserved.");
       return;
     }
-
-    // debugPrint(("[NexusIsolateManager] Disposing isolate...");
     _sendPort?.send('shutdown');
     _receivePort.close();
+    await _updateController.close();
     await _renderPacketController.close();
     _isolate?.kill(priority: Isolate.immediate);
     _isolate = null;
@@ -95,103 +102,99 @@ void _isolateEntryPoint(List<dynamic> args) async {
     }
 
     registerCoreComponents();
-
     final world = worldProvider();
     await world.init();
 
-    // *** FINAL FIX: Proactive Hydration ***
-    // Immediately send the initial state of the world to the UI after initialization.
-    // This solves the initial loading screen bug by ensuring the UI gets data
-    // as soon as the logic isolate is ready, without waiting for a message from the UI.
-    // debugPrint((
-    // "[NexusLogicIsolate] World initialized. Sending initial hydration packet.");
-    final initialPackets = <RenderPacket>[];
-    for (final entity in world.entities.values) {
-      final serializableComponents = <String, Map<String, dynamic>>{};
-      for (final component in entity.allComponents) {
-        if (component is SerializableComponent) {
-          serializableComponents[component.runtimeType.toString()] =
-              (component as SerializableComponent).toJson();
-        }
-      }
-      if (serializableComponents.isNotEmpty) {
-        initialPackets.add(
-            RenderPacket(id: entity.id, components: serializableComponents));
-      }
-    }
-    if (initialPackets.isNotEmpty) {
-      mainSendPort.send(initialPackets);
-    }
-    // End of Proactive Hydration block
-
-    final stopwatch = Stopwatch()..start();
-    Timer? gameLoopTimer;
-
-    gameLoopTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
-      final dt =
-          stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
-      stopwatch.reset();
-      stopwatch.start();
-
-      world.update(dt);
-
-      final packets = <RenderPacket>[];
+    void sendHydrationData() {
+      // Send legacy RenderPackets
+      final List<RenderPacket> packets = [];
       for (final entity in world.entities.values) {
-        if (entity.dirtyComponents.isEmpty) continue;
-
         final serializableComponents = <String, Map<String, dynamic>>{};
-        for (final componentType in entity.dirtyComponents) {
-          final component = entity.getByType(componentType);
+        for (final component in entity.allComponents) {
           if (component is SerializableComponent) {
             serializableComponents[component.runtimeType.toString()] =
                 (component as SerializableComponent).toJson();
+
+            // Send granular ESCUEM ComponentUpdate
+            mainSendPort.send(ComponentUpdate(
+              entityId: entity.id,
+              componentTypeName: component.runtimeType.toString(),
+              componentJson: (component as SerializableComponent).toJson(),
+            ));
           }
         }
-
         if (serializableComponents.isNotEmpty) {
           packets.add(
               RenderPacket(id: entity.id, components: serializableComponents));
         }
+      }
+      if (packets.isNotEmpty) {
+        mainSendPort.send(packets);
+      }
+    }
+
+    sendHydrationData();
+
+    final stopwatch = Stopwatch()..start();
+    Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      final dt =
+          stopwatch.elapsed.inMicroseconds / Duration.microsecondsPerSecond;
+      stopwatch.reset();
+      stopwatch.start();
+      world.update(dt);
+
+      final List<RenderPacket> dirtyPackets = [];
+      for (final entity in world.entities.values) {
+        if (entity.dirtyComponents.isEmpty) continue;
+
+        final Map<String, Map<String, dynamic>> dirtyComponentJson = {};
+        for (final componentType in entity.dirtyComponents) {
+          final component = entity.getByType(componentType);
+          if (component is SerializableComponent) {
+            final json = (component as SerializableComponent).toJson();
+            dirtyComponentJson[component.runtimeType.toString()] = json;
+
+            // Send granular ESCUEM ComponentUpdate
+            mainSendPort.send(ComponentUpdate(
+              entityId: entity.id,
+              componentTypeName: component.runtimeType.toString(),
+              componentJson: json,
+            ));
+          }
+        }
+        if (dirtyComponentJson.isNotEmpty) {
+          dirtyPackets
+              .add(RenderPacket(id: entity.id, components: dirtyComponentJson));
+        }
         entity.clearDirty();
       }
 
-      final removedEntityIds = world.getAndClearRemovedEntities();
-      for (final id in removedEntityIds) {
-        packets.add(RenderPacket(id: id, components: {}, isRemoved: true));
+      if (dirtyPackets.isNotEmpty) {
+        mainSendPort.send(dirtyPackets);
       }
 
-      if (packets.isNotEmpty) {
-        mainSendPort.send(packets);
+      final removedEntityIds = world.getAndClearRemovedEntities();
+      if (removedEntityIds.isNotEmpty) {
+        final List<RenderPacket> removalPackets = [];
+        for (final id in removedEntityIds) {
+          // Send legacy removal packet
+          removalPackets
+              .add(RenderPacket(id: id, components: {}, isRemoved: true));
+          // Send ESCUEM removal update
+          mainSendPort.send(ComponentUpdate(
+              entityId: id, componentTypeName: 'Entity', isRemoved: true));
+        }
+        mainSendPort.send(removalPackets);
       }
     });
 
     isolateReceivePort.listen((message) {
       if (message is String) {
-        switch (message) {
-          case 'shutdown':
-            gameLoopTimer?.cancel();
-            world.clear();
-            isolateReceivePort.close();
-            break;
-          case 'hydrate':
-            final packets = <RenderPacket>[];
-            for (final entity in world.entities.values) {
-              final serializableComponents = <String, Map<String, dynamic>>{};
-              for (final component in entity.allComponents) {
-                if (component is SerializableComponent) {
-                  serializableComponents[component.runtimeType.toString()] =
-                      (component as SerializableComponent).toJson();
-                }
-              }
-              if (serializableComponents.isNotEmpty) {
-                packets.add(RenderPacket(
-                    id: entity.id, components: serializableComponents));
-              }
-            }
-            if (packets.isNotEmpty) {
-              mainSendPort.send(packets);
-            }
-            break;
+        if (message == 'shutdown') {
+          world.clear();
+          isolateReceivePort.close();
+        } else if (message == 'hydrate') {
+          sendHydrationData();
         }
       } else {
         world.eventBus.fire(message);

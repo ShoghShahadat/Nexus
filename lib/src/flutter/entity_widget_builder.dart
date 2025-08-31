@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:nexus/src/core/entity.dart';
-import 'package:nexus/src/systems/flutter_rendering_system.dart';
+import 'package:nexus/src/flutter/flutter_rendering_system.dart';
 
 /// A highly performant widget that listens to a single entity using its ID
 /// and the rendering system, then rebuilds its child whenever the entity's

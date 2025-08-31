@@ -16,8 +16,9 @@ export 'src/core/logic/logic_function.dart';
 export 'src/core/utils/equatable_mixin.dart';
 export 'src/core/storage/storage_adapter.dart';
 export 'src/core/utils/frequency.dart';
-// *** NEW: Exporting the new copyWith extension ***
 export 'src/core/utils/component_extensions.dart';
+export 'src/core/render_packet.dart'; // Restored
+export 'src/core/component_update.dart'; // New
 
 // --- GPU Compute API ---
 export 'src/compute/gpu_buffer.dart';
@@ -32,7 +33,6 @@ export 'src/services/network/i_web_socket_service.dart';
 export 'src/core/serialization/serializable_component.dart';
 export 'src/core/serialization/component_factory.dart';
 export 'src/core/serialization/world_serializer.dart';
-export 'src/core/render_packet.dart';
 export 'src/core/serialization/binary_component.dart';
 export 'src/core/serialization/binary_component_factory.dart';
 export 'src/core/serialization/binary_reader_writer.dart';
@@ -91,6 +91,7 @@ export 'src/components/screen_info_component.dart';
 export 'src/components/shape_path_component.dart';
 export 'src/components/spawner_link_component.dart';
 export 'src/components/styleable_component.dart';
+export 'src/components/stylesheet_component.dart';
 export 'src/components/tags_component.dart';
 export 'src/components/theme_component.dart';
 export 'src/components/timer_component.dart';
@@ -98,6 +99,8 @@ export 'src/components/velocity_component.dart';
 export 'src/components/web_socket_components.dart';
 export 'src/components/widget_component.dart';
 export 'src/components/history_component.dart';
+export 'src/components/global_transform_component.dart';
+export 'src/components/dom_element_component.dart';
 
 // --- Rendering Components ---
 export 'src/components/rendering/drawable_component.dart';
@@ -120,7 +123,6 @@ export 'src/systems/collision_system.dart';
 export 'src/systems/damage_system.dart';
 export 'src/systems/decoration_animation_system.dart';
 export 'src/systems/effect_system.dart';
-export 'src/systems/flutter_rendering_system.dart';
 export 'src/systems/garbage_collector_system.dart';
 export 'src/systems/hardware_input_system.dart';
 export 'src/systems/history_system.dart';
@@ -145,21 +147,25 @@ export 'src/systems/theming_system.dart';
 export 'src/systems/timer_system.dart';
 export 'src/systems/transform_system.dart';
 export 'src/systems/web_socket_system.dart';
+export 'src/systems/transform_dirty_system.dart';
 
 // --- Rendering System ---
 export 'src/systems/rendering/custom_painting_system.dart';
 
-// --- Modules ---
+// --- Flutter Bridge (Dual Architecture) ---
 
-// --- Flutter Bridge ---
-export 'src/flutter/entity_widget_builder.dart';
+// New ESCUEM Architecture
+export 'src/flutter/nexus_scope.dart';
+export 'src/flutter/entity_builder.dart';
+
+// Legacy Architecture
+export 'src/flutter/flutter_rendering_system.dart';
 export 'src/flutter/nexus_widget.dart';
 export 'src/flutter/nexus_app.dart';
+export 'src/flutter/entity_widget_builder.dart';
+export 'src/flutter/widget_builder.dart';
+
+// Core Manager
 export 'src/flutter/nexus_manager.dart';
 export 'src/flutter/nexus_isolate_manager.dart';
 export 'src/flutter/nexus_single_thread_manager.dart';
-export 'src/flutter/builder_tags.dart';
-export 'src/flutter/widget_builder.dart';
-
-// --- Rendering Builder ---
-export 'src/flutter/rendering/nexus_canvas_builder.dart';
