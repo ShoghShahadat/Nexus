@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/events/hardware_input_events.dart';
 
 /// A system that processes raw hardware button events and translates them into
 /// higher-level, domain-specific events for the application to consume.
@@ -32,13 +31,5 @@ class HardwareInputSystem extends System {
         print('[HardwareInputSystem] Volume Down pressed.');
         break;
     }
-  }
-
-  @override
-  bool matches(Entity entity) => false; // Purely event-driven.
-
-  @override
-  void update(Entity entity, double dt) {
-    // Logic is in the event listener.
   }
 }

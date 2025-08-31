@@ -5,7 +5,7 @@ import 'package:nexus/nexus.dart';
 /// exit animation when an item is deleted.
 /// سیستمی که مسئول اجرای انیمیشن‌ها روی آیتم‌های لیست است، مانند انیمیشن
 /// خروج هنگام حذف یک آیتم.
-class ListItemAnimationSystem extends System {
+class ListItemAnimationSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     // It looks for items that are marked for animation but don't have an

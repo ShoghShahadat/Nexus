@@ -1,11 +1,9 @@
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/particle_component.dart'
-    show ParticleComponent;
 
 /// A system that manages the aging and immediate disposal of particle entities.
 /// It increments the `age` property on each frame and removes the entity as soon
 /// as its `maxAge` is reached, preventing any delay from the GarbageCollectorSystem.
-class ParticleLifecycleSystem extends System {
+class ParticleLifecycleSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     return entity.has<ParticleComponent>();

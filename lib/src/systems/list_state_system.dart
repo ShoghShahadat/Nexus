@@ -144,10 +144,4 @@ class ListStateSystem extends System {
     return world.entities.values
         .firstWhereOrNull((e) => e.get<ListComponent>()?.listId == listId);
   }
-
-  @override
-  bool matches(Entity entity) => false; // Purely event-driven
-
-  @override
-  void update(Entity entity, double dt) {}
 }

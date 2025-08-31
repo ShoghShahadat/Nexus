@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/events/input_events.dart';
 
 /// A system that listens for input events sent from the UI thread and
 /// triggers the corresponding logic in the background isolate.
@@ -26,10 +25,4 @@ class InputSystem extends System {
     final clickable = entity.get<ClickableComponent>();
     clickable?.onTap(entity);
   }
-
-  @override
-  bool matches(Entity entity) => false;
-
-  @override
-  void update(Entity entity, double dt) {}
 }

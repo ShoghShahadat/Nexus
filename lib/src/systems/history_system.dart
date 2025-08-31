@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'package:nexus/nexus.dart';
-import 'package:nexus/src/components/history_component.dart';
-import 'package:nexus/src/events/history_events.dart';
 
 /// A system that manages undo/redo functionality for entities
 /// with a [HistoryComponent].
-class HistorySystem extends System {
+class HistorySystem extends UpdateSystem {
   StreamSubscription? _undoSubscription;
   StreamSubscription? _redoSubscription;
 

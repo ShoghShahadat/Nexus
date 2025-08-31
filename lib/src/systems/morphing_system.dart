@@ -6,7 +6,7 @@ import 'package:nexus/nexus.dart';
 /// This system watches for changes in the [MorphingLogicComponent] and creates
 /// an [AnimationComponent] to handle the timing of the morph. It updates an
 /// [AnimationProgressComponent] to communicate the animation's state to the UI.
-class MorphingSystem extends System {
+class MorphingSystem extends UpdateSystem {
   @override
   bool matches(Entity entity) {
     // We want to process entities that have a morph description but are not

@@ -71,10 +71,4 @@ class ListItemInteractionSystem extends System {
         break;
     }
   }
-
-  @override
-  bool matches(Entity entity) => false; // Purely event-driven
-
-  @override
-  void update(Entity entity, double dt) {}
 }
