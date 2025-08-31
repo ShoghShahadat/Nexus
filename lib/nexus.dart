@@ -154,6 +154,7 @@ export 'src/systems/rendering/custom_painting_system.dart';
 // --- Flutter Bridge ---
 export 'src/flutter/entity_widget_builder.dart';
 export 'src/flutter/nexus_widget.dart';
+export 'src/flutter/nexus_app.dart';
 export 'src/flutter/nexus_manager.dart';
 export 'src/flutter/nexus_isolate_manager.dart';
 export 'src/flutter/nexus_single_thread_manager.dart';
