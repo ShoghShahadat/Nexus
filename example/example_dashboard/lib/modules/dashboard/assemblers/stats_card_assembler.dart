@@ -1,67 +1,48 @@
-import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
-import 'package:example_dashboard/modules/dashboard/components/stats_card_component.dart';
 import 'package:example_dashboard/shared/components/tags.dart';
+import 'package:example_dashboard/modules/dashboard/components/stats_card_component.dart';
 
-/// این کلاس مسئولیت ساخت Entityهای مربوط به کارت‌های آمار را دارد.
-class StatsCardAssembler {
-  final NexusWorld world;
+/// یک Assembler برای ایجاد موجودیت‌های مربوط به کارت‌های آمار.
+class StatsCardAssembler extends EntityAssembler<void> {
+  StatsCardAssembler(super.world, super.context);
 
-  StatsCardAssembler(this.world);
-
-  /// لیستی از Entityهای کارت آمار را با داده‌های اولیه ایجاد می‌کند.
+  @override
   List<Entity> assemble() {
-    return [
-      _createCard(
-        title: 'Revenue',
-        value: '1,250,000',
-        icon: Icons.attach_money,
-        trend: Trend.up,
-        color: Colors.green,
-      ),
-      _createCard(
-        title: 'Users',
-        value: '3,420',
-        icon: Icons.people_outline,
-        trend: Trend.up,
-        color: Colors.blue,
-      ),
-      _createCard(
-        title: 'Orders',
-        value: '1,890',
-        icon: Icons.shopping_cart_outlined,
-        trend: Trend.down,
-        color: Colors.orange,
-      ),
-      _createCard(
-        title: 'Engagement',
-        value: '78.5%',
-        icon: Icons.favorite_border,
-        trend: Trend.neutral,
-        color: Colors.red,
-      ),
+    final cardData = [
+      {'title': 'Revenue', 'icon': 0xea4d, 'value': '\$0', 'trend': Trend.up},
+      {'title': 'Users', 'icon': 0xe49a, 'value': '0', 'trend': Trend.down},
+      {
+        'title': 'Engagement',
+        'icon': 0xf051d,
+        'value': '0.0%',
+        'trend': Trend.stable
+      },
+      {'title': 'Sales', 'icon': 0xf051b, 'value': '0', 'trend': Trend.up},
     ];
-  }
 
-  /// یک متد کمکی برای ساخت یک Entity کارت آمار.
-  Entity _createCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Trend trend,
-    required Color color,
-  }) {
-    final entity = Entity()
-      ..add(StatsCardComponent(
-        title: title,
-        value: value,
-        iconCodePoint: icon.codePoint,
-        trend: trend,
-        // FIX: Removed deprecated '.value' property.
-        // اصلاح: پراپرتی منسوخ شده '.value' حذف شد.
-        colorValue: color.value,
-      ))
-      ..add(TagsComponent({DashboardTags.statsCard}));
-    return entity;
+    final createdCards = <Entity>[];
+
+    for (var data in cardData) {
+      // --- CRITICAL FIX: Two-step entity creation and configuration. ---
+      // 1. Create the entity and immediately add it to the world.
+      // 2. Add components to the now-registered entity.
+      // اصلاح حیاتی: ایجاد و پیکربندی موجودیت در دو مرحله.
+      // ۱. موجودیت را ایجاد کرده و بلافاصله آن را به دنیا اضافه می‌کنیم.
+      // ۲. کامپوننت‌ها را به موجودیت ثبت‌شده اضافه می‌کنیم.
+      final cardEntity = Entity();
+      world.addEntity(cardEntity);
+
+      cardEntity.addComponents([
+        TagsComponent({DashboardTags.statsCard}),
+        StatsCardComponent(
+          title: data['title'] as String,
+          iconData: data['icon'] as int,
+          value: data['value'] as String,
+          trend: data['trend'] as Trend,
+        )
+      ]);
+      createdCards.add(cardEntity);
+    }
+    return createdCards;
   }
 }

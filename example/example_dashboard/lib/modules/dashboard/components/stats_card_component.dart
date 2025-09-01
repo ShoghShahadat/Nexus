@@ -1,44 +1,60 @@
 import 'package:nexus/nexus.dart';
 
-/// Enum برای نمایش روند (صعودی، نزولی یا خنثی).
-enum Trend { up, down, neutral }
+/// Enum برای نمایش روند (Trend) آمار.
+enum Trend { up, down, stable }
 
-/// کامپوننت داده برای نگهداری اطلاعات یک کارت آمار.
+/// یک کامپوننت داده‌محور که وضعیت یک کارت آمار را نگهداری می‌کند.
 class StatsCardComponent extends Component with SerializableComponent {
   final String title;
+  final int iconData; // کد آیکون از فونت متریال
   final String value;
-  final int iconCodePoint;
   final Trend trend;
-  final int colorValue;
+  final bool isLoading;
 
   StatsCardComponent({
     required this.title,
+    required this.iconData,
     required this.value,
-    required this.iconCodePoint,
     required this.trend,
-    required this.colorValue,
+    this.isLoading = false,
   });
 
   @override
-  List<Object?> get props => [title, value, iconCodePoint, trend, colorValue];
+  List<Object?> get props => [title, iconData, value, trend, isLoading];
 
-  // --- Serialization ---
-  factory StatsCardComponent.fromJson(Map<String, dynamic> json) {
+  /// متد `copyWith` برای ایجاد یک نمونه جدید با مقادیر به‌روز شده.
+  StatsCardComponent copyWith({
+    String? title,
+    int? iconData,
+    String? value,
+    Trend? trend,
+    bool? isLoading,
+  }) {
     return StatsCardComponent(
-      title: json['title'] as String,
-      value: json['value'] as String,
-      iconCodePoint: json['iconCodePoint'] as int,
-      trend: Trend.values[json['trend'] as int],
-      colorValue: json['colorValue'] as int,
+      title: title ?? this.title,
+      iconData: iconData ?? this.iconData,
+      value: value ?? this.value,
+      trend: trend ?? this.trend,
+      isLoading: isLoading ?? this.isLoading,
     );
   }
 
   @override
   Map<String, dynamic> toJson() => {
         'title': title,
+        'iconData': iconData,
         'value': value,
-        'iconCodePoint': iconCodePoint,
         'trend': trend.index,
-        'colorValue': colorValue,
+        'isLoading': isLoading,
       };
+
+  factory StatsCardComponent.fromJson(Map<String, dynamic> json) {
+    return StatsCardComponent(
+      title: json['title'] as String,
+      iconData: json['iconData'] as int,
+      value: json['value'] as String,
+      trend: Trend.values[json['trend'] as int],
+      isLoading: json['isLoading'] as bool? ?? false,
+    );
+  }
 }

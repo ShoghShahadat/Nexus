@@ -43,14 +43,6 @@ class NexusWorld {
 
   void _createRootEntity() {
     rootEntity = Entity();
-    // CRITICAL FIX for LateInitializationError:
-    // FIRST, add the entity to the world so its `world` property is set.
-    // THEN, add components to it. Now it's safe because `addComponents`
-    // can access `entity.world`.
-    // اصلاح حیاتی برای خطای LateInitializationError:
-    // ابتدا، موجودیت را به دنیا اضافه می‌کنیم تا پراپرتی `world` آن تنظیم شود.
-    // سپس، کامپوننت‌ها را به آن اضافه می‌کنیم. اکنون این کار امن است زیرا
-    // `addComponents` می‌تواند به `entity.world` دسترسی داشته باشد.
     addEntity(rootEntity);
 
     rootEntity.addComponents([
@@ -62,8 +54,11 @@ class NexusWorld {
   }
 
   Future<void> init() async {
+    // CRITICAL FIX: The module's onLoad is now called in `loadModule`.
+    // We only need to create entities here now.
+    // اصلاح حیاتی: متد onLoad ماژول اکنون در `loadModule` فراخوانی می‌شود.
+    // در اینجا فقط نیاز به ایجاد موجودیت‌ها داریم.
     for (final module in _modules) {
-      module.onLoad(this);
       for (final provider in module.entityProviders) {
         provider.createEntities(this);
       }
@@ -75,6 +70,13 @@ class NexusWorld {
 
   void loadModule(NexusModule module) {
     _modules.add(module);
+
+    // --- CRITICAL FIX: Call onLoad *before* processing any providers. ---
+    // This ensures all services are registered before systems that depend on them are added.
+    // اصلاح حیاتی: متد onLoad را *قبل* از پردازش هر provider فراخوانی می‌کنیم.
+    // این کار تضمین می‌کند که تمام سرویس‌ها قبل از اضافه شدن سیستم‌های وابسته به آنها، ثبت شده‌اند.
+    module.onLoad(this);
+
     for (final provider in module.systemProviders) {
       for (final system in provider.systems) {
         addSystem(system);
@@ -89,16 +91,12 @@ class NexusWorld {
             '[NexusWorld] WARNING: An entity with ID ${entity.id} already exists. Overwriting.');
       }
     }
-    // --- NEW: Assign world reference before adding ---
     entity.setWorld(this);
     _entities[entity.id] = entity;
 
-    // --- MODIFIED: Call onEntityAdded for ALL systems ---
     for (final system in _allSystems) {
-      // General lifecycle hook for all systems
       system.onEntityAdded(entity);
 
-      // Specific logic for UpdateSystems
       if (system is UpdateSystem && system.matches(entity)) {
         system.addEntityToCache(entity);
       }
@@ -110,12 +108,9 @@ class NexusWorld {
     if (entity != null) {
       _removedEntityIdsThisFrame.add(id);
 
-      // --- MODIFIED: Call onEntityRemoved for ALL systems ---
       for (final system in _allSystems) {
-        // General lifecycle hook for all systems
         system.onEntityRemoved(entity);
 
-        // Specific logic for UpdateSystems
         if (system is UpdateSystem) {
           system.removeEntityFromCache(entity);
         }
@@ -131,7 +126,6 @@ class NexusWorld {
     return removed;
   }
 
-  /// --- MODIFIED: Now registers systems based on their type ---
   void addSystem(System system) {
     if (system is GarbageCollectorSystem) {
       _gc = system;
@@ -139,7 +133,6 @@ class NexusWorld {
     _allSystems.add(system);
     system.onAddedToWorld(this);
 
-    // --- NEW: Handle system specialization ---
     if (system is UpdateSystem) {
       _updateSystems.add(system);
       for (final entity in _entities.values) {
@@ -161,7 +154,6 @@ class NexusWorld {
       _gc = null;
     }
     if (_allSystems.remove(system)) {
-      // --- NEW: Also remove from specialized lists/maps ---
       if (system is UpdateSystem) {
         _updateSystems.remove(system);
       } else if (system is ReactiveSystem) {
@@ -173,11 +165,8 @@ class NexusWorld {
     }
   }
 
-  /// --- NEW & MODIFIED: The central dispatcher, now non-generic and more robust. ---
-  /// It uses runtime types to notify the correct systems, fixing the type inference error.
   void notifyComponentChange(
       Entity entity, Component? oldComponent, Component? newComponent) {
-    // Determine the component type from the arguments at runtime.
     final componentType =
         newComponent?.runtimeType ?? oldComponent!.runtimeType;
 
@@ -185,20 +174,15 @@ class NexusWorld {
 
     if (interestedSystems == null) return;
 
-    // Use a copy of the list to avoid concurrent modification issues.
     for (final system in List<ReactiveSystem>.from(interestedSystems)) {
       if (newComponent == null && oldComponent != null) {
-        // This is a removal
         system.onComponentRemoved(entity, oldComponent);
       } else if (newComponent != null) {
-        // This is an addition or update
         system.onComponentChanged(entity, oldComponent, newComponent);
       }
     }
   }
 
-  /// --- THE ULTIMATELY OPTIMIZED UPDATE LOOP ---
-  /// Now, it only iterates over the systems that absolutely need to run every frame.
   void update(double dt) {
     _gc?.runGc(dt);
 

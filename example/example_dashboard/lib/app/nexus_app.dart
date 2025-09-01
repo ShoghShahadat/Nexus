@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:example_dashboard/app/theme.dart';
+import 'package:example_dashboard/main.dart';
 import 'package:example_dashboard/modules/dashboard/dashboard_module.dart';
 import 'package:example_dashboard/modules/dashboard/dashboard_scene.dart';
 
@@ -15,10 +16,13 @@ class DashboardApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
       home: NexusScope(
-        // worldProvider یک دنیای Nexus جدید ایجاد کرده و ماژول اصلی داشبورد را در آن بارگذاری می‌کند.
-        // این تابع در یک Isolate مجزا (در پلتفرم‌های غیر وب) اجرا می‌شود.
+        // --- CRITICAL FIX: Register custom components for the Logic Isolate ---
+        // این تابع تضمین می‌کند که ایزوله منطق نیز فکتوری‌های لازم برای
+        // کار با کامپوننت‌های سفارشی را در اختیار دارد.
+        isolateInitializer: () async {
+          registerDashboardComponents();
+        },
         worldProvider: () => NexusWorld()..loadModule(DashboardModule()),
-        // فرزند NexusScope، ویجت اصلی صفحه داشبورد است.
         child: const DashboardScene(),
       ),
     );

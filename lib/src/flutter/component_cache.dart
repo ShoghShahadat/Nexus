@@ -7,69 +7,68 @@ import 'package:nexus/src/core/component_update.dart';
 /// و ویجت‌ها را از تغییرات مطلع می‌سازد.
 class ComponentCache {
   final NexusManager manager;
-  final Map<EntityId, Map<Type, Component>> _componentCache = {};
+  final Map<EntityId, Map<String, Component>> _componentCache = {};
   final Map<EntityId, ChangeNotifier> _entityNotifiers = {};
   StreamSubscription? _updateSubscription;
+
+  // --- NEW: A stream to signal when the cache is ready (has received first data) ---
+  final _readyController = StreamController<void>.broadcast();
+  Stream<void> get onReady => _readyController.stream;
+  bool _isReady = false;
 
   ComponentCache({required this.manager}) {
     _updateSubscription = manager.componentUpdateStream.listen(_onUpdate);
   }
 
-  /// دریافت یک کامپوننت از کش.
   T? get<T extends Component>(EntityId id) {
-    return _componentCache[id]?[T] as T?;
+    return _componentCache[id]?[T.toString()] as T?;
   }
 
-  /// دریافت ChangeNotifier برای یک موجودیت خاص.
   ChangeNotifier getNotifier(EntityId id) {
     return _entityNotifiers.putIfAbsent(id, () => ChangeNotifier());
   }
 
   void _onUpdate(ComponentUpdate update) {
+    // --- PRO LOGGING ---
+    debugPrint(
+        "📬 [ComponentCache] Received update for Entity ${update.entityId}: Component '${update.componentTypeName}', isRemoved: ${update.isRemoved}");
+
     final entityCache = _componentCache.putIfAbsent(update.entityId, () => {});
     final notifier = getNotifier(update.entityId);
 
-    final type =
-        ComponentFactoryRegistry.I.getComponentType(update.componentTypeName);
-    if (type == null) return;
-
     if (update.isRemoved) {
-      entityCache.remove(type);
+      entityCache.remove(update.componentTypeName);
     } else if (update.componentJson != null) {
       try {
         final component = ComponentFactoryRegistry.I
             .create(update.componentTypeName, update.componentJson!);
-        entityCache[type] = component;
+        entityCache[update.componentTypeName] = component;
       } catch (e) {
         debugPrint(
-            '[ComponentCache] Error deserializing ${update.componentTypeName}: $e');
+            "❌ [ComponentCache] ERROR deserializing '${update.componentTypeName}': $e");
       }
     }
+
+    // --- PRO LOGGING ---
+    debugPrint(
+        "🔔 [ComponentCache] Notifying listeners for Entity ${update.entityId}.");
     notifier.notifyListeners();
+
+    // --- NEW: Signal readiness on first data received ---
+    if (!_isReady) {
+      _isReady = true;
+      debugPrint(
+          "✅ [ComponentCache] Cache is now ready. Firing onReady event.");
+      _readyController.add(null);
+    }
   }
 
   void dispose() {
     _updateSubscription?.cancel();
+    _readyController.close();
     for (var notifier in _entityNotifiers.values) {
       notifier.dispose();
     }
-  }
-}
-
-// افزودن یک متد کمکی به رجیستری برای دریافت Type از روی نام
-extension ComponentTypeResolver on ComponentFactoryRegistry {
-  static final Map<String, Type> _typeMap = {};
-
-  void _cacheType(String name, Type type) {
-    _typeMap.putIfAbsent(name, () => type);
-  }
-
-  Type? getComponentType(String typeName) {
-    return _typeMap[typeName];
-  }
-
-  void registerAndCache(String typeName, ComponentFactory factory, Type type) {
-    register(typeName, factory);
-    _cacheType(typeName, type);
+    debugPrint("🗑️ [ComponentCache] Disposed.");
   }
 }

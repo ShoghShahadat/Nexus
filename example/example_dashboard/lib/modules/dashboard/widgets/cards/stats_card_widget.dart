@@ -2,105 +2,80 @@ import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:example_dashboard/modules/dashboard/components/stats_card_component.dart';
 
-/// ویجت نمایش‌دهنده یک کارت آمار.
-/// این ویجت به صورت واکنشی به تغییرات داده‌های خود گوش می‌دهد.
+/// ویجت برای نمایش یک کارت آمار.
 class StatsCardWidget extends StatelessWidget {
   final EntityId entityId;
-
   const StatsCardWidget({super.key, required this.entityId});
 
   @override
   Widget build(BuildContext context) {
-    // استفاده از EntityBuilder برای گوش دادن به تغییرات StatsCardComponent.
-    // این ویجت تنها زمانی بازسازی می‌شود که داده‌های این کارت خاص تغییر کند.
+    // این ویجت به تغییرات StatsCardComponent گوش می‌دهد و تنها در صورت نیاز بازسازی می‌شود.
     return EntityBuilder<StatsCardComponent>(
       entityId: entityId,
-      loadingBuilder: (context) =>
-          const Card(child: Center(child: CircularProgressIndicator())),
-      builder: (context, stats) {
-        final color = Color(stats.colorValue);
-        final textTheme = Theme.of(context).textTheme;
+      builder: (context, card) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+
+        IconData trendIcon;
+        Color trendColor;
+        switch (card.trend) {
+          case Trend.up:
+            trendIcon = Icons.arrow_upward;
+            trendColor = Colors.green;
+            break;
+          case Trend.down:
+            trendIcon = Icons.arrow_downward;
+            trendColor = Colors.red;
+            break;
+          // FIX: Corrected 'neutral' to 'stable' to match the enum definition.
+          // اصلاح: مقدار 'neutral' به 'stable' برای تطابق با تعریف enum تغییر یافت.
+          case Trend.stable:
+            trendIcon = Icons.remove;
+            trendColor = Colors.grey;
+            break;
+        }
 
         return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: color.withOpacity(0.3), width: 1.5),
-          ),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Row(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(stats.title, style: textTheme.labelSmall),
-                    Icon(
-                      IconData(stats.iconCodePoint,
-                          fontFamily: 'MaterialIcons'),
-                      color: color,
-                      size: 24,
-                    ),
-                  ],
+                CircleAvatar(
+                  radius: 28,
+                  // FIX: Used theme color instead of a non-existent component property.
+                  // اصلاح: از رنگ تم به جای یک پراپرتی ناموجود در کامپوننت استفاده شد.
+                  backgroundColor: colorScheme.primary.withOpacity(0.1),
+                  child: Icon(
+                      // FIX: Correctly accessed `iconData` instead of `iconCodePoint`.
+                      // اصلاح: دسترسی به `iconData` به جای `iconCodePoint` تصحیح شد.
+                      IconData(card.iconData, fontFamily: 'MaterialIcons'),
+                      color: colorScheme.primary,
+                      size: 28),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(stats.value,
-                        style: textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.bold)),
-                    _TrendIndicator(trend: stats.trend),
-                  ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(card.title, style: theme.textTheme.titleLarge),
+                      const SizedBox(height: 4),
+                      if (card.isLoading)
+                        const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                      else
+                        Text(card.value, style: theme.textTheme.headlineSmall),
+                    ],
+                  ),
                 ),
+                Icon(trendIcon, color: trendColor, size: 28),
               ],
             ),
           ),
         );
       },
-    );
-  }
-}
-
-/// یک ویجت کوچک برای نمایش نشانگر روند (صعودی/نزولی).
-class _TrendIndicator extends StatelessWidget {
-  final Trend trend;
-  const _TrendIndicator({required this.trend});
-
-  @override
-  Widget build(BuildContext context) {
-    final IconData icon;
-    final Color color;
-    final String text;
-
-    switch (trend) {
-      case Trend.up:
-        icon = Icons.arrow_upward;
-        color = Colors.green;
-        text = 'Increased';
-        break;
-      case Trend.down:
-        icon = Icons.arrow_downward;
-        color = Colors.red;
-        text = 'Decreased';
-        break;
-      case Trend.neutral:
-        icon = Icons.horizontal_rule;
-        color = Colors.grey;
-        text = 'Stable';
-        break;
-    }
-
-    return Row(
-      children: [
-        Icon(icon, color: color, size: 16),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
-        ),
-      ],
     );
   }
 }

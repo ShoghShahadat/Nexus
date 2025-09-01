@@ -93,6 +93,7 @@ void _isolateEntryPoint(List<dynamic> args) async {
   mainSendPort.send(isolateReceivePort.sendPort);
 
   try {
+    debugPrint("🧠 [Isolate] Entry point started.");
     if (rootIsolateToken != null) {
       BackgroundIsolateBinaryMessenger.ensureInitialized(rootIsolateToken);
     }
@@ -101,39 +102,22 @@ void _isolateEntryPoint(List<dynamic> args) async {
       await isolateInitializer();
     }
 
+    debugPrint("🧠 [Isolate] Registering core components...");
     registerCoreComponents();
     final world = worldProvider();
+    debugPrint("🧠 [Isolate] NexusWorld created. Initializing...");
     await world.init();
+    debugPrint("🧠 [Isolate] NexusWorld initialized.");
 
-    void sendHydrationData() {
-      // Send legacy RenderPackets
-      final List<RenderPacket> packets = [];
+    void hydrateWorld() {
+      debugPrint(
+          "💧 [Isolate] Hydration requested. Marking all components as dirty...");
       for (final entity in world.entities.values) {
-        final serializableComponents = <String, Map<String, dynamic>>{};
-        for (final component in entity.allComponents) {
-          if (component is SerializableComponent) {
-            serializableComponents[component.runtimeType.toString()] =
-                (component as SerializableComponent).toJson();
-
-            // Send granular ESCUEM ComponentUpdate
-            mainSendPort.send(ComponentUpdate(
-              entityId: entity.id,
-              componentTypeName: component.runtimeType.toString(),
-              componentJson: (component as SerializableComponent).toJson(),
-            ));
-          }
-        }
-        if (serializableComponents.isNotEmpty) {
-          packets.add(
-              RenderPacket(id: entity.id, components: serializableComponents));
-        }
-      }
-      if (packets.isNotEmpty) {
-        mainSendPort.send(packets);
+        entity.markAllComponentsAsDirty();
       }
     }
 
-    sendHydrationData();
+    hydrateWorld();
 
     final stopwatch = Stopwatch()..start();
     Timer.periodic(const Duration(milliseconds: 16), (timer) {
@@ -143,65 +127,59 @@ void _isolateEntryPoint(List<dynamic> args) async {
       stopwatch.start();
       world.update(dt);
 
-      final List<RenderPacket> dirtyPackets = [];
       for (final entity in world.entities.values) {
         if (entity.dirtyComponents.isEmpty) continue;
 
-        final Map<String, Map<String, dynamic>> dirtyComponentJson = {};
         for (final componentType in entity.dirtyComponents) {
           final component = entity.getByType(componentType);
-          if (component is SerializableComponent) {
-            final json = (component as SerializableComponent).toJson();
-            dirtyComponentJson[component.runtimeType.toString()] = json;
 
-            // Send granular ESCUEM ComponentUpdate
-            mainSendPort.send(ComponentUpdate(
-              entityId: entity.id,
-              componentTypeName: component.runtimeType.toString(),
-              componentJson: json,
-            ));
-          }
-        }
-        if (dirtyComponentJson.isNotEmpty) {
-          dirtyPackets
-              .add(RenderPacket(id: entity.id, components: dirtyComponentJson));
+          final update = ComponentUpdate(
+            entityId: entity.id,
+            componentTypeName: componentType.toString(),
+            isRemoved: component == null,
+            // --- CRITICAL FIX: Explicitly cast to SerializableComponent ---
+            // This tells the compiler that inside this expression, component is guaranteed
+            // to be of the correct type, thus allowing the call to toJson().
+            // اصلاح حیاتی: به صراحت به SerializableComponent تبدیل می‌کنیم.
+            // این به کامپایلر می‌گوید که در داخل این عبارت، کامپوننت قطعاً از نوع صحیح است
+            // و اجازه فراخوانی toJson() را می‌دهد.
+            componentJson:
+                (component != null && component is SerializableComponent)
+                    ? (component as SerializableComponent).toJson()
+                    : null,
+          );
+          // --- PRO LOGGING ---
+          debugPrint(
+              "📤 [Isolate] Sending update for Entity ${update.entityId}: Component '${update.componentTypeName}', isRemoved: ${update.isRemoved}");
+          mainSendPort.send(update);
         }
         entity.clearDirty();
       }
 
-      if (dirtyPackets.isNotEmpty) {
-        mainSendPort.send(dirtyPackets);
-      }
-
       final removedEntityIds = world.getAndClearRemovedEntities();
       if (removedEntityIds.isNotEmpty) {
-        final List<RenderPacket> removalPackets = [];
         for (final id in removedEntityIds) {
-          // Send legacy removal packet
-          removalPackets
-              .add(RenderPacket(id: id, components: {}, isRemoved: true));
-          // Send ESCUEM removal update
           mainSendPort.send(ComponentUpdate(
               entityId: id, componentTypeName: 'Entity', isRemoved: true));
         }
-        mainSendPort.send(removalPackets);
       }
     });
 
     isolateReceivePort.listen((message) {
       if (message is String) {
         if (message == 'shutdown') {
+          debugPrint("🛑 [Isolate] Shutdown command received.");
           world.clear();
           isolateReceivePort.close();
         } else if (message == 'hydrate') {
-          sendHydrationData();
+          hydrateWorld();
         }
       } else {
         world.eventBus.fire(message);
       }
     });
   } catch (e, stacktrace) {
-    debugPrint('[NexusLogicIsolate] FATAL ERROR: $e');
+    debugPrint('❌ [Isolate] FATAL ERROR: $e');
     debugPrint(stacktrace.toString());
   }
 }

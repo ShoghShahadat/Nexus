@@ -1,45 +1,38 @@
 import 'package:nexus/nexus.dart';
+import 'package:example_dashboard/modules/dashboard/assemblers/header_assembler.dart';
 import 'package:example_dashboard/modules/dashboard/assemblers/stats_card_assembler.dart';
-import 'package:example_dashboard/modules/dashboard/components/header_component.dart';
-import 'package:example_dashboard/shared/components/tags.dart';
 
-/// این کلاس مسئولیت ساخت و پیکربندی Entityهای اصلی ساختار داشبورد را دارد.
-/// REFACTORED: Now finds the existing root entity and adds the dashboard
-/// structure as children, instead of creating a redundant root entity.
-/// بازآفرینی: اکنون به جای ساخت یک Entity ریشه اضافی، Entity ریشه موجود را
-/// پیدا کرده و ساختار داشبورد را به عنوان فرزندان آن اضافه می‌کند.
-class DashboardAssembler {
-  final NexusWorld world;
+/// این Assembler اصلی، مسئولیت هماهنگی و ساخت تمام موجودیت‌های ماژول داشبورد را بر عهده دارد.
+/// این کلاس جایگزین EntityProvider قبلی شده است.
+class DashboardAssembler extends EntityAssembler<void> {
+  DashboardAssembler(super.world, super.context);
 
-  DashboardAssembler(this.world);
+  @override
+  List<Entity> assemble() {
+    // FIX: Correctly pass `null` as the second argument to the assemblers.
+    // This resolves the 'not_enough_positional_arguments' error.
+    // اصلاح: مقدار `null` به عنوان آرگومان دوم به assemblerها به درستی پاس داده شد.
+    // این کار خطای 'not_enough_positional_arguments' را برطرف می‌کند.
+    final headerAssembler = HeaderAssembler(world, null);
+    final statsCardAssembler = StatsCardAssembler(world, null);
 
-  /// ساختار اصلی Entityها را ایجاد و به world اضافه می‌کند.
-  void assemble() {
-    // ۱. ساخت Entity برای هدر
-    final headerEntity = Entity()
-      ..add(HeaderComponent(
-        title: 'Dashboard',
-        userName: 'Shahrokh',
-      ))
-      ..add(TagsComponent({DashboardTags.header}));
-    world.addEntity(headerEntity);
+    final header = headerAssembler.assemble().first;
+    final statsCards = statsCardAssembler.assemble();
 
-    // ۲. ساخت Entityهای کارت‌های آمار
-    final statsCards = StatsCardAssembler(world).assemble();
+    // ساختار سلسله‌مراتبی UI را با استفاده از ChildrenComponent تعریف می‌کنیم.
+    final root = world.rootEntity;
+    root.add(ChildrenComponent([
+      header.id,
+      ...statsCards.map((e) => e.id),
+    ]));
+
+    // تمام موجودیت‌های ساخته‌شده را به دنیا اضافه می‌کنیم.
+    world.addEntity(header);
     for (var card in statsCards) {
       world.addEntity(card);
     }
 
-    // ۳. ساخت Entity نگهدارنده کارت‌ها
-    final cardContainerEntity = Entity()
-      ..add(ChildrenComponent(statsCards.map((e) => e.id).toList()))
-      ..add(TagsComponent({DashboardTags.statsCardContainer}));
-    world.addEntity(cardContainerEntity);
-
-    // ۴. پیدا کردن Entity ریشه (که توسط NexusWorld با ID=0 ساخته شده)
-    // و اضافه کردن ساختار داشبورد به عنوان فرزندان آن.
-    final rootEntity = world.entities[0]!;
-    rootEntity
-        .add(ChildrenComponent([headerEntity.id, cardContainerEntity.id]));
+    // این Assembler اصلی موجودیت جدیدی ایجاد نمی‌کند، بلکه فرآیند را مدیریت می‌کند.
+    return [header, ...statsCards];
   }
 }

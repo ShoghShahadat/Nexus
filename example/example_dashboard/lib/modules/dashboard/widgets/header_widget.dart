@@ -1,36 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
-import 'package:example_dashboard/modules/dashboard/components/header_component.dart';
 
-/// ویجتی که هدر داشبورد را نمایش می‌دهد.
+/// ویجت برای نمایش هدر داشبورد.
 class HeaderWidget extends StatelessWidget {
   final EntityId entityId;
   const HeaderWidget({super.key, required this.entityId});
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return EntityBuilder<HeaderComponent>(
+    return EntityBuilder<CustomWidgetComponent>(
       entityId: entityId,
-      loadingBuilder: (context) => const SizedBox(height: 50),
-      builder: (context, header) {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (context, component) {
+        final theme = Theme.of(context).textTheme;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(header.title, style: textTheme.headlineMedium),
-                Text('Welcome back, ${header.userName}!',
-                    style: textTheme.titleLarge),
-              ],
-            ),
-            const CircleAvatar(
-              radius: 25,
-              backgroundImage:
-                  NetworkImage('https://i.pravatar.cc/150?u=shahrokh'),
-            ),
+            Text(component.properties['title'] ?? 'Dashboard',
+                style: theme.headlineMedium),
+            Text(component.properties['subtitle'] ?? '',
+                style: theme.titleLarge),
           ],
         );
       },

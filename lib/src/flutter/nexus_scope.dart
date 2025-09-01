@@ -7,7 +7,6 @@ import 'package:nexus/src/flutter/component_cache.dart';
 
 /// یک ویجت ریشه که چرخه حیات دنیای Nexus را مدیریت کرده و آن را
 /// از طریق BuildContext در دسترس تمام ویجت‌های فرزند قرار می‌دهد.
-/// این ویجت جایگزین NexusWidget شده و همانند Provider عمل می‌کند.
 class NexusScope extends StatefulWidget {
   final NexusWorld Function() worldProvider;
   final Future<void> Function()? isolateInitializer;
@@ -20,7 +19,6 @@ class NexusScope extends StatefulWidget {
     this.isolateInitializer,
   });
 
-  /// نزدیک‌ترین NexusManager را در درخت ویجت پیدا می‌کند.
   static NexusManager of(BuildContext context) {
     final scope =
         context.dependOnInheritedWidgetOfExactType<_NexusScopeInherited>();
@@ -28,7 +26,6 @@ class NexusScope extends StatefulWidget {
     return scope!.manager;
   }
 
-  /// نزدیک‌ترین ComponentCache را در درخت ویجت پیدا می‌کند.
   static ComponentCache cacheOf(BuildContext context) {
     final scope =
         context.dependOnInheritedWidgetOfExactType<_NexusScopeInherited>();
@@ -50,9 +47,16 @@ class _NexusScopeState extends State<NexusScope> {
   @override
   void initState() {
     super.initState();
+    // --- PRO LOGGING & FIX ---
+    // 1. Register component factories on the UI thread as well. This is critical.
+    // 2. Add logging to trace the initialization process.
+    debugPrint("📱 [NexusScope] initState: Initializing UI-side components...");
+    registerCoreComponents(); // CRITICAL FIX
     _initializeManager();
 
     _cache = ComponentCache(manager: _manager);
+    debugPrint(
+        "📱 [NexusScope] ComponentCache created and listening for updates.");
 
     _lifecycleListener = AppLifecycleListener(
       onStateChange: _onLifecycleStateChanged,
@@ -62,7 +66,8 @@ class _NexusScopeState extends State<NexusScope> {
   @override
   void reassemble() {
     super.reassemble();
-    // در زمان Hot Reload، درخواست یک همگام‌سازی کامل می‌کنیم
+    debugPrint(
+        "🔄 [NexusScope] Hot Reload detected. Requesting full hydration...");
     _manager.hydrate();
   }
 
@@ -81,9 +86,11 @@ class _NexusScopeState extends State<NexusScope> {
       isolateInitializer: widget.isolateInitializer,
       rootIsolateToken: RootIsolateToken.instance,
     );
+    debugPrint("🚀 [NexusScope] NexusManager spawned. Isolate: $useIsolate");
   }
 
   void _onLifecycleStateChanged(AppLifecycleState state) {
+    debugPrint("🧬 [NexusScope] AppLifecycleState changed to: $state");
     final status = switch (state) {
       AppLifecycleState.resumed => AppLifecycleStatus.resumed,
       AppLifecycleState.inactive => AppLifecycleStatus.inactive,
@@ -96,6 +103,7 @@ class _NexusScopeState extends State<NexusScope> {
 
   @override
   void dispose() {
+    debugPrint("📴 [NexusScope] Disposing...");
     _lifecycleListener.dispose();
     _cache.dispose();
     if (!kDebugMode || kIsWeb) {
@@ -117,7 +125,6 @@ class _NexusScopeState extends State<NexusScope> {
   }
 }
 
-/// یک InheritedWidget برای فراهم کردن دسترسی به Manager و Cache.
 class _NexusScopeInherited extends InheritedWidget {
   final NexusManager manager;
   final ComponentCache cache;
