@@ -1,22 +1,30 @@
 import 'package:example_dashboard/app/nexus_app.dart';
-import 'package:example_dashboard/modules/dashboard/components/stats_card_component.dart';
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
+import 'package:example_dashboard/modules/dashboard/components/chart_components.dart';
+import 'package:example_dashboard/modules/dashboard/components/stats_card_component.dart';
 
-/// نقطه شروع اصلی برنامه فلاتر.
-void main() {
-  // --- CRITICAL FIX: Register custom components for the UI thread ---
-  // این تابع باید قبل از اجرای برنامه فراخوانی شود تا ترد UI
-  // فکتوری‌های لازم برای ساخت کامپوننت‌های سفارشی را بشناسد.
-  registerDashboardComponents();
-  runApp(const DashboardApp());
+// --- NEW: A dedicated function to register custom components for this app ---
+// --- جدید: یک تابع اختصاصی برای ثبت کامپوننت‌های سفارشی این برنامه ---
+void registerDashboardComponents() {
+  final registry = ComponentFactoryRegistry.I;
+  registry.register('StatsCardComponent',
+      (json) => StatsCardComponent.fromJson(json), StatsCardComponent);
+  registry.register('SalesDataComponent',
+      (json) => SalesDataComponent.fromJson(json), SalesDataComponent);
+  registry.register(
+      'UserActivityDataComponent',
+      (json) => UserActivityDataComponent.fromJson(json),
+      UserActivityDataComponent);
 }
 
-/// کامپوننت‌های سفارشی مربوط به ماژول داشبورد را ثبت می‌کند.
-void registerDashboardComponents() {
-  ComponentFactoryRegistry.I.register(
-    'StatsCardComponent',
-    (json) => StatsCardComponent.fromJson(json),
-  );
-  // در آینده، تمام کامپوننت‌های سفارشی دیگر این ماژول را اینجا ثبت کنید.
+/// The main entry point for the Flutter application.
+void main() {
+  // --- CRITICAL FIX: Register ALL components on the UI thread BEFORE running the app ---
+  // --- اصلاح حیاتی: تمام کامپوننت‌ها را در ترد UI قبل از اجرای برنامه ثبت می‌کند ---
+  registerCoreComponents();
+  registerDashboardComponents();
+
+  // This function runs the root widget of the application, DashboardApp.
+  runApp(const DashboardApp());
 }

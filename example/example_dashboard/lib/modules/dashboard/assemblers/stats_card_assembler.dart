@@ -1,48 +1,36 @@
+import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:example_dashboard/shared/components/tags.dart';
 import 'package:example_dashboard/modules/dashboard/components/stats_card_component.dart';
 
-/// یک Assembler برای ایجاد موجودیت‌های مربوط به کارت‌های آمار.
-class StatsCardAssembler extends EntityAssembler<void> {
+/// مسئول ایجاد موجودیت‌های کارت‌های آمار.
+class StatsCardAssembler extends EntityAssembler {
   StatsCardAssembler(super.world, super.context);
 
   @override
   List<Entity> assemble() {
-    final cardData = [
-      {'title': 'Revenue', 'icon': 0xea4d, 'value': '\$0', 'trend': Trend.up},
-      {'title': 'Users', 'icon': 0xe49a, 'value': '0', 'trend': Trend.down},
-      {
-        'title': 'Engagement',
-        'icon': 0xf051d,
-        'value': '0.0%',
-        'trend': Trend.stable
-      },
-      {'title': 'Sales', 'icon': 0xf051b, 'value': '0', 'trend': Trend.up},
+    final cardsData = [
+      (title: 'Revenue', value: '\$12,450', icon: Icons.attach_money_rounded),
+      (title: 'Users', value: '1,250', icon: Icons.people_alt_rounded),
+      (title: 'Orders', value: '4,820', icon: Icons.shopping_cart_rounded),
+      (title: 'Engagement', value: '64.8%', icon: Icons.insights_rounded),
     ];
 
-    final createdCards = <Entity>[];
+    final entities = <Entity>[];
+    for (final data in cardsData) {
+      final entity = Entity();
+      world.addEntity(entity);
 
-    for (var data in cardData) {
-      // --- CRITICAL FIX: Two-step entity creation and configuration. ---
-      // 1. Create the entity and immediately add it to the world.
-      // 2. Add components to the now-registered entity.
-      // اصلاح حیاتی: ایجاد و پیکربندی موجودیت در دو مرحله.
-      // ۱. موجودیت را ایجاد کرده و بلافاصله آن را به دنیا اضافه می‌کنیم.
-      // ۲. کامپوننت‌ها را به موجودیت ثبت‌شده اضافه می‌کنیم.
-      final cardEntity = Entity();
-      world.addEntity(cardEntity);
-
-      cardEntity.addComponents([
-        TagsComponent({DashboardTags.statsCard}),
-        StatsCardComponent(
-          title: data['title'] as String,
-          iconData: data['icon'] as int,
-          value: data['value'] as String,
-          trend: data['trend'] as Trend,
-        )
-      ]);
-      createdCards.add(cardEntity);
+      entity.add(TagsComponent({DashboardTags.statsCard}));
+      entity.add(StatsCardComponent(
+        title: data.title,
+        value: data.value,
+        iconData: data.icon.codePoint,
+        trend: Trend.stable,
+      ));
+      entity.add(ApiStatusComponent(status: ApiStatus.idle));
+      entities.add(entity);
     }
-    return createdCards;
+    return entities;
   }
 }

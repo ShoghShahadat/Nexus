@@ -8,7 +8,7 @@ class MockApiService {
   final _numberFormat = NumberFormat.decimalPattern('en_us');
 
   /// یک متد شبیه‌سازی شده که پس از یک تاخیر کوتاه، داده‌های جدید را برمی‌گرداند.
-  Future<({String value, Trend trend})> fetchUpdatedStats(String title) async {
+  Future<Map<String, dynamic>> fetchUpdatedStats(String title) async {
     // شبیه‌سازی تاخیر شبکه
     await Future.delayed(Duration(milliseconds: _random.nextInt(800) + 200));
 
@@ -16,7 +16,10 @@ class MockApiService {
     final newValue = _random.nextInt(100000) + 500;
     final newTrend = Trend.values[_random.nextInt(Trend.values.length)];
 
-    return (value: _formatValue(title, newValue), trend: newTrend);
+    return {
+      "value": _formatValue(title, newValue),
+      "trend_index": newTrend.index
+    };
   }
 
   /// قالب‌بندی مقدار بر اساس عنوان کارت.
@@ -28,5 +31,28 @@ class MockApiService {
       return '${(value / 1000).toStringAsFixed(1)}%';
     }
     return _numberFormat.format(value);
+  }
+
+  /// داده‌های شبیه‌سازی شده برای نمودار فروش را برمی‌گرداند.
+  Map<String, dynamic> fetchSalesData() {
+    return {
+      'spots': List.generate(12, (index) {
+        return {'x': index.toDouble() + 1, 'y': _random.nextDouble() * 50 + 20};
+      })
+    };
+  }
+
+  /// داده‌های شبیه‌سازی شده برای نمودار فعالیت کاربران را برمی‌گرداند.
+  Map<String, dynamic> fetchUserActivityData() {
+    final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return {
+      'bars': List.generate(7, (index) {
+        return {
+          'x': index.toDouble(),
+          'y': _random.nextDouble() * 100 + 50,
+          'label': days[index]
+        };
+      })
+    };
   }
 }

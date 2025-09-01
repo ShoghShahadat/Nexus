@@ -1,74 +1,62 @@
-import 'dart:async';
 import 'package:nexus/nexus.dart';
 import 'package:example_dashboard/services/mock_api_service.dart';
+import 'package:example_dashboard/shared/components/tags.dart';
 import 'package:example_dashboard/modules/dashboard/components/stats_card_component.dart';
 
-/// سیستمی که به صورت دوره‌ای آمار کارت‌ها را به‌روزرسانی می‌کند.
-class StatsUpdaterSystem extends UpdateSystem {
-  late final MockApiService _apiService;
-  final Map<EntityId, Timer> _timers = {};
+/// یک رویداد داخلی برای فعال کردن به‌روزرسانی کارت‌های آمار.
+class _UpdateStatsEvent {}
 
-  /// در این متد، ما با اطمینان به سرویس ثبت‌شده دسترسی پیدا می‌کنیم.
+/// این سیستم مسئول به‌روزرسانی دوره‌ای داده‌های کارت‌های آمار است.
+class StatsUpdaterSystem extends System {
+  late final MockApiService _apiService;
+
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    // This call will now succeed because the service was registered in the module's onLoad.
-    // این فراخوانی اکنون موفقیت‌آمیز خواهد بود زیرا سرویس در onLoad ماژول ثبت شده است.
     _apiService = services.get<MockApiService>();
+
+    // یک تایمر ایجاد می‌کنیم که هر 3 ثانیه یک بار رویداد به‌روزرسانی را ارسال کند.
+    final timerEntity = Entity();
+    world.addEntity(timerEntity);
+    timerEntity.add(TimerComponent([
+      TimerTask(
+        id: 'stats-updater',
+        duration: 3,
+        repeats: true,
+        onTickEvent: _UpdateStatsEvent(),
+      )
+    ]));
+
+    // به رویداد تایمر گوش می‌دهیم.
+    listen<_UpdateStatsEvent>((event) => _fetchUpdates());
   }
 
-  @override
-  bool matches(Entity entity) {
-    // این سیستم روی تمام موجودیت‌هایی که کامپوننت کارت آمار را دارند، عمل می‌کند.
-    return entity.has<StatsCardComponent>();
-  }
+  /// تمام کارت‌های آمار را پیدا کرده و برای هر کدام یک درخواست API جدید ثبت می‌کند.
+  void _fetchUpdates() {
+    final statsCards = world.entities.values.where((e) =>
+        e.get<TagsComponent>()?.hasTag(DashboardTags.statsCard) ?? false);
 
-  @override
-  void onEntityAdded(Entity entity) {
-    super.onEntityAdded(entity);
-    // برای هر کارت جدید، یک تایمر برای به‌روزرسانی دوره‌ای ایجاد می‌کنیم.
-    _startTimerForEntity(entity);
-  }
+    for (final card in statsCards) {
+      final cardData = card.get<StatsCardComponent>();
+      if (cardData == null) continue;
 
-  @override
-  void onEntityRemoved(Entity entity) {
-    // هنگام حذف یک کارت، تایمر مربوط به آن را نیز متوقف و حذف می‌کنیم.
-    _timers[entity.id]?.cancel();
-    _timers.remove(entity.id);
-    super.onEntityRemoved(entity);
-  }
-
-  void _startTimerForEntity(Entity entity) {
-    // هر 5 ثانیه یک‌بار آمار را به‌روز کن.
-    _timers[entity.id] = Timer.periodic(const Duration(seconds: 5), (_) {
-      _updateStats(entity);
-    });
-    // بلافاصله پس از اضافه شدن نیز یک‌بار به‌روز کن.
-    _updateStats(entity);
-  }
-
-  Future<void> _updateStats(Entity entity) async {
-    final card = entity.get<StatsCardComponent>();
-    if (card == null || card.isLoading) return;
-
-    // وضعیت لودینگ را فعال می‌کنیم.
-    entity.add(card.copyWith(isLoading: true));
-
-    final newStats = await _apiService.fetchUpdatedStats(card.title);
-
-    // پس از دریافت داده‌های جدید، کامپوننت را با اطلاعات جدید به‌روز می‌کنیم.
-    final currentCard = entity.get<StatsCardComponent>();
-    if (currentCard != null) {
-      entity.add(currentCard.copyWith(
-        value: newStats.value,
-        trend: newStats.trend,
-        isLoading: false,
-      ));
+      // یک کامپوننت درخواست جدید اضافه می‌کنیم تا ApiSystem آن را پردازش کند.
+      card.add(
+        ApiRequestComponent(
+          url: '/stats/${cardData.title.toLowerCase()}',
+          onParse: (json) {
+            // پاسخ شبیه‌سازی شده را به یک کامپوننت جدید تبدیل می‌کنیم.
+            return [
+              StatsCardComponent(
+                title: cardData.title,
+                value: json['value'] as String,
+                iconData: cardData.iconData,
+                trend: Trend.values[json['trend_index'] as int],
+              ),
+            ];
+          },
+        ),
+      );
     }
-  }
-
-  @override
-  void update(Entity entity, double dt) {
-    // منطق اصلی این سیستم مبتنی بر تایمر است و نیازی به اجرای کد در حلقه update ندارد.
   }
 }

@@ -1,164 +1,87 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:example_dashboard/shared/components/tags.dart';
-import 'package:example_dashboard/modules/dashboard/components/stats_card_component.dart';
+import 'package:example_dashboard/modules/dashboard/widgets/header_widget.dart';
+import 'package:example_dashboard/modules/dashboard/widgets/cards/stats_card_builder.dart';
+import 'package:example_dashboard/modules/dashboard/widgets/charts/sales_chart_widget.dart';
+import 'package:example_dashboard/modules/dashboard/widgets/charts/user_activity_widget.dart';
 
-/// ویجت اصلی که صحنه داشبورد را رندر می‌کند.
-class DashboardScene extends StatelessWidget {
+/// ویجت اصلی که صحنه داشبورد را نمایش می‌دهد.
+class DashboardScene extends StatefulWidget {
   const DashboardScene({super.key});
 
   @override
+  State<DashboardScene> createState() => _DashboardSceneState();
+}
+
+class _DashboardSceneState extends State<DashboardScene> {
+  bool _isReady = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isReady) {
+      // منتظر می‌مانیم تا اولین بسته داده از ایزوله منطق برسد.
+      final cache = NexusScope.cacheOf(context);
+      cache.onReady.then((_) {
+        if (mounted) {
+          setState(() => _isReady = true);
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (!_isReady) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          // با استفاده از EntityBuilder، تنها در صورت تغییر کامپوننت ChildrenComponent ریشه،
-          // این بخش بازسازی (rebuild) می‌شود.
-          child: EntityBuilder<ChildrenComponent>(
-            entityId: 0, // ID موجودیت ریشه همیشه 0 است.
-            loadingBuilder: (context) =>
-                const Center(child: CircularProgressIndicator()),
-            builder: (context, childrenComponent) {
-              final childrenIds = childrenComponent.children;
-              final headerId = childrenIds.firstWhere((id) =>
-                  NexusScope.cacheOf(context)
-                      .get<TagsComponent>(id)
-                      ?.hasTag(DashboardTags.header) ??
-                  false);
-              final cardIds = childrenIds
-                  .where((id) =>
-                      NexusScope.cacheOf(context)
-                          .get<TagsComponent>(id)
-                          ?.hasTag(DashboardTags.statsCard) ??
-                      false)
-                  .toList();
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // رندر هدر
-                  _HeaderWidget(entityId: headerId),
-                  const SizedBox(height: 20),
-                  // رندر کارت‌های آمار در یک گرید واکنش‌گرا
-                  Expanded(
-                    child: GridView.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 400,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: 2.2,
-                      ),
-                      itemCount: cardIds.length,
-                      itemBuilder: (context, index) {
-                        return _StatsCardWidget(entityId: cardIds[index]);
-                      },
-                    ),
-                  ),
-                ],
-              );
-            },
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Header
+              EntityBuilder<TagsComponent>(
+                entityId: 1, // Assuming header is entity 1
+                builder: (context, _) => HeaderWidget(entityId: 1),
+              ),
+              const SizedBox(height: 24),
+              // 2. Main content grid
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // --- Responsive Grid Layout ---
+                    final crossAxisCount =
+                        (constraints.maxWidth / 350).floor().clamp(1, 4);
+                    return GridView.count(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 20,
+                      mainAxisSpacing: 20,
+                      childAspectRatio: 1.5,
+                      children: const [
+                        // --- Stats Cards ---
+                        StatsCardWidget(entityId: 2), // Revenue
+                        StatsCardWidget(entityId: 3), // Users
+                        StatsCardWidget(entityId: 4), // Orders
+                        StatsCardWidget(entityId: 5), // Engagement
+                        // --- Charts ---
+                        SalesChartWidget(entityId: 6),
+                        UserActivityWidget(entityId: 7),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
-}
-
-/// ویجت برای نمایش هدر.
-class _HeaderWidget extends StatelessWidget {
-  final EntityId entityId;
-  const _HeaderWidget({required this.entityId});
-
-  @override
-  Widget build(BuildContext context) {
-    return EntityBuilder<CustomWidgetComponent>(
-      entityId: entityId,
-      builder: (context, component) {
-        final theme = Theme.of(context).textTheme;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(component.properties['title'] ?? 'Dashboard',
-                style: theme.headlineMedium),
-            Text(component.properties['subtitle'] ?? '',
-                style: theme.titleLarge),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// ویجت برای نمایش یک کارت آمار.
-class _StatsCardWidget extends StatelessWidget {
-  final EntityId entityId;
-  const _StatsCardWidget({required this.entityId});
-
-  @override
-  Widget build(BuildContext context) {
-    // این ویجت به تغییرات StatsCardComponent گوش می‌دهد و تنها در صورت نیاز بازسازی می‌شود.
-    return EntityBuilder<StatsCardComponent>(
-      entityId: entityId,
-      builder: (context, card) {
-        final theme = Theme.of(context);
-        final colorScheme = theme.colorScheme;
-
-        IconData trendIcon;
-        Color trendColor;
-        switch (card.trend) {
-          case Trend.up:
-            trendIcon = Icons.arrow_upward;
-            trendColor = Colors.green;
-            break;
-          case Trend.down:
-            trendIcon = Icons.arrow_downward;
-            trendColor = Colors.red;
-            break;
-          case Trend.stable:
-            trendIcon = Icons.remove;
-            trendColor = Colors.grey;
-            break;
-        }
-
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: colorScheme.primary.withOpacity(0.1),
-                  child: Icon(
-                      IconData(card.iconData, fontFamily: 'MaterialIcons'),
-                      color: colorScheme.primary,
-                      size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(card.title, style: theme.textTheme.titleLarge),
-                      const SizedBox(height: 4),
-                      if (card.isLoading)
-                        const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                      else
-                        Text(card.value, style: theme.textTheme.headlineSmall),
-                    ],
-                  ),
-                ),
-                Icon(trendIcon, color: trendColor, size: 28),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }

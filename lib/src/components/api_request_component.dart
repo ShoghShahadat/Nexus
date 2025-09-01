@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/services/network/http_method.dart';
 
@@ -31,6 +32,10 @@ class ApiRequestComponent extends Component {
   /// یک رویداد اختیاری که در صورت شکست درخواست در event bus منتشر می‌شود.
   final dynamic onErrorEvent;
 
+  /// --- NEW: A unique key to prevent re-triggering the same request ---
+  /// --- جدید: یک کلید یکتا برای جلوگیری از اجرای مجدد یک درخواست ---
+  final UniqueKey key;
+
   ApiRequestComponent({
     required this.url,
     required this.onParse,
@@ -39,10 +44,10 @@ class ApiRequestComponent extends Component {
     this.headers,
     this.onSuccessEvent,
     this.onErrorEvent,
-  });
+  }) : key = UniqueKey();
 
-  // This component contains functions, so it uses reference equality.
-  // این کامپوننت به دلیل داشتن تابع، از برابری بر اساس رفرنس استفاده می‌کند.
+  // This component contains functions and a UniqueKey, so it uses reference equality.
+  // این کامپوننت به دلیل داشتن تابع و کلید یکتا، از برابری بر اساس رفرنس استفاده می‌کند.
   @override
   List<Object?> get props => [
         url,
@@ -52,5 +57,6 @@ class ApiRequestComponent extends Component {
         onParse,
         onSuccessEvent,
         onErrorEvent,
+        key,
       ];
 }
