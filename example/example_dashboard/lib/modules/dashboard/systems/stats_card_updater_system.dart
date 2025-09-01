@@ -7,23 +7,23 @@ class StatsCardUpdaterSystem extends System {
   @override
   void onAddedToWorld(NexusWorld world) {
     super.onAddedToWorld(world);
-    // Listen for the custom event to trigger updates.
+    // به رویداد سفارشی برای فعال کردن به‌روزرسانی‌ها گوش می‌دهیم
     listen<_RequestUpdateEvent>(_onRequestUpdate);
 
-    // Initial setup: find all stat cards and create timers for them.
+    // تنظیمات اولیه: تمام کارت‌های آمار را پیدا کرده و برایشان تایمر ایجاد می‌کنیم
     final statCards = world.entities.values.where((e) =>
         e.get<TagsComponent>()?.hasTag(DashboardTags.statsCard) ?? false);
 
     for (final entity in statCards) {
       final cardComp = entity.get<StatsCardComponent>();
       if (cardComp != null) {
-        // Create a repeating timer for each card.
+        // برای هر کارت یک تایمر تکرارشونده ایجاد می‌کنیم
         entity.add(TimerComponent([
           TimerTask(
             id: 'update_timer_${entity.id}',
-            duration: 5.0, // every 5 seconds
+            duration: 5.0, // هر 5 ثانیه
             repeats: true,
-            // When the timer completes a cycle, it fires our custom event.
+            // وقتی تایمر یک چرخه را کامل می‌کند، رویداد سفارشی ما را شلیک می‌کند
             onCompleteEvent: _RequestUpdateEvent(entity.id, cardComp.title),
           )
         ]));
@@ -31,22 +31,19 @@ class StatsCardUpdaterSystem extends System {
     }
   }
 
-  /// Handles the update request event fired by the TimerSystem.
+  /// رویداد درخواست به‌روزرسانی که توسط TimerSystem شلیک می‌شود را مدیریت می‌کند.
   void _onRequestUpdate(_RequestUpdateEvent event) {
     final entity = world.entities[event.entityId];
     if (entity == null) return;
 
-    // Add an ApiRequestComponent to fetch new data.
+    // یک ApiRequestComponent برای واکشی داده‌های جدید اضافه می‌کنیم
     entity.add(ApiRequestComponent(
       url: '/api/stats/${event.title}',
       onParse: (json) {
         final cardComp = entity.get<StatsCardComponent>();
-        if (cardComp == null) return []; // Should not happen
+        if (cardComp == null) return []; // نباید اتفاق بیفتد
 
-        // FIX: Use the powerful `copyWith` extension method for a clean,
-        // immutable, and error-free update. This is much safer than
-        // recreating the component from scratch.
-        // اصلاح: از متد قدرتمند `copyWith` برای یک به‌روزرسانی تمیز،
+        // از متد قدرتمند `copyWith` برای یک به‌روزرسانی تمیز،
         // غیرقابل تغییر و بدون خطا استفاده می‌شود. این روش بسیار امن‌تر از
         // ساخت مجدد کامپوننت از ابتدا است.
         return [
@@ -60,7 +57,7 @@ class StatsCardUpdaterSystem extends System {
   }
 }
 
-// A private, internal event used to communicate between the TimerSystem and this system.
+// یک رویداد خصوصی و داخلی که برای ارتباط بین TimerSystem و این سیستم استفاده می‌شود.
 class _RequestUpdateEvent {
   final EntityId entityId;
   final String title;

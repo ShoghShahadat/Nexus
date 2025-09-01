@@ -1,60 +1,50 @@
 import 'package:nexus/nexus.dart';
+import 'package:flutter/material.dart';
 
-/// Enum برای نمایش روند (Trend) آمار.
-enum Trend { up, down, stable }
+/// Enum برای نمایش روند داده‌ها (صعودی یا نزولی).
+enum Trend {
+  up,
+  down,
+  stable,
+}
 
-/// یک کامپوننت داده‌محور که وضعیت یک کارت آمار را نگهداری می‌کند.
+/// کامپوننتی برای نگهداری داده‌های یک کارت آمار.
 class StatsCardComponent extends Component with SerializableComponent {
   final String title;
-  final int iconData; // کد آیکون از فونت متریال
   final String value;
   final Trend trend;
-  final bool isLoading;
+  final IconData icon;
+  final int iconColorValue;
 
   StatsCardComponent({
     required this.title,
-    required this.iconData,
     required this.value,
     required this.trend,
-    this.isLoading = false,
+    required this.icon,
+    required this.iconColorValue,
   });
 
-  @override
-  List<Object?> get props => [title, iconData, value, trend, isLoading];
-
-  /// متد `copyWith` برای ایجاد یک نمونه جدید با مقادیر به‌روز شده.
-  StatsCardComponent copyWith({
-    String? title,
-    int? iconData,
-    String? value,
-    Trend? trend,
-    bool? isLoading,
-  }) {
+  factory StatsCardComponent.fromJson(Map<String, dynamic> json) {
     return StatsCardComponent(
-      title: title ?? this.title,
-      iconData: iconData ?? this.iconData,
-      value: value ?? this.value,
-      trend: trend ?? this.trend,
-      isLoading: isLoading ?? this.isLoading,
+      title: json['title'] as String,
+      value: json['value'] as String,
+      trend: Trend.values[json['trend_index'] as int],
+      icon: IconData(json['icon_code'] as int,
+          fontFamily: json['icon_font_family'] as String),
+      iconColorValue: json['icon_color_value'] as int,
     );
   }
 
   @override
   Map<String, dynamic> toJson() => {
         'title': title,
-        'iconData': iconData,
         'value': value,
-        'trend': trend.index,
-        'isLoading': isLoading,
+        'trend_index': trend.index,
+        'icon_code': icon.codePoint,
+        'icon_font_family': icon.fontFamily,
+        'icon_color_value': iconColorValue,
       };
 
-  factory StatsCardComponent.fromJson(Map<String, dynamic> json) {
-    return StatsCardComponent(
-      title: json['title'] as String,
-      iconData: json['iconData'] as int,
-      value: json['value'] as String,
-      trend: Trend.values[json['trend'] as int],
-      isLoading: json['isLoading'] as bool? ?? false,
-    );
-  }
+  @override
+  List<Object?> get props => [title, value, trend, icon, iconColorValue];
 }

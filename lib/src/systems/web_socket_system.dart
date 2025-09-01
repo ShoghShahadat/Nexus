@@ -43,15 +43,26 @@ class WebSocketSystem extends ReactiveSystem {
     Future.microtask(() => entity.remove<WebSocketRequestComponent>());
 
     // Set initial state.
-    entity.add(WebSocketStateComponent(status: WebSocketStatus.connecting));
+    // --- FIX: Pass the required connectionId to the state component. ---
+    // --- اصلاح: connectionId الزامی را به کامپوننت وضعیت پاس می‌دهد. ---
+    entity.add(WebSocketStateComponent(
+        connectionId: request.connectionId,
+        status: WebSocketStatus.connecting));
 
     try {
+      // --- FIX: Pass the connectionId to the connect method. ---
+      // --- اصلاح: connectionId را به متد connect پاس می‌دهد. ---
       final stream = _webSocketService.connect(
+        request.connectionId,
         request.url,
         protocols: request.protocols,
       );
 
-      entity.add(WebSocketStateComponent(status: WebSocketStatus.connected));
+      // --- FIX: Pass the required connectionId to the state component. ---
+      // --- اصلاح: connectionId الزامی را به کامپوننت وضعیت پاس می‌دهد. ---
+      entity.add(WebSocketStateComponent(
+          connectionId: request.connectionId,
+          status: WebSocketStatus.connected));
       if (request.onConnectedEvent != null) {
         world.eventBus.fire(request.onConnectedEvent);
       }
@@ -64,22 +75,31 @@ class WebSocketSystem extends ReactiveSystem {
           }
         },
         onError: (error) {
+          // --- FIX: Pass the required connectionId to the state component. ---
+          // --- اصلاح: connectionId الزامی را به کامپوننت وضعیت پاس می‌دهد. ---
           entity.add(WebSocketStateComponent(
+            connectionId: request.connectionId,
             status: WebSocketStatus.error,
             errorMessage: error.toString(),
           ));
-          _cleanupConnection(entity.id, request.onDisconnectedEvent);
+          _cleanupConnection(entity.id, request);
         },
         onDone: () {
-          entity.add(
-              WebSocketStateComponent(status: WebSocketStatus.disconnected));
-          _cleanupConnection(entity.id, request.onDisconnectedEvent);
+          // --- FIX: Pass the required connectionId to the state component. ---
+          // --- اصلاح: connectionId الزامی را به کامپوننت وضعیت پاس می‌دهد. ---
+          entity.add(WebSocketStateComponent(
+              connectionId: request.connectionId,
+              status: WebSocketStatus.disconnected));
+          _cleanupConnection(entity.id, request);
         },
       );
 
       _subscriptions[entity.id] = subscription;
     } catch (e) {
+      // --- FIX: Pass the required connectionId to the state component. ---
+      // --- اصلاح: connectionId الزامی را به کامپوننت وضعیت پاس می‌دهد. ---
       entity.add(WebSocketStateComponent(
+        connectionId: request.connectionId,
         status: WebSocketStatus.error,
         errorMessage: e.toString(),
       ));
@@ -92,20 +112,29 @@ class WebSocketSystem extends ReactiveSystem {
     // as it removes it itself immediately after processing.
   }
 
-  /// NEW: This lifecycle hook is now inherited from the base System class.
-  /// It's the correct place to clean up when an entity is removed from the world.
   @override
   void onEntityRemoved(Entity entity) {
-    _cleanupConnection(entity.id, null);
+    // Attempt to find the request info if the entity is removed unexpectedly
+    final state = entity.get<WebSocketStateComponent>();
+    if (state != null) {
+      _cleanupConnectionById(entity.id, state.connectionId);
+    }
     super.onEntityRemoved(entity);
   }
 
-  void _cleanupConnection(EntityId id, dynamic onDisconnectedEvent) {
+  void _cleanupConnection(EntityId id, WebSocketRequestComponent request) {
+    _cleanupConnectionById(id, request.connectionId);
+    if (request.onDisconnectedEvent != null) {
+      world.eventBus.fire(request.onDisconnectedEvent);
+    }
+  }
+
+  void _cleanupConnectionById(EntityId id, String connectionId) {
     _subscriptions[id]?.cancel();
     _subscriptions.remove(id);
-    if (onDisconnectedEvent != null) {
-      world.eventBus.fire(onDisconnectedEvent);
-    }
+    // --- FIX: Pass the connectionId to the disconnect method. ---
+    // --- اصلاح: connectionId را به متد disconnect پاس می‌دهد. ---
+    _webSocketService.disconnect(connectionId);
   }
 
   @override
@@ -114,7 +143,7 @@ class WebSocketSystem extends ReactiveSystem {
       sub.cancel();
     }
     _subscriptions.clear();
-    _webSocketService.disconnect();
+    _webSocketService.disconnectAll();
     super.onRemovedFromWorld();
   }
 }

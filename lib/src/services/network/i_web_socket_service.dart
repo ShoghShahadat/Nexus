@@ -8,20 +8,25 @@
 /// اجازه می‌دهد از پکیج کلاینت WebSocket مورد علاقه خود استفاده کنند. یک پیاده‌سازی
 /// مشخص از این کلاس باید در GetIt ثبت شود.
 abstract class IWebSocketService {
-  /// Establishes a connection to the WebSocket server.
-  /// یک اتصال به سرور WebSocket برقرار می‌کند.
+  /// Establishes a connection to the WebSocket server for a given ID.
+  /// یک اتصال به سرور WebSocket برای یک شناسه مشخص برقرار می‌کند.
   ///
   /// Returns a stream that emits messages received from the server.
   /// Should throw an exception if the connection fails.
   /// یک استریم برمی‌گرداند که پیام‌های دریافتی از سرور را منتشر می‌کند.
   /// در صورت شکست اتصال، باید یک استثنا پرتاب کند.
-  Stream<dynamic> connect(String url, {Iterable<String>? protocols});
+  Stream<dynamic> connect(String connectionId, String url,
+      {Iterable<String>? protocols});
 
-  /// Sends data to the connected WebSocket server.
-  /// داده‌ها را به سرور WebSocket متصل ارسال می‌کند.
-  void send(dynamic data);
+  /// Sends data to a specific connected WebSocket server.
+  /// داده‌ها را به سرور WebSocket متصل و مشخصی ارسال می‌کند.
+  void send(String connectionId, dynamic data);
 
-  /// Closes the WebSocket connection.
-  /// اتصال WebSocket را می‌بندد.
-  void disconnect();
+  /// Closes a specific WebSocket connection.
+  /// یک اتصال WebSocket مشخص را می‌بندد.
+  void disconnect(String connectionId);
+
+  /// Disconnects all active connections.
+  /// تمام اتصالات فعال را قطع می‌کند.
+  void disconnectAll();
 }

@@ -53,10 +53,10 @@ class StatsCardView extends StatelessWidget {
                       color: theme.primaryColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                        IconData(data.iconData, fontFamily: 'MaterialIcons'),
-                        color: theme.primaryColor,
-                        size: 28),
+                    child:
+                        Icon(data.icon, // Use the correct property for the icon
+                            color: theme.primaryColor,
+                            size: 28),
                   ),
                 ],
               ),

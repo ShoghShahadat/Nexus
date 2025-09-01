@@ -34,17 +34,30 @@ class WebSocketRequestComponent extends Component {
   /// یک رویداد اختیاری که هنگام بسته شدن یا از دست رفتن اتصال منتشر می‌شود.
   final dynamic onDisconnectedEvent;
 
+  /// A unique identifier for this connection request. This allows systems
+  /// to manage multiple, distinct WebSocket connections simultaneously.
+  /// یک شناسه یکتا برای این درخواست اتصال. این به سیستم‌ها اجازه می‌دهد
+  /// چندین اتصال WebSocket مجزا را به طور همزمان مدیریت کنند.
+  final String connectionId;
+
   WebSocketRequestComponent({
     required this.url,
     required this.onParseMessage,
+    required this.connectionId, // Made mandatory for clarity
     this.protocols,
     this.onConnectedEvent,
     this.onDisconnectedEvent,
   });
 
   @override
-  List<Object?> get props =>
-      [url, protocols, onParseMessage, onConnectedEvent, onDisconnectedEvent];
+  List<Object?> get props => [
+        url,
+        protocols,
+        onParseMessage,
+        onConnectedEvent,
+        onDisconnectedEvent,
+        connectionId
+      ];
 }
 
 /// A serializable component that holds the current state of a WebSocket connection.
@@ -57,14 +70,17 @@ class WebSocketRequestComponent extends Component {
 class WebSocketStateComponent extends Component with SerializableComponent {
   final WebSocketStatus status;
   final String? errorMessage;
+  final String connectionId;
 
   WebSocketStateComponent({
+    required this.connectionId,
     this.status = WebSocketStatus.connecting,
     this.errorMessage,
   });
 
   factory WebSocketStateComponent.fromJson(Map<String, dynamic> json) {
     return WebSocketStateComponent(
+      connectionId: json['connectionId'] as String,
       status: WebSocketStatus.values[json['status'] as int],
       errorMessage: json['errorMessage'] as String?,
     );
@@ -72,10 +88,11 @@ class WebSocketStateComponent extends Component with SerializableComponent {
 
   @override
   Map<String, dynamic> toJson() => {
+        'connectionId': connectionId,
         'status': status.index,
         'errorMessage': errorMessage,
       };
 
   @override
-  List<Object?> get props => [status, errorMessage];
+  List<Object?> get props => [status, errorMessage, connectionId];
 }

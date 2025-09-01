@@ -1,27 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 
-/// ویجت برای نمایش هدر داشبورد.
 class HeaderWidget extends StatelessWidget {
-  final EntityId entityId;
-  const HeaderWidget({super.key, required this.entityId});
+  final String entityTag;
+
+  const HeaderWidget({super.key, required this.entityTag});
 
   @override
   Widget build(BuildContext context) {
-    return EntityBuilder<CustomWidgetComponent>(
-      entityId: entityId,
-      builder: (context, component) {
-        final theme = Theme.of(context).textTheme;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(component.properties['title'] ?? 'Dashboard',
-                style: theme.headlineMedium),
-            Text(component.properties['subtitle'] ?? '',
-                style: theme.titleLarge),
-          ],
-        );
-      },
+    final textTheme = Theme.of(context).textTheme;
+
+    // این ویجت در حال حاضر استاتیک است، اما با EntityBuilder می‌توان آن را
+    // به داده‌های دینامیک (مانند نام کاربر) متصل کرد.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Dashboard Overview', style: textTheme.headlineMedium),
+        const SizedBox(height: 4),
+        Text('Welcome back, User!', style: textTheme.bodySmall),
+      ],
     );
   }
 }

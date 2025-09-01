@@ -1,73 +1,87 @@
 import 'package:nexus/nexus.dart';
 import 'package:collection/collection.dart';
 
-// --- Sales Chart ---
-
-// FIX: Changed 'extends' to 'with' for EquatableMixin.
-// Mixins must be applied with the 'with' keyword.
-// اصلاح: کلمه 'extends' به 'with' برای EquatableMixin تغییر کرد.
-// Mixinها باید با کلمه کلیدی 'with' اعمال شوند.
-class Spot with EquatableMixin {
+/// یک کلاس داده برای نگهداری اطلاعات یک نقطه در نمودار خطی.
+class ChartSpot with EquatableMixin {
   final double x;
   final double y;
-  const Spot(this.x, this.y);
+
+  ChartSpot({required this.x, required this.y});
+
+  factory ChartSpot.fromJson(Map<String, dynamic> json) {
+    return ChartSpot(
+      x: (json['x'] as num).toDouble(),
+      y: (json['y'] as num).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'x': x, 'y': y};
+
   @override
   List<Object?> get props => [x, y];
 }
 
+/// کامپوننتی برای نگهداری داده‌های نمودار فروش.
 class SalesDataComponent extends Component with SerializableComponent {
-  final List<Spot> spots;
-  SalesDataComponent({required this.spots});
+  final List<ChartSpot> spots;
+
+  SalesDataComponent(this.spots);
+
+  factory SalesDataComponent.fromJson(Map<String, dynamic> json) {
+    return SalesDataComponent(
+      (json['spots'] as List)
+          .map((spotJson) => ChartSpot.fromJson(spotJson))
+          .toList(),
+    );
+  }
 
   @override
-  Map<String, dynamic> toJson() => {
-        'spots': spots.map((s) => {'x': s.x, 'y': s.y}).toList(),
-      };
-
-  factory SalesDataComponent.fromJson(Map<String, dynamic> json) =>
-      SalesDataComponent(
-        spots: (json['spots'] as List)
-            .map((s) =>
-                Spot((s['x'] as num).toDouble(), (s['y'] as num).toDouble()))
-            .toList(),
-      );
+  Map<String, dynamic> toJson() =>
+      {'spots': spots.map((s) => s.toJson()).toList()};
 
   @override
-  List<Object?> get props => [const DeepCollectionEquality().hash(spots)];
+  List<Object?> get props => [spots];
 }
 
-// --- User Activity Chart ---
-
-// FIX: Changed 'extends' to 'with' for EquatableMixin.
-// Mixins must be applied with the 'with' keyword.
-// اصلاح: کلمه 'extends' به 'with' برای EquatableMixin تغییر کرد.
-// Mixinها باید با کلمه کلیدی 'with' اعمال شوند.
-class Bar with EquatableMixin {
+/// یک کلاس داده برای نگهداری اطلاعات یک میله در نمودار میله‌ای.
+class ChartBar with EquatableMixin {
   final double x;
   final double y;
   final String label;
-  const Bar(this.x, this.y, this.label);
+
+  ChartBar({required this.x, required this.y, required this.label});
+
+  factory ChartBar.fromJson(Map<String, dynamic> json) {
+    return ChartBar(
+      x: (json['x'] as num).toDouble(),
+      y: (json['y'] as num).toDouble(),
+      label: json['label'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {'x': x, 'y': y, 'label': label};
+
   @override
   List<Object?> get props => [x, y, label];
 }
 
+/// کامپوننتی برای نگهداری داده‌های نمودار فعالیت کاربران.
 class UserActivityDataComponent extends Component with SerializableComponent {
-  final List<Bar> bars;
-  UserActivityDataComponent({required this.bars});
+  final List<ChartBar> bars;
+
+  UserActivityDataComponent(this.bars);
+
+  factory UserActivityDataComponent.fromJson(Map<String, dynamic> json) {
+    return UserActivityDataComponent(
+      (json['bars'] as List)
+          .map((barJson) => ChartBar.fromJson(barJson))
+          .toList(),
+    );
+  }
 
   @override
-  Map<String, dynamic> toJson() => {
-        'bars':
-            bars.map((b) => {'x': b.x, 'y': b.y, 'label': b.label}).toList(),
-      };
-
-  factory UserActivityDataComponent.fromJson(Map<String, dynamic> json) =>
-      UserActivityDataComponent(
-        bars: (json['bars'] as List)
-            .map((b) => Bar((b['x'] as num).toDouble(),
-                (b['y'] as num).toDouble(), b['label'] as String))
-            .toList(),
-      );
+  Map<String, dynamic> toJson() =>
+      {'bars': bars.map((b) => b.toJson()).toList()};
 
   @override
   List<Object?> get props => [const DeepCollectionEquality().hash(bars)];
