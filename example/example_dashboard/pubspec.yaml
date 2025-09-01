@@ -1,0 +1,31 @@
+name: example_dashboard
+description: A professional example project showcasing the Custom Painting power of the Nexus framework.
+publish_to: 'none' 
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # --- Nexus Framework ---
+  # IMPORTANT: Replace this with the actual path to your local nexus package.
+  # نکته مهم: این مسیر را با مسیر واقعی پکیج nexus در سیستم خود جایگزین کنید.
+  nexus:
+    path: ../../ 
+    # For production, you would use:
+    # nexus: ^3.0.0
+
+  # --- Core Libraries ---
+  go_router: ^16.2.0
+  get_it: ^7.7.0
+  intl: ^0.20.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

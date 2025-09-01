@@ -162,6 +162,7 @@ export 'src/flutter/entity_builder.dart';
 export 'src/flutter/flutter_rendering_system.dart';
 export 'src/flutter/nexus_widget.dart';
 export 'src/flutter/nexus_app.dart';
+export 'src/flutter/component_cache.dart';
 export 'src/flutter/entity_widget_builder.dart';
 export 'src/flutter/widget_builder.dart';
 
