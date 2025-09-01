@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:nexus/nexus.dart';
 import 'package:nexus/src/core/component_update.dart';
-import 'package:nexus/src/core/render_packet.dart';
 
 class NexusIsolateManager implements NexusManager {
   Isolate? _isolate;
@@ -15,6 +14,7 @@ class NexusIsolateManager implements NexusManager {
   @override
   Stream<ComponentUpdate> get componentUpdateStream => _updateController.stream;
 
+  // Legacy Stream - Not used by ESCUEM but kept for potential backward compatibility
   final _renderPacketController =
       StreamController<List<RenderPacket>>.broadcast();
   @override
@@ -38,9 +38,8 @@ class NexusIsolateManager implements NexusManager {
         completer.complete(message);
       } else if (message is ComponentUpdate) {
         _updateController.add(message);
-      } else if (message is List<RenderPacket>) {
-        _renderPacketController.add(message);
       }
+      // Silently ignore legacy RenderPacket messages if not used
     });
 
     final entryPointArgs = [
@@ -93,32 +92,67 @@ void _isolateEntryPoint(List<dynamic> args) async {
   mainSendPort.send(isolateReceivePort.sendPort);
 
   try {
-    debugPrint("🧠 [Isolate] Entry point started.");
+    debugPrint('🧠 [Isolate] Entry point started.');
     if (rootIsolateToken != null) {
       BackgroundIsolateBinaryMessenger.ensureInitialized(rootIsolateToken);
     }
 
     if (isolateInitializer != null) {
       await isolateInitializer();
+    } else {
+      // Fallback if no initializer is provided from the UI side
+      debugPrint(
+          '🧠 [Isolate] No initializer provided, registering core components...');
+      registerCoreComponents();
     }
 
-    debugPrint("🧠 [Isolate] Registering core components...");
-    registerCoreComponents();
+    debugPrint('🧠 [Isolate] NexusWorld created. Initializing...');
     final world = worldProvider();
-    debugPrint("🧠 [Isolate] NexusWorld created. Initializing...");
     await world.init();
-    debugPrint("🧠 [Isolate] NexusWorld initialized.");
+    debugPrint('🧠 [Isolate] NexusWorld initialized.');
 
-    void hydrateWorld() {
-      debugPrint(
-          "💧 [Isolate] Hydration requested. Marking all components as dirty...");
+    // This function is now the single source of truth for sending state
+    void _updateAndSendState() {
+      // --- Handle Dirty Entities (Add/Update) ---
       for (final entity in world.entities.values) {
-        entity.markAllComponentsAsDirty();
+        if (entity.dirtyComponents.isEmpty) continue;
+
+        for (final componentType in entity.dirtyComponents) {
+          final component = entity.getByType(componentType);
+
+          if (component != null && component is SerializableComponent) {
+            debugPrint(
+                '📤 [Isolate] Sending update for Entity ${entity.id}: Component \'${component.runtimeType.toString()}\', isRemoved: false');
+
+            // --- CRITICAL FIX: Use an explicit cast to tell the compiler the exact type. ---
+            // This resolves the type promotion issue permanently.
+            // --- اصلاح حیاتی: از یک تبدیل نوع صریح برای گفتن نوع دقیق به کامپایلر استفاده می‌کند. ---
+            // این کار مشکل ارتقاء نوع را برای همیشه حل می‌کند.
+            mainSendPort.send(ComponentUpdate(
+              entityId: entity.id,
+              componentTypeName: component.runtimeType.toString(),
+              componentJson: (component as SerializableComponent).toJson(),
+              isRemoved: false,
+            ));
+          }
+        }
+        entity.clearDirty();
+      }
+
+      // --- Handle Removed Entities ---
+      final removedEntityIds = world.getAndClearRemovedEntities();
+      if (removedEntityIds.isNotEmpty) {
+        for (final id in removedEntityIds) {
+          // Send a single, simple removal message per entity
+          mainSendPort.send(ComponentUpdate(
+              entityId: id,
+              componentTypeName: 'Entity', // Special type for removal
+              isRemoved: true));
+        }
       }
     }
 
-    hydrateWorld();
-
+    // --- Main Update Loop ---
     final stopwatch = Stopwatch()..start();
     Timer.periodic(const Duration(milliseconds: 16), (timer) {
       final dt =
@@ -126,60 +160,33 @@ void _isolateEntryPoint(List<dynamic> args) async {
       stopwatch.reset();
       stopwatch.start();
       world.update(dt);
-
-      for (final entity in world.entities.values) {
-        if (entity.dirtyComponents.isEmpty) continue;
-
-        for (final componentType in entity.dirtyComponents) {
-          final component = entity.getByType(componentType);
-
-          final update = ComponentUpdate(
-            entityId: entity.id,
-            componentTypeName: componentType.toString(),
-            isRemoved: component == null,
-            // --- CRITICAL FIX: Explicitly cast to SerializableComponent ---
-            // This tells the compiler that inside this expression, component is guaranteed
-            // to be of the correct type, thus allowing the call to toJson().
-            // اصلاح حیاتی: به صراحت به SerializableComponent تبدیل می‌کنیم.
-            // این به کامپایلر می‌گوید که در داخل این عبارت، کامپوننت قطعاً از نوع صحیح است
-            // و اجازه فراخوانی toJson() را می‌دهد.
-            componentJson:
-                (component != null && component is SerializableComponent)
-                    ? (component as SerializableComponent).toJson()
-                    : null,
-          );
-          // --- PRO LOGGING ---
-          debugPrint(
-              "📤 [Isolate] Sending update for Entity ${update.entityId}: Component '${update.componentTypeName}', isRemoved: ${update.isRemoved}");
-          mainSendPort.send(update);
-        }
-        entity.clearDirty();
-      }
-
-      final removedEntityIds = world.getAndClearRemovedEntities();
-      if (removedEntityIds.isNotEmpty) {
-        for (final id in removedEntityIds) {
-          mainSendPort.send(ComponentUpdate(
-              entityId: id, componentTypeName: 'Entity', isRemoved: true));
-        }
-      }
+      _updateAndSendState();
     });
 
+    // --- Event Listener ---
     isolateReceivePort.listen((message) {
       if (message is String) {
         if (message == 'shutdown') {
-          debugPrint("🛑 [Isolate] Shutdown command received.");
           world.clear();
           isolateReceivePort.close();
         } else if (message == 'hydrate') {
-          hydrateWorld();
+          debugPrint(
+              '💧 [Isolate] Hydration requested. Marking all components as dirty...');
+          // Mark all serializable components of all entities as dirty
+          for (final entity in world.entities.values) {
+            for (final component in entity.allComponents) {
+              if (component is SerializableComponent) {
+                entity.dirtyComponents.add(component.runtimeType);
+              }
+            }
+          }
         }
       } else {
         world.eventBus.fire(message);
       }
     });
   } catch (e, stacktrace) {
-    debugPrint('❌ [Isolate] FATAL ERROR: $e');
+    debugPrint('[NexusLogicIsolate] FATAL ERROR: $e');
     debugPrint(stacktrace.toString());
   }
 }
