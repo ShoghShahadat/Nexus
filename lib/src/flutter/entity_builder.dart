@@ -25,29 +25,44 @@ class EntityBuilder<T extends Component> extends StatefulWidget {
 }
 
 class _EntityBuilderState<T extends Component> extends State<EntityBuilder<T>> {
-  late final ComponentCache _cache;
-  late final ChangeNotifier _notifier;
+  // FIX: All context-dependent fields are now late-initialized.
+  // اصلاح: تمام فیلدهای وابسته به context اکنون به صورت late مقداردهی اولیه می‌شوند.
+  late ComponentCache _cache;
+  late ChangeNotifier _notifier;
   T? _component;
   bool _isDisposed = false;
+  bool _dependenciesInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    // ویجت به محض ساخته شدن، به cache دسترسی پیدا کرده و برای دریافت
-    // به‌روزرسانی‌ها ثبت‌نام می‌کند.
-    _cache = NexusScope.cacheOf(context);
-    _notifier = _cache.getNotifier(widget.entityId);
-    _notifier.addListener(_onComponentChanged);
+    // Defer context-dependent initialization to didChangeDependencies.
+    // مقداردهی اولیه وابسته به context به didChangeDependencies موکول می‌شود.
+  }
 
-    // سعی می‌کنیم مقدار اولیه کامپوننت را از کش بخوانیم.
-    _component = _cache.get<T>(widget.entityId);
+  // FIX: Moved context-dependent initialization here.
+  // This method is the correct place to access InheritedWidgets.
+  // اصلاح: مقداردهی اولیه وابسته به context به اینجا منتقل شد.
+  // این متد جای مناسبی برای دسترسی به InheritedWidgetها است.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_dependenciesInitialized) {
+      _cache = NexusScope.cacheOf(context);
+      _notifier = _cache.getNotifier(widget.entityId);
+      _notifier.addListener(_onComponentChanged);
+
+      _component = _cache.get<T>(widget.entityId);
+      _dependenciesInitialized = true;
+    }
   }
 
   @override
   void didUpdateWidget(covariant EntityBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.entityId != oldWidget.entityId) {
-      // اگر entityId تغییر کند، اشتراک قبلی را لغو و اشتراک جدیدی ایجاد می‌کنیم.
+      // If the entityId changes, we need to listen to the new notifier.
+      // اگر entityId تغییر کند، باید به notifier جدید گوش دهیم.
       _notifier.removeListener(_onComponentChanged);
       _notifier = _cache.getNotifier(widget.entityId);
       _notifier.addListener(_onComponentChanged);
@@ -58,7 +73,11 @@ class _EntityBuilderState<T extends Component> extends State<EntityBuilder<T>> {
   @override
   void dispose() {
     _isDisposed = true;
-    _notifier.removeListener(_onComponentChanged);
+    // Ensure notifier is initialized before trying to remove a listener.
+    // اطمینان حاصل می‌کنیم که notifier قبل از حذف listener مقداردهی شده است.
+    if (_dependenciesInitialized) {
+      _notifier.removeListener(_onComponentChanged);
+    }
     super.dispose();
   }
 
@@ -66,7 +85,6 @@ class _EntityBuilderState<T extends Component> extends State<EntityBuilder<T>> {
     if (_isDisposed) return;
     final newComponent = _cache.get<T>(widget.entityId);
 
-    // تنها در صورتی rebuild می‌کنیم که نمونه کامپوننت واقعاً تغییر کرده باشد.
     if (!identical(_component, newComponent)) {
       setState(() {
         _component = newComponent;

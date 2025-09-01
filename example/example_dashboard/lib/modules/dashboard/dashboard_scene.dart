@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:nexus/nexus.dart';
 import 'package:example_dashboard/modules/dashboard/widgets/header_widget.dart';
 import 'package:example_dashboard/modules/dashboard/widgets/cards/stats_card_widget.dart';
-import 'package:example_dashboard/shared/components/tags.dart';
 
 /// ویجت اصلی که صفحه داشبورد را رندر می‌کند.
-/// REFACTORED: This scene now builds its layout based on a single 'root' entity,
-/// which is a more robust and scalable ECS pattern.
-/// بازآفرینی: این صفحه اکنون لایوت خود را بر اساس یک Entity ریشه واحد می‌سازد
-/// که یک الگوی ECS قوی‌تر و مقیاس‌پذیرتر است.
+/// REFACTORED: This scene now builds its layout based on the root entity with the
+/// fixed and predictable ID of 0. This removes the race condition.
+/// بازآفرینی: این صفحه اکنون لایوت خود را بر اساس Entity ریشه با شناسه
+/// ثابت و قابل پیش‌بینی 0 می‌سازد. این کار race condition را برطرف می‌کند.
 class DashboardScene extends StatelessWidget {
   const DashboardScene({super.key});
 
@@ -16,12 +15,13 @@ class DashboardScene extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        // EntityBuilder به دنبال Entity ریشه می‌گردد تا ساختار کلی صفحه را بسازد.
+        // EntityBuilder به دنبال Entity ریشه با شناسه ثابت 0 می‌گردد.
         child: EntityBuilder<ChildrenComponent>(
-          entityId:
-              NexusScope.cacheOf(context).findEntityByTag(DashboardTags.root),
+          entityId: 0, // Root entity always has ID 0
           loadingBuilder: (context) =>
               const Center(child: CircularProgressIndicator()),
+          errorBuilder: (context, error) =>
+              Center(child: Text('Error: $error')),
           builder: (context, rootChildren) {
             // ID های هدر و کانتینر کارت‌ها از Entity ریشه خوانده می‌شود.
             final headerId = rootChildren.children[0];
@@ -63,27 +63,5 @@ class DashboardScene extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// یک متد کمکی برای یافتن EntityId بر اساس تگ از طریق ComponentCache.
-/// این یک پیاده‌سازی موقت برای دمو است.
-extension EntityFinder on ComponentCache {
-  EntityId findEntityByTag(String tag) {
-    // HACK: This is a workaround for the demo because the cache doesn't
-    // expose a direct way to query entities. In a real app, you might have
-    // a singleton entity or a more sophisticated lookup mechanism.
-    for (var i = 0; i < 200; i++) {
-      // Search a reasonable range of IDs
-      try {
-        final tagsComponent = get<TagsComponent>(i);
-        if (tagsComponent?.hasTag(tag) ?? false) {
-          return i;
-        }
-      } catch (_) {
-        // Ignore errors for non-existent entities
-      }
-    }
-    throw Exception('Entity with tag "$tag" not found!');
   }
 }

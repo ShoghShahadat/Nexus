@@ -4,8 +4,10 @@ import 'package:example_dashboard/modules/dashboard/components/header_component.
 import 'package:example_dashboard/shared/components/tags.dart';
 
 /// این کلاس مسئولیت ساخت و پیکربندی Entityهای اصلی ساختار داشبورد را دارد.
-/// REFACTORED: Now creates a single root entity to define the page structure.
-/// بازآفرینی: اکنون یک Entity ریشه واحد برای تعریف ساختار صفحه ایجاد می‌کند.
+/// REFACTORED: Now finds the existing root entity and adds the dashboard
+/// structure as children, instead of creating a redundant root entity.
+/// بازآفرینی: اکنون به جای ساخت یک Entity ریشه اضافی، Entity ریشه موجود را
+/// پیدا کرده و ساختار داشبورد را به عنوان فرزندان آن اضافه می‌کند.
 class DashboardAssembler {
   final NexusWorld world;
 
@@ -34,10 +36,10 @@ class DashboardAssembler {
       ..add(TagsComponent({DashboardTags.statsCardContainer}));
     world.addEntity(cardContainerEntity);
 
-    // ۴. ساخت Entity ریشه که ساختار کلی صفحه را مشخص می‌کند.
-    final rootEntity = Entity()
-      ..add(TagsComponent({DashboardTags.root}))
-      ..add(ChildrenComponent([headerEntity.id, cardContainerEntity.id]));
-    world.addEntity(rootEntity);
+    // ۴. پیدا کردن Entity ریشه (که توسط NexusWorld با ID=0 ساخته شده)
+    // و اضافه کردن ساختار داشبورد به عنوان فرزندان آن.
+    final rootEntity = world.entities[0]!;
+    rootEntity
+        .add(ChildrenComponent([headerEntity.id, cardContainerEntity.id]));
   }
 }

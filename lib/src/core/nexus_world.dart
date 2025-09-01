@@ -43,15 +43,22 @@ class NexusWorld {
 
   void _createRootEntity() {
     rootEntity = Entity();
-    // --- NEW: Entity needs a reference to the world to enable notifications ---
-    rootEntity.setWorld(this);
+    // CRITICAL FIX for LateInitializationError:
+    // FIRST, add the entity to the world so its `world` property is set.
+    // THEN, add components to it. Now it's safe because `addComponents`
+    // can access `entity.world`.
+    // اصلاح حیاتی برای خطای LateInitializationError:
+    // ابتدا، موجودیت را به دنیا اضافه می‌کنیم تا پراپرتی `world` آن تنظیم شود.
+    // سپس، کامپوننت‌ها را به آن اضافه می‌کنیم. اکنون این کار امن است زیرا
+    // `addComponents` می‌تواند به `entity.world` دسترسی داشته باشد.
+    addEntity(rootEntity);
+
     rootEntity.addComponents([
       TagsComponent({'root'}),
       ScreenInfoComponent(
           width: 0, height: 0, orientation: ScreenOrientation.portrait),
       LifecyclePolicyComponent(isPersistent: true),
     ]);
-    addEntity(rootEntity);
   }
 
   Future<void> init() async {
